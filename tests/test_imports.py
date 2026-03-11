@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from helpers import import_from_hydra, import_from_hlpd
+from helpers import import_from_hydra
 
 
 class TestSharedImports:
@@ -31,16 +31,3 @@ class TestHydraImports:
         losses = import_from_hydra("losses")
         assert hasattr(losses, "FocalLoss")
         assert hasattr(losses, "HYDRALoss")
-
-
-class TestHLPDImports:
-    def test_import_hlpd_hierarchical_attention(self):
-        ha = import_from_hlpd("hierarchical_attention")
-        assert hasattr(ha, "HierarchicalSelfAttention")
-        assert hasattr(ha, "build_taxonomy_distance_matrix")
-
-    def test_import_hlpd_losses(self):
-        losses = import_from_hlpd("losses")
-        assert hasattr(losses, "ZLPRLoss")
-        assert hasattr(losses, "HierarchicalBCELoss")
-        assert hasattr(losses, "build_multi_hot_targets")

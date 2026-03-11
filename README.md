@@ -17,8 +17,7 @@ projet-fil-rouge/
 │   ├── src/               #   models.py, losses.py, trainer.py, predict.py
 │   └── configs/
 ├── 02b_hlpd/              # HLPD : decodeur hierarchique non-autoregressif (ECIR 2025)
-│   ├── src/               #   model.py, hierarchical_attention.py, losses.py
-│   └── configs/
+│   └── README.md          #   Architecture detaillee (code a venir)
 ├── 03_production/         # Entrainement distribue (DDP) + MLOps
 │   ├── src/               #   trainer_ddp.py, data_sharding.py, ddp_utils.py, error_analysis.py
 │   └── scripts/           #   launch_distributed.sh, launch_node.sh
@@ -53,64 +52,23 @@ python -m pytest tests/ -v
 
 ---
 
-## Resultats
-
-Metriques evaluees sur le jeu de test (split 80/10/10).
-
-| Modele | F1 Macro L1 | F1 Macro L2 | F1 Weighted L1 | F1 Weighted L2 |
-|--------|:-----------:|:-----------:|:--------------:|:--------------:|
-| TF-IDF + SVM lineaire | 0.870 | 0.620 | — | — |
-| Word2Vec + SVM | 0.855 | 0.600 | — | — |
-| CamemBERT (flat) | 0.910 | 0.680 | — | — |
-| **HYDRA Local (ours)** | **0.925** | **0.714** | **0.939** | **0.848** |
-
----
-
-## Architecture HYDRA
-
-```
-Texte (titre + description)
-        |
-  [Tokenizer : max_length=128]
-        |
-  [Encodeur partage : CamemBERT / XLM-RoBERTa / mBERT]
-        |
-  [Projection d'embedding]
-        |
-   +--------+--------+
-   |                  |
-[Head L1]         [Head L2]
-(157 classes)     (6100+ classes)
-   |                  |
- Softmax           Softmax
-```
-
-3 variantes implementees :
-- **HYDRALocal** : tetes L1 et L2 independantes
-- **HYDRAGlobal** : + tete globale (vue unifiee L1+L2)
-- **HYDRANested** : + contraintes d'imbrication hierarchique
-
----
-
 ## Tests
 
-83 tests unitaires couvrant tous les modules :
+Tests unitaires couvrant les modules implementes :
 
 ```bash
 $ python -m pytest tests/ -v
-# 83 passed in 15s
 ```
 
 | Fichier de test | Module teste | Tests |
 |-----------------|-------------|:-----:|
 | `test_hydra_models.py` | Modeles HYDRA (3 variantes + pooling) | 11 |
 | `test_hydra_losses.py` | FocalLoss, HYDRALoss | 10 |
-| `test_hlpd.py` | Hierarchical Self-Attention, ZLPR Loss | 20 |
 | `test_shared_metrics.py` | F1, Constrained F1, HCR | 11 |
 | `test_shared_data_loader.py` | Chargement et preprocessing | 10 |
 | `test_shared_utils.py` | Utilitaires (seed, device, params) | 6 |
 | `test_production.py` | DDP utils | 3 |
-| `test_imports.py` | Verification des imports | 7 |
+| `test_imports.py` | Verification des imports | 5 |
 
 ---
 
@@ -141,8 +99,6 @@ $ python -m pytest tests/ -v
 - **Mehdi Aithamma**
 - **Younes Boutrouft**
 - **Amir Hossein Kashani Rahimi**
-
-Encadrante : **Charlotte Laclau** (Telecom Paris)
 
 ---
 
