@@ -4,13 +4,6 @@ Projet academique **Telecom Paris** (IP Paris) x **Rakuten Institute of Technolo
 
 Classification hierarchique de produits e-commerce : **8M produits**, **157 categories (L1)**, **6 100+ sous-categories (L2)**.
 
-## Resultats cles
-
-| Modele | F1 L1 Macro | F1 L2 Macro | F1 L1 Weighted | F1 L2 Weighted |
-|--------|:-----------:|:-----------:|:--------------:|:--------------:|
-| TF-IDF + SVM (baseline) | 86.2% | -- | 88.6% | -- |
-| **HYDRA Local** (8M, 3 epochs) | **92.5%** | **71.4%** | **93.9%** | **84.8%** |
-
 ## Structure
 
 ```
