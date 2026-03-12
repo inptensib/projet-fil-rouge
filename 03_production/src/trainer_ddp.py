@@ -123,7 +123,7 @@ class HYDRATrainerDDP:
         world_size: int,
         device: torch.device,
         max_length: int = 128,
-        batch_size: int = 64,
+        batch_size: int = 128,
         epochs: int = 10,
         lr: float = 3.5e-5,
         weight_decay: float = 0.01,
@@ -136,7 +136,7 @@ class HYDRATrainerDDP:
         check_hierarchy_consistency: bool = False,
         early_stopping_patience: int = 2,
         early_stopping_min_delta: float = 0.001,
-        level_weight_l1: float = 1.0,
+        level_weight_l1: float = 0.5,
         focal_gamma: float = 2.0,
         grad_clip_max_norm: float = GRAD_CLIP_MAX_NORM,
     ):

@@ -44,9 +44,9 @@ Texte (titre + description)
 | `dropout` | `0.3` | Dropout avant heads |
 | `lr` | `3.5e-5` | Learning rate |
 | `batch_size` | `128` | Taille de batch |
-| `epochs` | `20` | Nombre d'epoques |
+| `epochs` | `10` | Nombre d'epoques |
 | `loss` | `cross_entropy` | `cross_entropy` / `focal` |
-| `level_weights` | `[0.4, 0.6]` | Poids L1/L2 |
+| `level_weights` | `[0.5]` | Poids L1 (L2 implicitement 1.0) |
 
 ## Usage
 
@@ -61,7 +61,7 @@ model = create_hydra_model(
 
 criterion = HYDRALoss(
     architecture="local", num_classes_l1=157, num_classes_l2=6100,
-    use_focal=True, level_weight_l1=0.4,
+    use_focal=True, level_weight_l1=0.5,
 )
 
 level_outputs, unified_output = model(input_ids, attention_mask)

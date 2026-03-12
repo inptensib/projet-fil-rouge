@@ -16,7 +16,6 @@ import time
 from pathlib import Path
 
 import torch
-import torch.nn.functional as F
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.utils.data import DataLoader
@@ -74,8 +73,8 @@ class HYDRATrainer:
         data: dict,
         encoder_name: str = "CamemBERT",
         variant: str = "local",
-        batch_size: int = 64,
-        epochs: int = 20,
+        batch_size: int = 128,
+        epochs: int = 10,
         lr: float = 3.5e-5,
         weight_decay: float = 0.01,
         max_length: int = 128,

@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/infres/tandriam-25/fil_rouge/venv/bin/python -m pytest tests/ -x -q --tb=short 2>&1 | tail -20",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "mlflow": {
+      "command": "/home/infres/tandriam-25/fil_rouge/venv/bin/mlflow",
+      "args": ["mcp", "run"],
+      "env": {
+        "MLFLOW_TRACKING_URI": "http://localhost:5000"
+      }
+    }
+  }
+}

@@ -15,7 +15,7 @@ dropout: 0.3
 
 # --- Training ---
 batch_size: 128
-epochs: 20
+epochs: 10
 lr: 3.5e-5
 weight_decay: 0.01
 warmup_ratio: 0.1
@@ -25,8 +25,7 @@ gradient_clip: 1.0
 # --- Multi-task loss ---
 loss: cross_entropy       # cross_entropy | focal
 level_weights:
-  - 0.4                  # L1 weight
-  - 0.6                  # L2 weight
+  - 0.5                  # L1 weight (L2 is implicitly 1.0)
 
 # --- Data ---
 data_dir: ../shared/dataset
