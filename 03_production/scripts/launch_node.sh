@@ -64,7 +64,12 @@ echo "   Start time: $(date)"
 echo "==================================================================="
 
 # -- Environment setup ------------------------------------------------------
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
+VENV_PATH="${VENV_PATH:-$(cd "$(dirname "$0")/../.." && pwd)/venv}"
+if [ -f "${VENV_PATH}/bin/activate" ]; then
+    source "${VENV_PATH}/bin/activate"
+else
+    echo "[WARN] No virtualenv at ${VENV_PATH}, using system Python"
+fi
 
 # HuggingFace: force offline mode (no Internet on compute nodes)
 export TRANSFORMERS_OFFLINE=1

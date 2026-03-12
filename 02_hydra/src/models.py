@@ -42,7 +42,7 @@ class HYDRABase(nn.Module):
 
     @staticmethod
     def _make_classification_head(
-        input_size: int, num_classes: int, dropout: float = 0.2
+        input_size: int, num_classes: int, dropout: float = 0.3
     ) -> nn.Sequential:
         """Create a classification head: Linear -> LayerNorm -> ReLU -> Dropout -> Linear."""
         return nn.Sequential(
@@ -74,7 +74,7 @@ class HYDRALocal(HYDRABase):
         num_classes_l2: int,
         pooling: str = "cls",
         project_embedding: bool = True,
-        dropout: float = 0.2,
+        dropout: float = 0.3,
         freeze_encoder: bool = False,
     ):
         super().__init__(pooling=pooling)
@@ -133,7 +133,7 @@ class HYDRAGlobal(HYDRABase):
         num_classes_l2: int,
         pooling: str = "cls",
         project_embedding: bool = True,
-        dropout: float = 0.2,
+        dropout: float = 0.3,
         freeze_encoder: bool = False,
     ):
         super().__init__(pooling=pooling)
@@ -198,7 +198,7 @@ class HYDRANested(HYDRABase):
         num_classes_l2: int,
         pooling: str = "cls",
         project_embedding: bool = True,
-        dropout: float = 0.2,
+        dropout: float = 0.3,
         freeze_encoder: bool = False,
     ):
         super().__init__(pooling=pooling)

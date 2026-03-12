@@ -38,6 +38,9 @@ ENV/
 *.pickle
 shards/
 dataset/
+!shared/dataset/
+shared/dataset/*
+!shared/dataset/.gitkeep
 
 # ==============================================================================
 # Models (weights only -- code IS tracked)
@@ -99,4 +102,4 @@ rendez_vous*
 # ==============================================================================
 *.so
 *.o
-\!models/.gitkeep
+!models/.gitkeep

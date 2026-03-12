@@ -1,42 +1,40 @@
-# 03_production -- Distributed Training
+# 03_production -- Training Distribue (DDP)
 
-Distributed Data Parallel (DDP) training for the HYDRA hierarchical classification models, designed for multi-node SLURM clusters with NCCL/RoCE interconnect.
+Training Distributed Data Parallel des modeles HYDRA sur cluster SLURM multi-noeuds (NCCL/RoCE).
+
+## Usage
+
+```bash
+./scripts/launch_distributed.sh local CamemBERT 4           # 4 noeuds P100
+./scripts/launch_distributed.sh nested XLM-RoBERTa 1 rtx3090  # 1 noeud RTX 3090
+```
+
+## Apports
+
+- **Gradient clipping** (`max_norm=1.0`) pour la stabilite
+- **Metriques hierarchiques** (Constrained F1, HCR) via `shared.metrics`
+- **Error tracking** inter-epoques pour detecter le label noise
+- **Batch prediction** pour l'inference multi-echantillons
 
 ## Structure
 
 ```
 03_production/
   src/
-    ddp_utils.py         -- DDP setup/teardown, rank-aware printing
-    data_sharding.py     -- Data sharding for distributed training (rank 0)
-    trainer_ddp.py       -- DDP trainer with gradient clipping, MLflow, error tracking
-    error_analysis.py    -- Per-sample and cross-epoch error analysis
-    predict.py           -- Production inference with DDP model loading support
+    main.py               # Point d'entree CLI pour le training DDP
+    ddp_utils.py          # Setup/teardown DDP, print rank-aware
+    data_sharding.py      # Sharding des donnees (rank 0)
+    trainer_ddp.py        # Trainer DDP + MLflow
+    error_analysis.py     # Analyse d'erreurs par sample et cross-epochs
+    predict.py            # Inference avec chargement de modeles DDP
   scripts/
-    launch_distributed.sh -- Multi-node launcher (detects GPUs, submits SLURM jobs)
-    launch_node.sh        -- Per-node SLURM script (configures NCCL, launches processes)
+    launch_distributed.sh # Lanceur multi-noeuds (detection GPUs, soumission SLURM)
+    launch_node.sh        # Script SLURM par noeud (config NCCL)
 ```
 
-## Key improvements over the original
+## Prerequis
 
-- **Gradient clipping** (`max_norm=1.0`) for training stability.
-- **Hierarchy-aware metrics** (constrained F1, HCR) from `shared.metrics`.
-- **Clean imports**: models from `02_hydra.src.models`, utilities from `shared/`.
-- **Merged error analysis**: combines per-sample and global error reports.
-- **Batch prediction**: `predict_batch()` for efficient multi-sample inference.
-
-## Usage
-
-```bash
-# From the project root:
-cd 03_production
-./scripts/launch_distributed.sh local CamemBERT 4       # 4 P100 nodes
-./scripts/launch_distributed.sh nested XLM-RoBERTa 1 rtx3090  # 1 RTX 3090 node
-```
-
-## Requirements
-
-- SLURM cluster with GPU partitions (P100 and/or 3090)
-- RoCE (RDMA over Converged Ethernet) for multi-node NCCL
-- Python environment at `/home/infres/tandriam-25/fil_rouge/venv/`
-- HuggingFace model cache pre-populated (nodes run offline)
+- Cluster SLURM avec partitions GPU (P100 / RTX 3090)
+- RoCE pour NCCL multi-noeuds
+- Environnement Python (voir `scripts/setup_cluster.sh`)
+- Cache HuggingFace pre-charge (noeuds offline)

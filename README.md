@@ -1,107 +1,79 @@
 # Rakuten Hierarchical Product Classification
 
-Projet academique de **Telecom Paris** (Institut Polytechnique de Paris) en partenariat avec le **Rakuten Institute of Technology (RIT)**.
+Projet academique **Telecom Paris** (IP Paris) x **Rakuten Institute of Technology**.
 
-Classification hierarchique de produits e-commerce sur le catalogue Rakuten France : **8 millions de produits**, organises en **157 categories (L1)** et **6 100+ sous-categories (L2)**.
+Classification hierarchique de produits e-commerce : **8M produits**, **157 categories (L1)**, **6 100+ sous-categories (L2)**.
 
----
+## Resultats cles
 
-## Structure du projet
+| Modele | F1 L1 Macro | F1 L2 Macro | F1 L1 Weighted | F1 L2 Weighted |
+|--------|:-----------:|:-----------:|:--------------:|:--------------:|
+| TF-IDF + SVM (baseline) | 86.2% | -- | 88.6% | -- |
+| **HYDRA Local** (8M, 3 epochs) | **92.5%** | **71.4%** | **93.9%** | **84.8%** |
+
+## Structure
 
 ```
-projet-fil-rouge/
-├── 01_baselines/          # Baselines : TF-IDF, Word2Vec, BERT flat
-│   ├── src/               #   tfidf_pipeline.py, word2vec_pipeline.py, bert_flat_classifier.py
-│   └── configs/
-├── 02_hydra/              # HYDRA : classification hierarchique multi-tete (EMNLP 2025)
-│   ├── src/               #   models.py, losses.py, trainer.py, predict.py
-│   └── configs/
-├── 02b_hlpd/              # HLPD : decodeur hierarchique non-autoregressif (ECIR 2025)
-│   └── README.md          #   Architecture detaillee (code a venir)
-├── 03_production/         # Entrainement distribue (DDP) + MLOps
-│   ├── src/               #   trainer_ddp.py, data_sharding.py, ddp_utils.py, error_analysis.py
-│   └── scripts/           #   launch_distributed.sh, launch_node.sh
-├── shared/                # Code partage (data_loader, metrics, utils)
-├── tests/                 # Suite de tests pytest (83 tests)
-├── notebooks/             # Notebooks exploratoires (EDA, visualisations)
-├── blog.md                # Blog technique detaille du projet
-├── requirements.txt
-├── .gitignore
-└── README.md
+rakuten-classification/
+├── 01_baselines/       # TF-IDF, Word2Vec, BERT flat
+├── 02_hydra/           # HYDRA : multi-tete hierarchique (EMNLP 2025)
+├── 02b_hlpd/           # HLPD : decodeur non-autoregressif (ECIR 2025, a venir)
+├── 03_production/      # Training distribue DDP sur cluster SLURM
+├── shared/             # data_loader, metrics, utils
+├── scripts/            # run_train.py, setup_cluster.sh
+├── tests/              # 61 tests pytest
+├── notebooks/          # EDA, visualisations
+├── Dockerfile          # Environnement reproductible
+├── docker-compose.yml  # MLflow, tests, training, baselines
+└── blog.md             # Blog technique detaille
 ```
-
----
 
 ## Quick Start
 
 ```bash
-# Cloner le repository
-git clone https://github.com/inptensib/projet-fil-rouge.git
-cd projet-fil-rouge
+git clone <repo-url> && cd rakuten-classification
 
-# Creer un environnement virtuel
-python -m venv venv
-source venv/bin/activate
-
-# Installer les dependances
+# Option 1 : venv
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-
-# Lancer les tests
 python -m pytest tests/ -v
+
+# Option 2 : Docker (recommande)
+docker compose run --rm --profile test test     # 61 tests
+docker compose up mlflow -d                     # MLflow UI :5000
+docker compose run --rm --profile gpu train     # HYDRA training (GPU)
+docker compose run --rm --profile baselines baseline-tfidf  # TF-IDF baseline
 ```
 
----
+## Dataset
 
-## Tests
+Le dataset Rakuten est proprietaire et **non inclus** dans ce repository.
 
-Tests unitaires couvrant les modules implementes :
+1. Obtenir `products.jsonl` aupres du Rakuten Institute of Technology
+2. Le placer dans `shared/dataset/` :
+   ```bash
+   cp /chemin/vers/products.jsonl shared/dataset/
+   ```
 
-```bash
-$ python -m pytest tests/ -v
-```
+Sans ce fichier, seuls les tests et MLflow fonctionnent. Le training et les baselines necessitent le dataset.
 
-| Fichier de test | Module teste | Tests |
-|-----------------|-------------|:-----:|
-| `test_hydra_models.py` | Modeles HYDRA (3 variantes + pooling) | 11 |
-| `test_hydra_losses.py` | FocalLoss, HYDRALoss | 10 |
-| `test_shared_metrics.py` | F1, Constrained F1, HCR | 11 |
-| `test_shared_data_loader.py` | Chargement et preprocessing | 10 |
-| `test_shared_utils.py` | Utilitaires (seed, device, params) | 6 |
-| `test_production.py` | DDP utils | 3 |
-| `test_imports.py` | Verification des imports | 5 |
+## Stack
 
----
-
-## Stack technique
-
-| Couche | Technologies |
-|--------|-------------|
-| Deep Learning | PyTorch, HuggingFace Transformers |
-| Encodeurs NLP | CamemBERT, XLM-RoBERTa, mBERT |
-| ML Classique | scikit-learn (SVM, SGD, Logistic Regression) |
-| Entrainement distribue | PyTorch DDP, NCCL, SLURM |
-| MLOps | MLflow |
-| Hardware | 8x Tesla P100 (cluster HPC) |
-
----
+| | |
+|---|---|
+| **Encodeurs** | CamemBERT, XLM-RoBERTa, mBERT |
+| **Framework** | PyTorch, HuggingFace Transformers |
+| **Baselines** | scikit-learn (SVM, SGD, LogReg) |
+| **Distribue** | PyTorch DDP, NCCL, SLURM (8x P100) |
+| **MLOps** | MLflow, Docker Compose |
 
 ## References
 
-- **HYDRA** — Karl et al., *HYDRA: Hierarchical Multi-label Classification using Attention-based Architecture*, EMNLP 2025.
-- **HLPD** — Torba et al., *Hierarchical Label Pre-populated Decoder for Multi-label Text Classification*, ECIR 2025.
-- **These** — Fatos Torba, *Classification hierarchique multi-label de textes*, 2025.
-
----
+- **HYDRA** -- Karl et al., *Hierarchical Multi-label Classification using Attention-based Architecture*, EMNLP 2025.
+- **HLPD** -- Torba, Laclau et al., *Hierarchical Label Pre-populated Decoder for Multi-label Text Classification*, ECIR 2025.
 
 ## Auteurs
 
-- **Tahiana Hajanirina ANDRIAMBAHOAKA**
-- **Mehdi Aithamma**
-- **Younes Boutrouft**
-- **Amir Hossein Kashani Rahimi**
+Tahiana H. Andriambahoaka, Mehdi Aithamma, Younes Boutrouft, Amir H. Kashani Rahimi
 
----
-
-## Remerciements
-
-Nous remercions le **Rakuten Institute of Technology** pour la mise a disposition du dataset et pour leur collaboration avec la communaute academique.
+*Remerciements au Rakuten Institute of Technology pour le dataset et la collaboration.*

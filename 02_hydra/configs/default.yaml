@@ -8,7 +8,7 @@ max_length: 128
 freeze_encoder: false
 
 # --- Architecture ---
-variant: local            # local | global | hybrid
+variant: local            # local | global | nested
 num_levels: 2
 hidden_dim: 256
 dropout: 0.3

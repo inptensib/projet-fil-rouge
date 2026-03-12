@@ -1,0 +1,40 @@
+# Data & models (mount as volumes, don't bake into image)
+dataset/
+shards/
+models/*.pt
+models/*.pth
+models/*.safetensors
+*.pkl
+
+# MLflow runs
+mlruns/
+mlflow.db
+
+# Logs
+logs/
+slurm-*.out
+
+# Git & IDE
+.git/
+.idea/
+.vscode/
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Environments
+venv/
+.venv/
+.env
+.env.*
+
+# DDP temp
+.ddp_config
+rendez_vous*
+
+# OS
+.DS_Store
+Thumbs.db

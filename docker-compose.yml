@@ -1,0 +1,108 @@
+# ==============================================================================
+# Rakuten Classification -- Docker Compose
+# ==============================================================================
+# Usage:
+#   docker compose up mlflow                                    # MLflow UI :5000
+#   docker compose run --rm --profile test test                 # Tests (61)
+#   docker compose run --rm --profile gpu train                 # HYDRA training
+#   docker compose run --rm --profile baselines baseline-tfidf  # TF-IDF baseline
+#
+# Dataset : placer products.jsonl dans shared/dataset/ avant le training.
+# Multi-GPU SLURM : ./03_production/scripts/launch_distributed.sh
+# ==============================================================================
+
+# --- Anchor YAML (not a service, ignored by Compose) ---
+x-app: &app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  volumes:
+    - ./shared/dataset:/app/shared/dataset:ro
+    - ./models:/app/models
+  environment:
+    HF_HOME: /app/.cache/huggingface
+    PYTHONPATH: /app
+
+services:
+
+  # --------------------------------------------------------------------------
+  # MLflow Tracking Server
+  # --------------------------------------------------------------------------
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.12.1
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    command: >
+      mlflow server
+        --backend-store-uri sqlite:///mlflow/mlflow.db
+        --default-artifact-root /mlflow/artifacts
+        --host 0.0.0.0
+        --port 5000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Tests (no GPU, no data, no MLflow)
+  # --------------------------------------------------------------------------
+  test:
+    <<: *app
+    command: pytest tests/ -v --tb=short
+    profiles: ["test"]
+
+  # --------------------------------------------------------------------------
+  # HYDRA Training (single-GPU)
+  # --------------------------------------------------------------------------
+  train:
+    <<: *app
+    command: >
+      python scripts/run_train.py
+        --config 02_hydra/configs/default.yaml
+        --data shared/dataset/products.jsonl
+        --n-samples 10000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles: ["gpu"]
+
+  # --------------------------------------------------------------------------
+  # Baselines (CPU, no GPU needed)
+  # --------------------------------------------------------------------------
+  baseline-tfidf:
+    <<: *app
+    command: >
+      python 01_baselines/src/tfidf_pipeline.py
+        --data_path shared/dataset/products.jsonl
+        --n_samples 10000
+        --save_dir models/baseline_tfidf
+    profiles: ["baselines"]
+
+  baseline-word2vec:
+    <<: *app
+    command: >
+      python 01_baselines/src/word2vec_pipeline.py
+        --data_path shared/dataset/products.jsonl
+        --n_samples 10000
+        --save_dir models/baseline_word2vec
+    profiles: ["baselines"]
+
+  baseline-bert:
+    <<: *app
+    command: >
+      python 01_baselines/src/bert_flat_classifier.py
+        --data_path shared/dataset/products.jsonl
+        --n_samples 10000
+        --save_dir models/baseline_bert
+    profiles: ["baselines"]
+
+volumes:
+  mlflow-data:
