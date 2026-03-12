@@ -3,12 +3,12 @@
 ## Workflow obligatoire
 
 1. **Planifier** avant de coder : explorer le code, comprendre le contexte, proposer un plan
-2. **Tester** apres chaque modification :
+2. **Tester** apres chaque modification (le hook auto-test le fait, sinon lancer manuellement) :
    ```bash
    /home/infres/tandriam-25/fil_rouge/venv/bin/python -m pytest tests/ -v --tb=short
    ```
 3. **Boucler** si des tests echouent : diagnostiquer, corriger, re-tester (0 failures)
-4. **Verifier la coherence** code ↔ docs (READMEs, blog.md, configs YAML) apres tout changement
+4. **`/sync-check`** apres tout changement de code, docs ou configs
 5. **`/simplify`** apres tout gros refactoring ou ajout de feature
 
 ## Conventions
@@ -18,7 +18,7 @@
 - Encodeur principal : `camembert-base`
 - FocalLoss sans alpha : `-(1-p_t)^gamma * log(p_t)`, `gamma=2.0`
 - Les defaults dans le code doivent matcher `02_hydra/configs/default.yaml` :
-  - `dropout=0.3`, `lr=3.5e-5`, `batch_size=128`, `hidden_dim=256`
+  - `dropout=0.3`, `lr=3.5e-5`, `batch_size=128`, `hidden_dim=256`, `epochs=10`, `level_weight_l1=0.5`
 
 ## Structure critique
 
@@ -48,10 +48,10 @@ Les skills sont des pipelines automatises puissants. Ne JAMAIS faire manuellemen
 
 | Trigger | Skill | Ce qu'il fait |
 |---------|-------|---------------|
-| Tu as modifie ou cree du code Python | `/sync-check` | Detecte TOUT drift entre code, configs YAML, READMEs et blog.md. Sans lui, des incoherences passent en prod silencieusement. |
+| Tu as modifie du code Python, des docs (.md), ou des configs (.yaml) | `/sync-check` | Detecte TOUT drift entre code, configs YAML, READMEs et blog.md. Sans lui, des incoherences passent en prod silencieusement. |
 | Tu as fait un refactoring, ajoute une feature, ou touche a >3 fichiers | `/simplify` | Revue de qualite : detecte code duplique, abstractions inutiles, imports morts. Garantit un code minimal et propre. |
-| L'utilisateur demande un commit ou tu t'appretes a en faire un | `/pre-commit` | Pipeline complet : lint + 61 tests + sync-check + scan securite. BLOQUANT : ne jamais committer sans l'avoir lance. |
-| Tu as modifie requirements.txt ou ajoute/supprime un import | `/dep-audit` | Croise imports reels vs requirements.txt. Detecte packages manquants (crash en prod) ou inutiles (bloat image Docker). |
+| L'utilisateur demande un commit ou tu t'appretes a en faire un | `/pre-commit` | Pipeline complet : lint + 61 tests + sync-check + scan securite. BLOQUANT : ne jamais committer sans l'avoir lance. Supersede `/sync-check` (il l'inclut deja). |
+| Tu as modifie requirements.txt, ajoute/supprime un import, ou cree un nouveau fichier Python | `/dep-audit` | Croise imports reels vs requirements.txt. Detecte packages manquants (crash en prod) ou inutiles (bloat image Docker). |
 
 ### GPU & Training — avant et pendant les runs
 
