@@ -4,24 +4,7 @@ Implementation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hie
 
 ## Architecture
 
-```
-Texte (titre + description)
-      |
-  [Tokenizer : max_length=128]
-      |
-  [Encodeur : CamemBERT / XLM-RoBERTa / mBERT]  (d_model = 768)
-      |
-  [Pooling : CLS | mean | max | last]
-      |
-  [Projection : Linear(d_model, d_model * num_levels)]  (768 -> 1536)
-      |
-  +--------+--------+
-  |                  |
-[Head L1]        [Head L2]
- (157)           (6100+)
-```
-
-Chaque head est un MLP : `Linear(emb, emb*2) -> LayerNorm -> ReLU -> Dropout -> Linear(emb*2, n_classes)`.
+![Architecture HYDRALocal](architecture_hydra.png)
 
 ### 3 variantes
 

@@ -1,0 +1,146 @@
+<mxGraphModel dx="1753" dy="818" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="L_title" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=18;fontColor=#333333;" value="&lt;b&gt;HYDRALocal&lt;/b&gt; — Têtes indépendantes" vertex="1">
+      <mxGeometry height="40" width="400" x="300" y="20" as="geometry" />
+    </mxCell>
+    <mxCell id="L_input" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontColor=#333333;arcSize=20;shadow=1;" value="&lt;b&gt;Input Text&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;designation . description&lt;/font&gt;" vertex="1">
+      <mxGeometry height="50" width="220" x="370" y="80" as="geometry" />
+    </mxCell>
+    <mxCell id="L_a1" edge="1" parent="1" source="L_input" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666666;" target="L_tok">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="L_tok" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;arcSize=20;shadow=1;" value="&lt;b&gt;Tokenizer&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;max_length = 128&lt;/font&gt;" vertex="1">
+      <mxGeometry height="50" width="220" x="370" y="170" as="geometry" />
+    </mxCell>
+    <mxCell id="L_a2" edge="1" parent="1" source="L_tok" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#6c8ebf;" target="L_enc">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="L_enc" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;arcSize=20;shadow=1;" value="&lt;b&gt;CamemBERT Encoder&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;hidden_size = 768&lt;/font&gt;" vertex="1">
+      <mxGeometry height="50" width="220" x="370" y="260" as="geometry" />
+    </mxCell>
+    <mxCell id="L_a3" edge="1" parent="1" source="L_enc" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;" target="L_proj" value="sequence 768-d">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="L_proj" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;arcSize=20;shadow=1;" value="&lt;b&gt;Projection&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;Linear(768, 1536)&lt;/font&gt;" vertex="1">
+      <mxGeometry height="50" width="220" x="370" y="350" as="geometry" />
+    </mxCell>
+    <mxCell id="L_a4" edge="1" parent="1" source="L_proj" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#82b366;" target="L_pool" value="sequence 1536-d">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="L_pool" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;arcSize=20;shadow=1;" value="&lt;b&gt;CLS Pooling&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;embedding (1536-d)&lt;/font&gt;" vertex="1">
+      <mxGeometry height="50" width="220" x="370" y="440" as="geometry" />
+    </mxCell>
+    <mxCell id="L_a5" edge="1" parent="1" source="L_pool" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d6b656;" target="L_h1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="L_a6" edge="1" parent="1" source="L_pool" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;" target="L_h2">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="L_h1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=20;shadow=1;" value="&lt;b&gt;L1 Head&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Linear(1536,3072)→LN→ReLU→Drop→Linear(3072,157)&lt;/font&gt;" vertex="1">
+      <mxGeometry height="55" width="280" x="160" y="550" as="geometry" />
+    </mxCell>
+    <mxCell id="L_h2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;arcSize=20;shadow=1;" value="&lt;b&gt;L2 Head&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;1&quot;&gt;Linear(1536,3072)→LN→ReLU→Drop→Linear(3072,6100+)&lt;/font&gt;" vertex="1">
+      <mxGeometry height="55" width="290" x="510" y="550" as="geometry" />
+    </mxCell>
+    <mxCell id="L_a7" edge="1" parent="1" source="L_h1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#d6b656;" target="L_out1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="L_a8" edge="1" parent="1" source="L_h2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#b85450;" target="L_out2">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="L_out1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=40;dashed=1;shadow=0;" value="&lt;b&gt;logits_l1&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;157 scores (categories)&lt;/font&gt;" vertex="1">
+      <mxGeometry height="45" width="160" x="220" y="650" as="geometry" />
+    </mxCell>
+    <mxCell id="L_out2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;arcSize=40;dashed=1;shadow=0;" value="&lt;b&gt;logits_l2&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;6100+ scores (sous-categories)&lt;/font&gt;" vertex="1">
+      <mxGeometry height="45" width="160" x="575" y="650" as="geometry" />
+    </mxCell>
+    <mxCell id="L_legbox" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#CCCCCC;fontColor=#666666;arcSize=10;align=left;spacingLeft=10;spacingRight=10;" value="&lt;b&gt;Légendes:&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;&lt;b&gt;768-d&lt;/b&gt; : dimension cachee de CamemBERT (un vecteur par token)&lt;br&gt;&lt;b&gt;1536-d&lt;/b&gt; : dimension apres projection (768 x 2 niveaux)&lt;br&gt;&lt;b&gt;Pooling CLS&lt;/b&gt; : prend le 1er token [CLS] comme resume de la phrase&lt;br&gt;&lt;b&gt;Head MLP&lt;/b&gt; : voir detail ci-contre →&lt;br&gt;&lt;b&gt;Scores&lt;/b&gt; : un score par classe, le plus eleve = prediction du modele&lt;/font&gt;" vertex="1">
+      <mxGeometry height="120" width="420" x="160" y="800" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_link" edge="1" parent="1" source="L_h1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999999;dashed=1;strokeWidth=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="Z_frame">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="480" y="578" />
+          <mxPoint x="480" y="760" />
+          <mxPoint x="1040" y="760" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="Z_frame" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#999999;dashed=1;strokeWidth=2;arcSize=5;verticalAlign=top;spacingTop=5;align=center;" value="&lt;b&gt;&lt;font size=&quot;3&quot;&gt;Détail : Head MLP&lt;/font&gt;&lt;/b&gt;" vertex="1">
+      <mxGeometry height="520" width="340" x="870" y="80" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_in" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;arcSize=15;" value="&lt;b&gt;Embedding&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;1536 valeurs&lt;/font&gt;" vertex="1">
+      <mxGeometry height="40" width="200" x="940" y="120" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_in_note" parent="1" style="text;html=1;align=right;fontColor=#888888;fontSize=10;" value="Entrée depuis le Pooling" vertex="1">
+      <mxGeometry height="20" width="110" x="820" y="130" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_a1" edge="1" parent="1" source="Z_in" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666666;" target="Z_lin1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_lin1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;arcSize=15;" value="&lt;b&gt;Linear&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;1536 → 3072&lt;/font&gt;" vertex="1">
+      <mxGeometry height="40" width="200" x="940" y="190" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_lin1_note" parent="1" style="text;html=1;align=right;fontColor=#888888;fontSize=10;" value="Élargit la représentation" vertex="1">
+      <mxGeometry height="20" width="110" x="820" y="200" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_a2" edge="1" parent="1" source="Z_lin1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666666;" target="Z_ln">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_ln" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6E6E6;strokeColor=#999999;arcSize=15;" value="&lt;b&gt;LayerNorm&lt;/b&gt;" vertex="1">
+      <mxGeometry height="35" width="200" x="940" y="260" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_ln_note" parent="1" style="text;html=1;align=right;fontColor=#888888;fontSize=10;" value="Stabilise les valeurs" vertex="1">
+      <mxGeometry height="20" width="90" x="840" y="267.5" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_a3" edge="1" parent="1" source="Z_ln" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666666;" target="Z_relu">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_relu" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6E6E6;strokeColor=#999999;arcSize=15;" value="&lt;b&gt;ReLU&lt;/b&gt;" vertex="1">
+      <mxGeometry height="35" width="200" x="940" y="325" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_relu_note" parent="1" style="text;html=1;align=right;fontColor=#888888;fontSize=10;" value="Garde les positifs, zéro les négatifs" vertex="1">
+      <mxGeometry height="20" width="160" x="770" y="332.5" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_a4" edge="1" parent="1" source="Z_relu" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666666;" target="Z_drop">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_drop" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6E6E6;strokeColor=#999999;arcSize=15;" value="&lt;b&gt;Dropout&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;30%&lt;/font&gt;" vertex="1">
+      <mxGeometry height="40" width="200" x="940" y="390" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_drop_note" parent="1" style="text;html=1;align=right;fontColor=#888888;fontSize=10;" value="Éteint 30% des neurones (régularisation)" vertex="1">
+      <mxGeometry height="20" width="180" x="750" y="400" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_a5" edge="1" parent="1" source="Z_drop" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666666;" target="Z_lin2">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_lin2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;arcSize=15;" value="&lt;b&gt;Linear&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;3072 → N&lt;/font&gt;" vertex="1">
+      <mxGeometry height="40" width="200" x="940" y="460" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_lin2_note" parent="1" style="text;html=1;align=right;fontColor=#888888;fontSize=10;" value="N = 157 (L1) ou 6100+ (L2)" vertex="1">
+      <mxGeometry height="20" width="120" x="810" y="470" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_a6" edge="1" parent="1" source="Z_lin2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#666666;" target="Z_out">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_out" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=15;dashed=1;" value="&lt;b&gt;N scores&lt;/b&gt;&lt;br&gt;&lt;font size=&quot;2&quot;&gt;le plus eleve = prediction&lt;/font&gt;" vertex="1">
+      <mxGeometry height="40" width="200" x="940" y="530" as="geometry" />
+    </mxCell>
+    <mxCell id="Z_out_note" parent="1" style="text;html=1;align=right;fontColor=#888888;fontSize=10;" value="Sortie : un score par classe" vertex="1">
+      <mxGeometry height="20" width="120" x="810" y="540" as="geometry" />
+    </mxCell>
+    <mxCell id="zaf2yTBeYFfSsF6yiTU9-1" edge="1" parent="1" source="L_h2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;strokeColor=#999999;dashed=1;strokeWidth=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="Z_frame">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="480" y="577" />
+          <mxPoint x="480" y="760" />
+          <mxPoint x="1040" y="760" />
+        </Array>
+        <mxPoint x="450" y="588" as="sourcePoint" />
+        <mxPoint x="1050" y="610" as="targetPoint" />
+      </mxGeometry>
+    </mxCell>
+  </root>
+</mxGraphModel>
