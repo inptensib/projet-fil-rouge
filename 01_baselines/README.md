@@ -1,18 +1,18 @@
 # 01_baselines -- Flat Classification Baselines
 
-Classification "a plat" (non-hierarchique) sur les **157 categories L1** du catalogue Rakuten. Sert de reference pour evaluer les gains de l'approche hierarchique HYDRA sur le niveau 1.
+Classification "à plat" (non-hiérarchique) sur les **157 catégories L1** du catalogue Rakuten. Sert de référence pour évaluer les gains de l'approche hiérarchique HYDRA sur le niveau 1.
 
 ## Approches
 
-| # | Methode | Description |
+| # | Méthode | Description |
 |---|---------|-------------|
 | 1 | **TF-IDF + Linear SVM** | Bag-of-words (unigrams+bigrams, 50k features) + LinearSVC |
 | 2 | **Word2Vec + Linear SVM** | Skip-gram 200-d, moyenne des embeddings + LinearSVC |
-| 3 | **BERT Flat** | CamemBERT / XLM-R / mBERT + tete lineaire (feature extraction ou fine-tuning) |
+| 3 | **BERT Flat** | CamemBERT / XLM-R / mBERT + tête linéaire (feature extraction ou fine-tuning) |
 
-## Resultats L1 (50k samples, 80/20 split, 157 categories)
+## Résultats L1 (50k samples, 80/20 split, 157 catégories)
 
-| Methode | F1 Macro | F1 Weighted | Temps |
+| Méthode | F1 Macro | F1 Weighted | Temps |
 |---------|:--------:|:-----------:|:-----:|
 | TF-IDF + LinearSVC | **86.2%** | **88.6%** | ~37s |
 | TF-IDF + LogReg | 65.9% | 75.2% | ~53s |
@@ -21,7 +21,7 @@ Classification "a plat" (non-hierarchique) sur les **157 categories L1** du cata
 | BERT XLM-RoBERTa (fine-tuned) | ~84% | ~88% | ~min |
 | BERT feature extraction | ~5-10% | ~5-10% | ~min |
 
-> TF-IDF + LinearSVC est une baseline etonnamment forte. Le feature extraction BERT (encodeur gele) echoue car les representations pre-entrainees ne sont pas adaptees au domaine produit.
+> TF-IDF + LinearSVC est une baseline étonnamment forte. Le feature extraction BERT (encodeur gelé) échoue car les représentations pré-entraînées ne sont pas adaptées au domaine produit.
 
 ## Usage
 
@@ -36,8 +36,8 @@ python src/bert_flat_classifier.py --data_path shared/dataset/products.jsonl --b
 ```
 01_baselines/
   src/
-    tfidf_pipeline.py        # TF-IDF + classifieurs lineaires
-    word2vec_pipeline.py      # Word2Vec + classifieurs lineaires
+    tfidf_pipeline.py        # TF-IDF + classifieurs linéaires
+    word2vec_pipeline.py      # Word2Vec + classifieurs linéaires
     bert_flat_classifier.py   # BERT feature extraction / fine-tuning
-    evaluate.py               # Comparaison cross-methodes
+    evaluate.py               # Comparaison cross-méthodes
 ```

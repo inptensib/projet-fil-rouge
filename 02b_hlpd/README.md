@@ -1,45 +1,45 @@
-# 02b_hlpd -- HLPD : Decodeur Hierarchique Non-Autoregressif
+# 02b_hlpd -- HLPD : Décodeur Hiérarchique Non-Autorégressif
 
-Implementation de **HLPD** (Torba, Laclau et al., ECIR 2025) pour la classification hierarchique multi-label.
+Implémentation de **HLPD** (Torba, Laclau et al., ECIR 2025) pour la classification hiérarchique multi-label.
 
-> **Note** : Code d'implementation a venir (Mehdi Aithamma). Ce README decrit l'architecture cible.
+> **Note** : Code d'implémentation à venir (Mehdi Aithamma). Ce README décrit l'architecture cible.
 
-## Idee cle
+## Idée clé
 
-Contrairement a HYDRA (tetes paralleles), HLPD utilise un **decodeur Transformer non-autoregressif** qui predit tous les labels en un seul forward pass, avec la hierarchie encodee directement dans le mecanisme d'attention.
+Contrairement à HYDRA (têtes parallèles), HLPD utilise un **décodeur Transformer non-autorégressif** qui prédit tous les labels en un seul forward pass, avec la hiérarchie encodée directement dans le mécanisme d'attention.
 
 ## Architecture
 
 ```
 Texte --> [Encodeur CamemBERT] --> H_enc
                                       |
-Labels taxonomie --> [Embeddings pre-populated] --> E_labels
+Labels taxonomie --> [Embeddings pré-populated] --> E_labels
                                       |
                     [Cross-attention H_enc x E_labels]
                                       |
-                    [Self-attention hierarchique]  x N couches
+                    [Self-attention hiérarchique]  x N couches
                                       |
-                    [Classification lineaire] --> Logits (1+157+6100)
+                    [Classification linéaire] --> Logits (1+157+6100)
 ```
 
-**Self-attention hierarchique** : un biais positionnel appris, derive des distances dans l'arbre taxonomique, force les labels proches (parent-enfant) a avoir une attention plus forte.
+**Self-attention hiérarchique** : un biais positionnel appris, dérivé des distances dans l'arbre taxonomique, force les labels proches (parent-enfant) à avoir une attention plus forte.
 
 ```
 Attn_hiera(Q,K,V) = Softmax((QK^T / sqrt(d_k)) + W * M_hiera) * V
 ```
 
-**ZLPR Loss** : ranking pairwise entre labels positifs/negatifs, plus stable que la BCE pour les problemes avec beaucoup de classes negatives.
+**ZLPR Loss** : ranking pairwise entre labels positifs/négatifs, plus stable que la BCE pour les problèmes avec beaucoup de classes négatives.
 
 ## HYDRA vs HLPD
 
 | | HYDRA | HLPD |
 |---|---|---|
-| Paradigme | Multi-tete discriminatif | Encoder-Decoder |
-| Coherence hierarchique | Post-hoc (Nested head) | Par construction (masque d'attention) |
+| Paradigme | Multi-tête discriminatif | Encoder-Decoder |
+| Cohérence hiérarchique | Post-hoc (Nested head) | Par construction (masque d'attention) |
 | Perte | Focal / CE | ZLPR (pairwise ranking) |
-| Complexite | O(n_classes) | O(n_labels^2) |
+| Complexité | O(n_classes) | O(n_labels^2) |
 
-## References
+## Références
 
 - Torba et al., *HLPD*, ECIR 2025.
 - Su et al., *ZLPR Loss*, 2022.

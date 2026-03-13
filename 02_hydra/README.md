@@ -1,6 +1,6 @@
-# 02_hydra -- HYDRA : Classification Hierarchique Multi-tete
+# 02_hydra -- HYDRA : Classification Hiérarchique Multi-tête
 
-Implementation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hierarchique de produits Rakuten.
+Implémentation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hiérarchique de produits Rakuten.
 
 ## Architecture
 
@@ -8,31 +8,31 @@ Implementation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hie
 
 ### 3 variantes
 
-| Variante | Mecanisme |
+| Variante | Mécanisme |
 |----------|-----------|
-| **HYDRALocal** | Tetes L1/L2 independantes |
-| **HYDRAGlobal** | + tete globale produisant des logits joints pour les (L1 + L2) classes |
-| **HYDRANested** | + tete de raffinement (MLP sur logits L1+L2 concatenes) pour coherence hierarchique |
+| **HYDRALocal** | Têtes L1/L2 indépendantes |
+| **HYDRAGlobal** | + tête globale produisant des logits joints pour les (L1 + L2) classes |
+| **HYDRANested** | + tête de raffinement (MLP sur logits L1+L2 concaténés) pour cohérence hiérarchique |
 
 ## Pertes
 
-- **FocalLoss** : `FL(p_t) = -(1 - p_t)^gamma * log(p_t)` -- concentre l'apprentissage sur les cas difficiles (gamma=0 revient a la CE standard)
+- **FocalLoss** : `FL(p_t) = -(1 - p_t)^gamma * log(p_t)` -- concentre l'apprentissage sur les cas difficiles (gamma=0 revient à la CE standard)
 - **HYDRALoss** : `L = w_L1 * L1 + w_L2 * L2 [+ w_global * L_global]` -- combine CrossEntropy ou FocalLoss par niveau
 
 ## Configuration (`configs/default.yaml`)
 
-| Parametre | Default | Description |
+| Paramètre | Default | Description |
 |-----------|---------|-------------|
 | `encoder` | `camembert-base` | Backbone |
 | `variant` | `local` | `local` / `global` / `nested` |
 | `dropout` | `0.3` | Dropout avant heads |
 | `lr` | `3.5e-5` | Learning rate |
 | `batch_size` | `128` | Taille de batch |
-| `epochs` | `10` | Nombre d'epoques |
+| `epochs` | `10` | Nombre d'époques |
 | `loss` | `cross_entropy` | `cross_entropy` / `focal` |
 | `level_weights` | `[0.5]` | Poids L1 (L2 implicitement 1.0) |
 
-> La dimension de projection est calculee automatiquement : `d_model * num_levels` (768 * 2 = 1536 pour CamemBERT).
+> La dimension de projection est calculée automatiquement : `d_model * num_levels` (768 * 2 = 1536 pour CamemBERT).
 
 ## Usage
 
@@ -59,15 +59,15 @@ loss, loss_l1, loss_l2 = criterion(level_outputs, unified_output, labels_l1, lab
 
 ```
 02_hydra/
-  configs/default.yaml    # Hyperparametres
+  configs/default.yaml    # Hyperparamètres
   src/
     models.py             # HYDRABase, HYDRALocal, HYDRAGlobal, HYDRANested
     losses.py             # FocalLoss, HYDRALoss
-    trainer.py            # Boucle d'entrainement single-GPU
-    predict.py            # Inference et evaluation
+    trainer.py            # Boucle d'entraînement single-GPU
+    predict.py            # Inférence et évaluation
 ```
 
-## References
+## Références
 
 - Karl et al., *HYDRA*, EMNLP 2025.
 - Lin et al., *Focal Loss for Dense Object Detection*, ICCV 2017.
