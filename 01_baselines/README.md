@@ -1,6 +1,6 @@
 # 01_baselines -- Flat Classification Baselines
 
-Classification "a plat" (non-hierarchique) sur les 157 categories du catalogue Rakuten. Sert de reference pour evaluer les gains de l'approche hierarchique HYDRA.
+Classification "a plat" (non-hierarchique) sur les **157 categories L1** du catalogue Rakuten. Sert de reference pour evaluer les gains de l'approche hierarchique HYDRA sur le niveau 1.
 
 ## Approches
 
@@ -10,7 +10,7 @@ Classification "a plat" (non-hierarchique) sur les 157 categories du catalogue R
 | 2 | **Word2Vec + Linear SVM** | Skip-gram 200-d, moyenne des embeddings + LinearSVC |
 | 3 | **BERT Flat** | CamemBERT / XLM-R / mBERT + tete lineaire (feature extraction ou fine-tuning) |
 
-## Resultats (50k samples, 80/20 split)
+## Resultats L1 (50k samples, 80/20 split, 157 categories)
 
 | Methode | F1 Macro | F1 Weighted | Temps |
 |---------|:--------:|:-----------:|:-----:|

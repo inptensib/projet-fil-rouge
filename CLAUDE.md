@@ -84,7 +84,7 @@ docker-compose.yml     services : test, training, baselines, mlflow
 
 ## Donnees
 
-- **Format** : JSONL (`products.jsonl`), champs : `designation`, `description`, `prdtypecode` (L1), `producttype` (L2)
+- **Format** : JSONL (`products.jsonl`), champs : `designation`, `description`, `typelabel` (L1), `producttype` (L2)
 - **Chargement** : `shared/data_loader.py` → `prepare_hierarchical_data()` (split 80/20, validation 12.5%)
 - **Sharding DDP** : `03_production/src/data_sharding.py` → valider avec `/shard-check` avant tout training distribue
 - **Pas de data dans le repo** : le fichier `shared/dataset/products.jsonl` doit etre place manuellement

@@ -9,11 +9,11 @@ Texte (titre + description)
       |
   [Tokenizer : max_length=128]
       |
-  [Encodeur : CamemBERT / XLM-RoBERTa / mBERT]
+  [Encodeur : CamemBERT / XLM-RoBERTa / mBERT]  (d_model = 768)
       |
   [Pooling : CLS | mean | max | last]
       |
-  [Projection : Linear(d_model, hidden_dim)]
+  [Projection : Linear(d_model, d_model * num_levels)]  (768 -> 1536)
       |
   +--------+--------+
   |                  |
@@ -21,13 +21,15 @@ Texte (titre + description)
  (157)           (6100+)
 ```
 
+Chaque head est un MLP : `Linear(emb, emb*2) -> LayerNorm -> ReLU -> Dropout -> Linear(emb*2, n_classes)`.
+
 ### 3 variantes
 
 | Variante | Mecanisme |
 |----------|-----------|
 | **HYDRALocal** | Tetes L1/L2 independantes |
-| **HYDRAGlobal** | + tete globale (concatenation L1+L2) |
-| **HYDRANested** | + contraintes d'imbrication (L2 conditionne par L1) |
+| **HYDRAGlobal** | + tete globale produisant des logits joints pour les (L1 + L2) classes |
+| **HYDRANested** | + tete de raffinement (MLP sur logits L1+L2 concatenes) pour coherence hierarchique |
 
 ## Pertes
 
@@ -40,13 +42,14 @@ Texte (titre + description)
 |-----------|---------|-------------|
 | `encoder` | `camembert-base` | Backbone |
 | `variant` | `local` | `local` / `global` / `nested` |
-| `hidden_dim` | `256` | Dimension projection |
 | `dropout` | `0.3` | Dropout avant heads |
 | `lr` | `3.5e-5` | Learning rate |
 | `batch_size` | `128` | Taille de batch |
 | `epochs` | `10` | Nombre d'epoques |
 | `loss` | `cross_entropy` | `cross_entropy` / `focal` |
 | `level_weights` | `[0.5]` | Poids L1 (L2 implicitement 1.0) |
+
+> La dimension de projection est calculee automatiquement : `d_model * num_levels` (768 * 2 = 1536 pour CamemBERT).
 
 ## Usage
 

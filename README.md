@@ -48,6 +48,10 @@ Le dataset Rakuten est proprietaire et **non inclus** dans ce repository.
    cp /chemin/vers/products.jsonl shared/dataset/
    ```
 
+**Format JSONL** — champs : `designation` (titre), `description` (texte complet), `typelabel` (categorie L1), `producttype` (sous-categorie L2).
+
+**Objectif** : maximiser `f1_l2_macro` (chaque sous-categorie pese egalement) tout en maintenant un HCR > 95% (coherence hierarchique L1-L2).
+
 Sans ce fichier, seuls les tests et MLflow fonctionnent. Le training et les baselines necessitent le dataset.
 
 ## Stack

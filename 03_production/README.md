@@ -5,15 +5,19 @@ Training Distributed Data Parallel des modeles HYDRA sur cluster SLURM multi-noe
 ## Usage
 
 ```bash
-./scripts/launch_distributed.sh local CamemBERT 4           # 4 noeuds P100
-./scripts/launch_distributed.sh nested XLM-RoBERTa 1 rtx3090  # 1 noeud RTX 3090
+# Depuis la racine du projet :
+./03_production/scripts/launch_distributed.sh local CamemBERT 4           # 4 noeuds P100
+./03_production/scripts/launch_distributed.sh nested XLM-RoBERTa 1 rtx3090  # 1 noeud RTX 3090
 ```
 
 ## Apports
 
 - **Gradient clipping** (`max_norm=1.0`) pour la stabilite
+- **Gradient accumulation** avec `no_sync()` pour reduire l'overhead NCCL
+- **Validation dual-speed** : Sniper (~15min, loss + ReduceLROnPlateau) et Audit (~1h, F1 complet + hard examples)
+- **MLflow** : tracking temps reel (loss, LR, metriques), tableaux d'erreurs, artefacts modele (rank 0)
 - **Metriques hierarchiques** (Constrained F1, HCR) via `shared.metrics`
-- **Error tracking** inter-epoques pour detecter le label noise
+- **Error tracking** inter-epoques pour detecter le label noise (persistance cross-epochs)
 - **Batch prediction** pour l'inference multi-echantillons
 
 ## Structure
