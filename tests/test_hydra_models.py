@@ -226,3 +226,177 @@ class TestTrainerOneBatch:
         # Second forward should produce different logits (weights updated)
         level_outputs_2, _ = model(input_ids, mask)
         assert not torch.allclose(level_outputs[0], level_outputs_2[0])
+
+
+class TestLastPoolingIgnoresPadding:
+    def test_last_pooling_ignores_padding(self, mock_auto_model):
+        """Last pooling must use the real last token, not padding."""
+        model = HYDRALocal(
+            encoder_name="mock-model",
+            num_classes_l1=_NUM_L1, num_classes_l2=_NUM_L2,
+            pooling="last", project_embedding=False,
+        )
+        B, S, H = 2, 8, _HIDDEN_SIZE
+        hidden = torch.randn(B, S, H)
+        # Sample 0: 4 real tokens, sample 1: 6 real tokens
+        mask = torch.zeros(B, S, dtype=torch.long)
+        mask[0, :4] = 1
+        mask[1, :6] = 1
+        pooled = model._pool(hidden, mask)
+        assert pooled.shape == (B, H)
+        # Should pick hidden[0, 3] and hidden[1, 5] (last real tokens)
+        assert torch.allclose(pooled[0], hidden[0, 3])
+        assert torch.allclose(pooled[1], hidden[1, 5])
+
+
+class TestCheckpointRoundTrip:
+    def test_checkpoint_round_trip(self, mock_auto_model, tmp_path):
+        """Save checkpoint and reload: state_dict must match exactly."""
+        model = HYDRALocal(
+            encoder_name="mock-model",
+            num_classes_l1=_NUM_L1, num_classes_l2=_NUM_L2,
+            pooling="mean", project_embedding=False, dropout=0.1, hidden_dim=32,
+        )
+
+        # Save checkpoint
+        ckpt_path = tmp_path / "test_ckpt.pt"
+        torch.save({
+            "model_state_dict": model.state_dict(),
+            "config": {
+                "variant": "local",
+                "encoder_name": "mock-model",
+                "num_classes_l1": _NUM_L1,
+                "num_classes_l2": _NUM_L2,
+                "pooling": "mean",
+                "project_embedding": False,
+                "dropout": 0.1,
+                "hidden_dim": 32,
+            },
+            "best_val_f1_l2": 0.5,
+            "epoch": 1,
+        }, ckpt_path)
+
+        # Reload using load_model from predict.py
+        _predict_mod = import_from_hydra("predict")
+        loaded_model, loaded_config = _predict_mod.load_model(
+            str(ckpt_path), device=torch.device("cpu")
+        )
+
+        # Verify all parameters match
+        for key in model.state_dict():
+            assert torch.equal(model.state_dict()[key], loaded_model.state_dict()[key]), \
+                f"Mismatch for {key}"
+        assert loaded_config["pooling"] == "mean"
+        assert loaded_config["project_embedding"] is False
+        assert loaded_config["hidden_dim"] == 32
+
+
+class TestPredictFunctions:
+    def test_predict_single(self, mock_auto_model):
+        """predict() returns correct structure on synthetic input."""
+        from sklearn.preprocessing import LabelEncoder
+        import numpy as np
+        _predict_mod = import_from_hydra("predict")
+
+        model = HYDRALocal(
+            encoder_name="mock-model",
+            num_classes_l1=_NUM_L1, num_classes_l2=_NUM_L2,
+        )
+        model.eval()
+
+        l1_encoder = LabelEncoder()
+        l1_encoder.classes_ = np.array([f"L1_{i}" for i in range(_NUM_L1)])
+
+        l2_encoder = LabelEncoder()
+        l2_encoder.classes_ = np.array([f"L2_{i}" for i in range(_NUM_L2)])
+
+        class _FakeTokenizerOutput(dict):
+            """Dict subclass with .to() for device transfer."""
+            def to(self, device):
+                return _FakeTokenizerOutput(
+                    {k: v.to(device) if isinstance(v, torch.Tensor) else v
+                     for k, v in self.items()}
+                )
+
+        tokenizer = mock.MagicMock()
+        tokenizer.side_effect = lambda text, **kwargs: _FakeTokenizerOutput({
+            "input_ids": torch.randint(0, 100, (1, _SEQ_LEN)),
+            "attention_mask": torch.ones(1, _SEQ_LEN, dtype=torch.long),
+        })
+
+        result = _predict_mod.predict(
+            "produit test", model, tokenizer,
+            l1_encoder, l2_encoder, torch.device("cpu"),
+        )
+        assert "level_1" in result and "level_2" in result
+        assert "label" in result["level_1"] and "confidence" in result["level_1"]
+        assert result["level_1"]["label"].startswith("L1_")
+        assert 0.0 <= result["level_1"]["confidence"] <= 1.0
+
+    def test_predict_batch(self, mock_auto_model):
+        """predict_batch() returns one result per input text."""
+        from sklearn.preprocessing import LabelEncoder
+        import numpy as np
+        _predict_mod = import_from_hydra("predict")
+
+        model = HYDRALocal(
+            encoder_name="mock-model",
+            num_classes_l1=_NUM_L1, num_classes_l2=_NUM_L2,
+        )
+        model.eval()
+
+        l1_encoder = LabelEncoder()
+        l1_encoder.classes_ = np.array([f"L1_{i}" for i in range(_NUM_L1)])
+        l2_encoder = LabelEncoder()
+        l2_encoder.classes_ = np.array([f"L2_{i}" for i in range(_NUM_L2)])
+
+        tokenizer = mock.MagicMock()
+        tokenizer.side_effect = lambda text, **kwargs: {
+            "input_ids": torch.randint(0, 100, (1, _SEQ_LEN)),
+            "attention_mask": torch.ones(1, _SEQ_LEN, dtype=torch.long),
+        }
+
+        texts = ["produit A", "produit B", "produit C"]
+        results = _predict_mod.predict_batch(
+            texts, model, tokenizer,
+            l1_encoder, l2_encoder, torch.device("cpu"),
+            batch_size=2,
+        )
+        assert len(results) == 3
+        for r in results:
+            assert "level_1" in r and "level_2" in r
+
+
+class TestEnforceHierarchy:
+    def test_enforce_hierarchy(self):
+        """_enforce_hierarchy must return a valid L2 child of predicted L1."""
+        _predict_mod = import_from_hydra("predict")
+
+        num_l1, num_l2 = 3, 6
+        # L1=0 -> L2={0,1}, L1=1 -> L2={2,3}, L1=2 -> L2={4,5}
+        parent_child_matrix = torch.zeros(num_l1, num_l2)
+        parent_child_matrix[0, 0] = 1; parent_child_matrix[0, 1] = 1
+        parent_child_matrix[1, 2] = 1; parent_child_matrix[1, 3] = 1
+        parent_child_matrix[2, 4] = 1; parent_child_matrix[2, 5] = 1
+
+        # Force L1 prediction to class 1 (valid L2: 2, 3)
+        logits_l1 = torch.tensor([[0.0, 10.0, 0.0]])
+        # L2 logits: highest is class 0, but it's invalid for L1=1
+        logits_l2 = torch.tensor([[5.0, 4.0, 3.0, 2.0, 1.0, 0.0]])
+
+        masked = _predict_mod._enforce_hierarchy(logits_l1, logits_l2, parent_child_matrix)
+        pred_l2 = torch.argmax(masked, dim=-1).item()
+        # Must be 2 or 3 (valid children of L1=1)
+        assert pred_l2 in (2, 3)
+
+
+class TestHYDRALossGlobalRaisesWithoutNumClasses:
+    def test_raises_without_num_classes(self):
+        """HYDRALoss(architecture='global') without num_classes must raise ValueError."""
+        with pytest.raises(ValueError, match="num_classes_l1 and num_classes_l2 are required"):
+            HYDRALoss(architecture="global")
+
+    def test_raises_nested_without_num_classes(self):
+        """HYDRALoss(architecture='nested') without num_classes must raise ValueError."""
+        with pytest.raises(ValueError, match="num_classes_l1 and num_classes_l2 are required"):
+            HYDRALoss(architecture="nested", num_classes_l1=5)

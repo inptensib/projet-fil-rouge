@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import torch
 import torch.nn.functional as F
+from torch.amp import autocast
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoTokenizer
 
@@ -62,6 +63,10 @@ def load_model(model_path: str, device: torch.device = None):
         encoder_name=encoder_path,
         num_classes_l1=config["num_classes_l1"],
         num_classes_l2=config["num_classes_l2"],
+        pooling=config.get("pooling", "cls"),
+        project_embedding=config.get("project_embedding", True),
+        dropout=config.get("dropout", 0.3),
+        hidden_dim=config.get("hidden_dim", 256),
     )
 
     # Handle DDP-wrapped state dicts
@@ -175,12 +180,15 @@ def predict_batch(
     all_results = []
     model.eval()
 
+    use_amp = device.type == "cuda"
+
     with torch.no_grad():
         for batch in loader:
             input_ids = batch["input_ids"].squeeze(1).to(device)
             attention_mask = batch["attention_mask"].squeeze(1).to(device)
 
-            level_outputs, _ = model(input_ids, attention_mask)
+            with autocast("cuda", enabled=use_amp):
+                level_outputs, _ = model(input_ids, attention_mask)
             logits_l1, logits_l2 = level_outputs
 
             if parent_child_matrix is not None:

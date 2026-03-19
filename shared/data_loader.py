@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import gc
 import json
+import logging
 import random
 from typing import Optional
 
@@ -186,10 +187,16 @@ def build_parent_child_mapping(
     Returns:
         Dictionary mapping L2 index -> L1 index.
     """
+    logger = logging.getLogger(__name__)
     l2_to_l1 = {}
     for l1, l2 in zip(level_1_labels, level_2_labels):
         if l2 not in l2_to_l1:
             l2_to_l1[l2] = l1
+        elif l2_to_l1[l2] != l1:
+            logger.warning(
+                "L2 class %s has multiple L1 parents: existing=%s, new=%s",
+                l2, l2_to_l1[l2], l1,
+            )
     return l2_to_l1
 
 
@@ -226,9 +233,10 @@ class HierarchicalProductDataset(Dataset):
     """
 
     def __init__(self, texts, labels_l1, labels_l2, tokenizer, max_length: int = 128):
+        import numpy as np
         self.texts = texts.tolist() if hasattr(texts, "tolist") else list(texts)
-        self.labels_l1 = labels_l1.tolist() if hasattr(labels_l1, "tolist") else list(labels_l1)
-        self.labels_l2 = labels_l2.tolist() if hasattr(labels_l2, "tolist") else list(labels_l2)
+        self.labels_l1 = np.asarray(labels_l1) if not isinstance(labels_l1, np.ndarray) else labels_l1
+        self.labels_l2 = np.asarray(labels_l2) if not isinstance(labels_l2, np.ndarray) else labels_l2
         self.tokenizer = tokenizer
         self.max_length = max_length
 
@@ -247,7 +255,7 @@ class HierarchicalProductDataset(Dataset):
         return {
             "input_ids": encoding["input_ids"].squeeze(0),
             "attention_mask": encoding["attention_mask"].squeeze(0),
-            "label_l1": torch.tensor(self.labels_l1[idx], dtype=torch.long),
-            "label_l2": torch.tensor(self.labels_l2[idx], dtype=torch.long),
+            "label_l1": torch.as_tensor(self.labels_l1[idx], dtype=torch.long),
+            "label_l2": torch.as_tensor(self.labels_l2[idx], dtype=torch.long),
             "sample_idx": idx,
         }

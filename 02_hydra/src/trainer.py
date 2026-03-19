@@ -249,7 +249,8 @@ class HYDRATrainer:
         )
 
         # Warmup scheduler
-        num_training_steps = len(train_loader) * self.epochs // self.gradient_accumulation_steps
+        extra_steps = int((len(train_loader) % self.gradient_accumulation_steps) > 0)
+        num_training_steps = (len(train_loader) // self.gradient_accumulation_steps + extra_steps) * self.epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
         self.scheduler = get_linear_schedule_with_warmup(
             self.optimizer, num_warmup_steps, num_training_steps
@@ -375,6 +376,10 @@ class HYDRATrainer:
                             "encoder_name": self.encoder_name,
                             "num_classes_l1": self.num_classes_l1,
                             "num_classes_l2": self.num_classes_l2,
+                            "pooling": self.model.pooling,
+                            "project_embedding": self.model.project_embedding,
+                            "dropout": self.model.level_1_head[3].p,
+                            "hidden_dim": self.model.hidden_dim,
                         },
                         "best_val_f1_l2": best_val_f1,
                         "epoch": epoch + 1,

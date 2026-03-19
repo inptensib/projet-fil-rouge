@@ -74,6 +74,12 @@ class HYDRALoss(nn.Module):
         use_focal: bool = False,
     ):
         super().__init__()
+        if architecture in ("global", "nested"):
+            if num_classes_l1 is None or num_classes_l2 is None:
+                raise ValueError(
+                    f"num_classes_l1 and num_classes_l2 are required for "
+                    f"architecture='{architecture}'"
+                )
         self.architecture = architecture
         self.alpha = alpha
         self.num_classes_l1 = num_classes_l1

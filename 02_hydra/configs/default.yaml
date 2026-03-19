@@ -12,6 +12,8 @@ variant: local            # local | global | nested
 num_levels: 2
 hidden_dim: 256
 dropout: 0.3
+pooling: cls              # cls | mean | max | last
+project_embedding: true
 
 # --- Training ---
 batch_size: 128
@@ -19,26 +21,30 @@ epochs: 10
 lr: 3.5e-5
 weight_decay: 0.01
 warmup_ratio: 0.1
-scheduler: linear         # linear | cosine
-gradient_clip: 1.0
+scheduler: linear
+max_grad_norm: 1.0
+gradient_accumulation_steps: 1
+
+# --- Early stopping ---
+early_stopping_patience: 2
+early_stopping_min_delta: 0.001
 
 # --- Multi-task loss ---
-loss: cross_entropy       # cross_entropy | focal
+use_focal: false
+focal_gamma: 2.0
 level_weights:
   - 0.5                  # L1 weight (L2 is implicitly 1.0)
 
+# --- Hierarchy ---
+check_hierarchy: false
+
 # --- Data ---
-data_dir: ../shared/dataset
-train_file: train.csv
-val_file: val.csv
-test_file: test.csv
 num_workers: 4
 pin_memory: true
 
 # --- Logging ---
 mlflow_tracking_uri: ../mlruns
 experiment_name: hydra
-log_every_n_steps: 50
 
 # --- Reproducibility ---
 seed: 42
@@ -47,4 +53,3 @@ deterministic: true
 # --- Hardware ---
 device: auto              # auto | cpu | cuda
 fp16: true
-ddp: false

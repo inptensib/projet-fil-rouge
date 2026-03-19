@@ -80,7 +80,8 @@ class HYDRABase(nn.Module):
             hidden_states = hidden_states.masked_fill(mask == 0, -1e9)
             return hidden_states.max(dim=1).values
         elif self.pooling == "last":
-            return hidden_states[:, -1, :]
+            last_idx = attention_mask.sum(dim=1) - 1
+            return hidden_states[torch.arange(hidden_states.size(0), device=hidden_states.device), last_idx]
 
     def _make_classification_head(
         self, input_size: int, num_classes: int, dropout: float = 0.3
