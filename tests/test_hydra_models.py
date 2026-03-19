@@ -12,6 +12,9 @@ from unittest import mock
 
 from helpers import import_from_hydra
 
+_losses_mod = import_from_hydra("losses")
+HYDRALoss = _losses_mod.HYDRALoss
+
 _HIDDEN_SIZE = 64
 _BATCH_SIZE = 2
 _SEQ_LEN = 16
@@ -157,3 +160,69 @@ class TestPoolingMethods:
                 num_classes_l1=_NUM_L1, num_classes_l2=_NUM_L2,
                 pooling="invalid",
             )
+
+    def test_max_pooling_ignores_padding(self, mock_auto_model):
+        """Max pooling must ignore padding tokens (mask=0) via -1e9 fill."""
+        model = HYDRALocal(
+            encoder_name="mock-model",
+            num_classes_l1=_NUM_L1, num_classes_l2=_NUM_L2,
+            pooling="max", project_embedding=False,
+        )
+        # Manually test _pool with a controlled hidden_states
+        B, S, H = 1, 4, _HIDDEN_SIZE
+        hidden = torch.full((B, S, H), -5.0)
+        hidden[0, 0, :] = 1.0  # only first token is real
+        mask = torch.zeros(B, S, dtype=torch.long)
+        mask[0, 0] = 1  # only first token unmasked
+        pooled = model._pool(hidden, mask)
+        # Should pick the unmasked token (value 1.0), not padded ones (-5.0)
+        assert pooled.shape == (B, H)
+        assert torch.allclose(pooled, torch.ones(B, H))
+
+
+class TestNestedGradientBackprop:
+    def test_nested_gradient_backprop(self, mock_auto_model):
+        """Gradients must flow through the nested head back to the encoder."""
+        model = HYDRANested(
+            encoder_name="mock-model",
+            num_classes_l1=_NUM_L1, num_classes_l2=_NUM_L2,
+        )
+        input_ids = torch.randint(0, 100, (_BATCH_SIZE, _SEQ_LEN))
+        mask = torch.ones(_BATCH_SIZE, _SEQ_LEN, dtype=torch.long)
+        level_outputs, unified = model(input_ids, mask)
+        loss = unified.sum()
+        loss.backward()
+        # Check that nested_head parameters have gradients
+        for name, param in model.nested_head.named_parameters():
+            assert param.grad is not None, f"No gradient for nested_head.{name}"
+            assert not torch.all(param.grad == 0), f"Zero gradient for nested_head.{name}"
+
+
+class TestTrainerOneBatch:
+    def test_trainer_one_batch(self, mock_auto_model):
+        """One training step: forward + backward + optimizer step must not crash."""
+        model = HYDRALocal(
+            encoder_name="mock-model",
+            num_classes_l1=_NUM_L1, num_classes_l2=_NUM_L2,
+        )
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4)
+        criterion = HYDRALoss(architecture="local", use_focal=False)
+
+        input_ids = torch.randint(0, 100, (_BATCH_SIZE, _SEQ_LEN))
+        mask = torch.ones(_BATCH_SIZE, _SEQ_LEN, dtype=torch.long)
+        labels_l1 = torch.randint(0, _NUM_L1, (_BATCH_SIZE,))
+        labels_l2 = torch.randint(0, _NUM_L2, (_BATCH_SIZE,))
+
+        # Forward
+        level_outputs, unified = model(input_ids, mask)
+        loss, loss_l1, loss_l2 = criterion(level_outputs, unified, labels_l1, labels_l2)
+        assert loss.item() > 0
+
+        # Backward + step
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+
+        # Second forward should produce different logits (weights updated)
+        level_outputs_2, _ = model(input_ids, mask)
+        assert not torch.allclose(level_outputs[0], level_outputs_2[0])

@@ -69,9 +69,9 @@ class HYDRALoss(nn.Module):
         alpha: float = 1.0,
         num_classes_l1: int = None,
         num_classes_l2: int = None,
-        level_weight_l1: float = 1.0,
+        level_weight_l1: float = 0.5,
         focal_gamma: float = 2.0,
-        use_focal: bool = True,
+        use_focal: bool = False,
     ):
         super().__init__()
         self.architecture = architecture

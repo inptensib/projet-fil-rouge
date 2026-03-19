@@ -49,6 +49,16 @@ class TestFocalLoss:
         ce_loss = ce(logits, labels)
         assert torch.allclose(focal_loss, ce_loss, atol=1e-5)
 
+    def test_focal_loss_gamma_zero_equals_cross_entropy(self):
+        """FocalLoss(gamma=0) must be numerically equal to CrossEntropyLoss."""
+        torch.manual_seed(123)
+        logits = torch.randn(32, 8)
+        labels = torch.randint(0, 8, (32,))
+
+        focal = FocalLoss(gamma=0.0, reduction="mean")
+        ce = torch.nn.CrossEntropyLoss(reduction="mean")
+        assert torch.allclose(focal(logits, labels), ce(logits, labels), atol=1e-5)
+
     def test_gradient_flows(self):
         logits = torch.randn(4, 10, requires_grad=True)
         labels = torch.randint(0, 10, (4,))

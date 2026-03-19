@@ -33,6 +33,14 @@ def get_device() -> torch.device:
     return torch.device("cpu")
 
 
+# Supported encoder models
+ENCODERS = {
+    "CamemBERT": "camembert-base",
+    "XLM-RoBERTa": "xlm-roberta-base",
+    "mBERT": "bert-base-multilingual-cased",
+}
+
+
 def count_parameters(model: torch.nn.Module) -> dict[str, int]:
     """Count total and trainable parameters in a model.
 

@@ -20,13 +20,53 @@ class HYDRABase(nn.Module):
 
     POOLING_METHODS = ("cls", "mean", "max", "last")
 
-    def __init__(self, pooling: str = "cls"):
+    def __init__(
+        self,
+        encoder_name: str,
+        num_classes_l1: int,
+        num_classes_l2: int,
+        pooling: str = "cls",
+        project_embedding: bool = True,
+        dropout: float = 0.3,
+        hidden_dim: int = 256,
+        freeze_encoder: bool = False,
+    ):
         super().__init__()
         if pooling not in self.POOLING_METHODS:
             raise ValueError(
                 f"Unknown pooling '{pooling}'. Choose from {self.POOLING_METHODS}"
             )
         self.pooling = pooling
+        self.num_levels = 2
+        self.num_classes_l1 = num_classes_l1
+        self.num_classes_l2 = num_classes_l2
+        self.project_embedding = project_embedding
+        self.hidden_dim = hidden_dim
+
+        # Encoder
+        self.encoder = AutoModel.from_pretrained(encoder_name)
+        self.hidden_size = self.encoder.config.hidden_size
+
+        if freeze_encoder:
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+
+        # Projection (applied AFTER pooling, on pooled vector of dim=hidden_size)
+        if project_embedding:
+            self.embedding_projector = nn.Linear(
+                self.hidden_size, self.hidden_size * self.num_levels
+            )
+            self.embedding_size = self.hidden_size * self.num_levels
+        else:
+            self.embedding_size = self.hidden_size
+
+        # Classification heads
+        self.level_1_head = self._make_classification_head(
+            self.embedding_size, num_classes_l1, dropout
+        )
+        self.level_2_head = self._make_classification_head(
+            self.embedding_size, num_classes_l2, dropout
+        )
 
     def _pool(self, hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """Pool encoder hidden states into a single vector per sample."""
@@ -36,22 +76,34 @@ class HYDRABase(nn.Module):
             mask = attention_mask.unsqueeze(-1).float()
             return (hidden_states * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1e-9)
         elif self.pooling == "max":
+            mask = attention_mask.unsqueeze(-1).float()
+            hidden_states = hidden_states.masked_fill(mask == 0, -1e9)
             return hidden_states.max(dim=1).values
         elif self.pooling == "last":
             return hidden_states[:, -1, :]
 
-    @staticmethod
     def _make_classification_head(
-        input_size: int, num_classes: int, dropout: float = 0.3
+        self, input_size: int, num_classes: int, dropout: float = 0.3
     ) -> nn.Sequential:
         """Create a classification head: Linear -> LayerNorm -> ReLU -> Dropout -> Linear."""
         return nn.Sequential(
-            nn.Linear(input_size, input_size * 2),
-            nn.LayerNorm(input_size * 2),
+            nn.Linear(input_size, self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(input_size * 2, num_classes),
+            nn.Linear(self.hidden_dim, num_classes),
         )
+
+    def _encode_and_pool(
+        self, input_ids: torch.Tensor, attention_mask: torch.Tensor
+    ) -> torch.Tensor:
+        """Run encoder, pool, then optionally project."""
+        encoder_output = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
+        hidden_states = encoder_output.last_hidden_state
+        embedding = self._pool(hidden_states, attention_mask)
+        if self.project_embedding:
+            embedding = self.embedding_projector(embedding)
+        return embedding
 
 
 class HYDRALocal(HYDRABase):
@@ -64,6 +116,7 @@ class HYDRALocal(HYDRABase):
         pooling: Pooling strategy ('cls', 'mean', 'max', 'last').
         project_embedding: Whether to project encoder output to a larger space.
         dropout: Dropout rate for classification heads.
+        hidden_dim: Hidden dimension for classification heads.
         freeze_encoder: Whether to freeze encoder parameters.
     """
 
@@ -75,45 +128,24 @@ class HYDRALocal(HYDRABase):
         pooling: str = "cls",
         project_embedding: bool = True,
         dropout: float = 0.3,
+        hidden_dim: int = 256,
         freeze_encoder: bool = False,
     ):
-        super().__init__(pooling=pooling)
-
-        self.encoder = AutoModel.from_pretrained(encoder_name)
-        self.hidden_size = self.encoder.config.hidden_size
-        self.num_levels = 2
-        self.num_classes_l1 = num_classes_l1
-        self.num_classes_l2 = num_classes_l2
-        self.project_embedding = project_embedding
-
-        if freeze_encoder:
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-
-        if project_embedding:
-            self.embedding_projector = nn.Linear(
-                self.hidden_size, self.hidden_size * self.num_levels
-            )
-            self.embedding_size = self.hidden_size * self.num_levels
-        else:
-            self.embedding_size = self.hidden_size
-
-        self.level_1_head = self._make_classification_head(
-            self.embedding_size, num_classes_l1, dropout
-        )
-        self.level_2_head = self._make_classification_head(
-            self.embedding_size, num_classes_l2, dropout
+        super().__init__(
+            encoder_name=encoder_name,
+            num_classes_l1=num_classes_l1,
+            num_classes_l2=num_classes_l2,
+            pooling=pooling,
+            project_embedding=project_embedding,
+            dropout=dropout,
+            hidden_dim=hidden_dim,
+            freeze_encoder=freeze_encoder,
         )
 
     def forward(
         self, input_ids: torch.Tensor, attention_mask: torch.Tensor
     ) -> tuple[list[torch.Tensor], None]:
-        encoder_output = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
-        hidden_states = encoder_output.last_hidden_state
-        if self.project_embedding:
-            hidden_states = self.embedding_projector(hidden_states)
-        embedding = self._pool(hidden_states, attention_mask)
-
+        embedding = self._encode_and_pool(input_ids, attention_mask)
         logits_l1 = self.level_1_head(embedding)
         logits_l2 = self.level_2_head(embedding)
         return [logits_l1, logits_l2], None
@@ -134,34 +166,18 @@ class HYDRAGlobal(HYDRABase):
         pooling: str = "cls",
         project_embedding: bool = True,
         dropout: float = 0.3,
+        hidden_dim: int = 256,
         freeze_encoder: bool = False,
     ):
-        super().__init__(pooling=pooling)
-
-        self.encoder = AutoModel.from_pretrained(encoder_name)
-        self.hidden_size = self.encoder.config.hidden_size
-        self.num_levels = 2
-        self.num_classes_l1 = num_classes_l1
-        self.num_classes_l2 = num_classes_l2
-        self.project_embedding = project_embedding
-
-        if freeze_encoder:
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-
-        if project_embedding:
-            self.embedding_projector = nn.Linear(
-                self.hidden_size, self.hidden_size * self.num_levels
-            )
-            self.embedding_size = self.hidden_size * self.num_levels
-        else:
-            self.embedding_size = self.hidden_size
-
-        self.level_1_head = self._make_classification_head(
-            self.embedding_size, num_classes_l1, dropout
-        )
-        self.level_2_head = self._make_classification_head(
-            self.embedding_size, num_classes_l2, dropout
+        super().__init__(
+            encoder_name=encoder_name,
+            num_classes_l1=num_classes_l1,
+            num_classes_l2=num_classes_l2,
+            pooling=pooling,
+            project_embedding=project_embedding,
+            dropout=dropout,
+            hidden_dim=hidden_dim,
+            freeze_encoder=freeze_encoder,
         )
 
         total_labels = num_classes_l1 + num_classes_l2
@@ -172,12 +188,7 @@ class HYDRAGlobal(HYDRABase):
     def forward(
         self, input_ids: torch.Tensor, attention_mask: torch.Tensor
     ) -> tuple[list[torch.Tensor], torch.Tensor]:
-        encoder_output = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
-        hidden_states = encoder_output.last_hidden_state
-        if self.project_embedding:
-            hidden_states = self.embedding_projector(hidden_states)
-        embedding = self._pool(hidden_states, attention_mask)
-
+        embedding = self._encode_and_pool(input_ids, attention_mask)
         logits_l1 = self.level_1_head(embedding)
         logits_l2 = self.level_2_head(embedding)
         unified_logits = self.global_head(embedding)
@@ -199,54 +210,33 @@ class HYDRANested(HYDRABase):
         pooling: str = "cls",
         project_embedding: bool = True,
         dropout: float = 0.3,
+        hidden_dim: int = 256,
         freeze_encoder: bool = False,
     ):
-        super().__init__(pooling=pooling)
-
-        self.encoder = AutoModel.from_pretrained(encoder_name)
-        self.hidden_size = self.encoder.config.hidden_size
-        self.num_levels = 2
-        self.num_classes_l1 = num_classes_l1
-        self.num_classes_l2 = num_classes_l2
-        self.project_embedding = project_embedding
-
-        if freeze_encoder:
-            for param in self.encoder.parameters():
-                param.requires_grad = False
-
-        if project_embedding:
-            self.embedding_projector = nn.Linear(
-                self.hidden_size, self.hidden_size * self.num_levels
-            )
-            self.embedding_size = self.hidden_size * self.num_levels
-        else:
-            self.embedding_size = self.hidden_size
-
-        self.level_1_head = self._make_classification_head(
-            self.embedding_size, num_classes_l1, dropout
-        )
-        self.level_2_head = self._make_classification_head(
-            self.embedding_size, num_classes_l2, dropout
+        super().__init__(
+            encoder_name=encoder_name,
+            num_classes_l1=num_classes_l1,
+            num_classes_l2=num_classes_l2,
+            pooling=pooling,
+            project_embedding=project_embedding,
+            dropout=dropout,
+            hidden_dim=hidden_dim,
+            freeze_encoder=freeze_encoder,
         )
 
         total_labels = num_classes_l1 + num_classes_l2
         self.nested_head = nn.Sequential(
-            nn.Linear(total_labels, self.hidden_size),
-            nn.LayerNorm(self.hidden_size),
+            nn.Linear(total_labels, self.hidden_dim),
+            nn.LayerNorm(self.hidden_dim),
             nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(self.hidden_size, total_labels),
+            nn.Linear(self.hidden_dim, total_labels),
         )
 
     def forward(
         self, input_ids: torch.Tensor, attention_mask: torch.Tensor
     ) -> tuple[list[torch.Tensor], torch.Tensor]:
-        encoder_output = self.encoder(input_ids=input_ids, attention_mask=attention_mask)
-        hidden_states = encoder_output.last_hidden_state
-        if self.project_embedding:
-            hidden_states = self.embedding_projector(hidden_states)
-        embedding = self._pool(hidden_states, attention_mask)
-
+        embedding = self._encode_and_pool(input_ids, attention_mask)
         logits_l1 = self.level_1_head(embedding)
         logits_l2 = self.level_2_head(embedding)
         concat_logits = torch.cat([logits_l1, logits_l2], dim=1)

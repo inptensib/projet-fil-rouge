@@ -9,6 +9,7 @@ class TestSharedImports:
     def test_import_shared_utils(self):
         import shared.utils
         assert hasattr(shared.utils, "set_seed")
+        assert hasattr(shared.utils, "ENCODERS")
 
     def test_import_shared_metrics(self):
         import shared.metrics
