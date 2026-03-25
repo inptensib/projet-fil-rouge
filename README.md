@@ -18,7 +18,10 @@
 
 ## 📌 À propos
 
-Ce projet implémente **HYDRA** (EMNLP 2025), une architecture multi-tête encoder-only pour la classification hiérarchique de texte, appliquée au catalogue produits de Rakuten France.
+Ce projet compare deux architectures de classification hiérarchique de texte, appliquées au catalogue produits de Rakuten France :
+
+- **HYDRA** (EMNLP 2025) — Multi-tête encoder-only, avec têtes parallèles L1/L2
+- **HLPD** (ECIR 2025) — Décodeur non-autorégressif avec attention hiérarchique *(en cours)*
 
 À partir du titre et de la description d'un produit en français, le modèle prédit simultanément :
 - La **catégorie L1** (157 classes) — ex: *Électronique*
@@ -28,7 +31,9 @@ Ce projet implémente **HYDRA** (EMNLP 2025), une architecture multi-tête encod
 
 ---
 
-## 🏗️ Architecture HYDRA
+## 🏗️ Architectures
+
+### HYDRA — Multi-tête encoder-only (implémenté)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -63,6 +68,27 @@ Ce projet implémente **HYDRA** (EMNLP 2025), une architecture multi-tête encod
 | **Local** | Têtes L1/L2 indépendantes | 0.5 × CE(L1) + CE(L2) |
 | **Global** | + tête unifiée sur l'embedding | + α × unified_loss |
 | **Nested** | + MLP sur concat(logits L1, logits L2) | + α × unified_loss |
+
+### HLPD — Décodeur hiérarchique non-autorégressif (en cours)
+
+```
+Texte ──→ [CamemBERT Encodeur] ──→ H_enc
+                                      │
+Labels taxonomie ──→ [Embeddings] ──→ E_labels
+                                      │
+                    [Cross-attention H_enc × E_labels]
+                                      │
+                    [Self-attention hiérarchique] × N couches
+                                      │
+                    [Classification] ──→ Logits (1 + 157 + 6059)
+```
+
+| | HYDRA | HLPD |
+|---|---|---|
+| Paradigme | Multi-tête discriminatif | Encoder-Decoder |
+| Cohérence hiérarchique | Post-hoc (masque parent-child) | Par construction (attention hiérarchique) |
+| Loss | CrossEntropy / Focal | ZLPR (pairwise ranking) |
+| Statut | ✅ Implémenté | 🔧 En cours (Mehdi) |
 
 ---
 
@@ -238,6 +264,7 @@ rakuten-classification/
 ├── 02_hydra/
 │   ├── configs/default.yaml   Hyperparamètres (source de vérité)
 │   └── src/                   models.py, losses.py, trainer.py, predict.py
+├── 02b_hlpd/                  HLPD : décodeur hiérarchique (en cours)
 ├── 03_production/
 │   ├── src/                   main.py, trainer_ddp.py, data_sharding.py
 │   └── scripts/               launch_distributed.sh, launch_node.sh
@@ -268,11 +295,4 @@ rakuten-classification/
 
 ## 👥 Auteurs
 
-| Nom | Rôle |
-|-----|------|
-| **Tahiana H. Andriambahoaka** | Architecture HYDRA, training distribué, MLOps |
-| **Mehdi Aithamma** | Baselines, évaluation |
-| **Younes Boutrouft** | Infrastructure, déploiement |
-| **Amir H. Kashani Rahimi** | Data engineering, analyse |
-
-> *Remerciements au Rakuten Institute of Technology pour le dataset et la collaboration.*
+Tahiana H. Andriambahoaka, Mehdi Aithamma, Younes Boutrouft, Amir H. Kashani Rahimi
