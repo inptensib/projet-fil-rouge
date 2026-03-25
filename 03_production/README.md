@@ -14,7 +14,7 @@ Training Distributed Data Parallel des modèles HYDRA sur cluster SLURM multi-n�
 
 - **Gradient clipping** (`max_norm=1.0`) pour la stabilité
 - **Gradient accumulation** avec `no_sync()` pour réduire l'overhead NCCL
-- **Validation dual-speed** : Sniper (~15min, loss + ReduceLROnPlateau) et Audit (~1h, F1 complet + hard examples)
+- **Validation dual-speed** : Sniper (~15min, loss) et Audit (~1h, F1 complet + hard examples)
 - **MLflow** : tracking temps réel (loss, LR, métriques), tableaux d'erreurs, artefacts modèle (rank 0)
 - **Métriques hiérarchiques** (Constrained F1, HCR) via `shared.metrics`
 - **Error tracking** inter-époques pour détecter le label noise (persistance cross-epochs)

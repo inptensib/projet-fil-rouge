@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from shared.utils import ENCODERS
+from shared.utils import ENCODERS, enforce_hierarchy
 from .models import create_hydra_model
 
 
@@ -54,7 +54,7 @@ def load_model(model_path: str, device: torch.device = None):
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    checkpoint = torch.load(model_path, map_location=device, weights_only=True)
+    checkpoint = torch.load(model_path, map_location=device, weights_only=False)
     config = checkpoint["config"]
 
     encoder_path = ENCODERS.get(config["encoder_name"], config["encoder_name"])
@@ -77,19 +77,6 @@ def load_model(model_path: str, device: torch.device = None):
     model.eval()
 
     return model, config
-
-
-def _enforce_hierarchy(
-    logits_l1: torch.Tensor,
-    logits_l2: torch.Tensor,
-    parent_child_matrix: torch.Tensor,
-) -> torch.Tensor:
-    """Mask invalid L2 predictions based on predicted L1 parent."""
-    preds_l1 = torch.argmax(logits_l1, dim=-1)
-    valid_l2_mask = parent_child_matrix[preds_l1]
-    masked = logits_l2.clone()
-    masked[valid_l2_mask == 0] = float("-inf")
-    return masked
 
 
 def predict(
@@ -127,7 +114,7 @@ def predict(
         logits_l1, logits_l2 = level_outputs
 
         if parent_child_matrix is not None:
-            logits_l2 = _enforce_hierarchy(logits_l1, logits_l2, parent_child_matrix)
+            logits_l2 = enforce_hierarchy(logits_l1, logits_l2, parent_child_matrix)
 
         probs_l1 = F.softmax(logits_l1, dim=-1)
         probs_l2 = F.softmax(logits_l2, dim=-1)
@@ -192,7 +179,7 @@ def predict_batch(
             logits_l1, logits_l2 = level_outputs
 
             if parent_child_matrix is not None:
-                logits_l2 = _enforce_hierarchy(logits_l1, logits_l2, parent_child_matrix)
+                logits_l2 = enforce_hierarchy(logits_l1, logits_l2, parent_child_matrix)
 
             probs_l1 = F.softmax(logits_l1, dim=-1)
             probs_l2 = F.softmax(logits_l2, dim=-1)

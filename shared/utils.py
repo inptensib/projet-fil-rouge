@@ -41,6 +41,28 @@ ENCODERS = {
 }
 
 
+def enforce_hierarchy(
+    logits_l1: torch.Tensor,
+    logits_l2: torch.Tensor,
+    parent_child_matrix: torch.Tensor,
+) -> torch.Tensor:
+    """Mask invalid L2 predictions based on predicted L1 parent.
+
+    Args:
+        logits_l1: L1 logits of shape (batch, num_l1).
+        logits_l2: L2 logits of shape (batch, num_l2).
+        parent_child_matrix: Binary matrix (num_l1, num_l2).
+
+    Returns:
+        Masked L2 logits with invalid classes set to -inf.
+    """
+    preds_l1 = torch.argmax(logits_l1, dim=-1)
+    valid_l2_mask = parent_child_matrix[preds_l1]
+    masked = logits_l2.clone()
+    masked[valid_l2_mask == 0] = float("-inf")
+    return masked
+
+
 def count_parameters(model: torch.nn.Module) -> dict[str, int]:
     """Count total and trainable parameters in a model.
 

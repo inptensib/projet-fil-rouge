@@ -39,22 +39,13 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from shared.data_loader import HierarchicalProductDataset
+from shared.utils import ENCODERS
 
 _HYDRA_ROOT = os.path.join(_PROJECT_ROOT, "02_hydra")
 if _HYDRA_ROOT not in sys.path:
     sys.path.insert(0, _HYDRA_ROOT)
 
 from src.models import create_hydra_model
-
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-ENCODERS = {
-    "CamemBERT": "camembert-base",
-    "XLM-RoBERTa": "xlm-roberta-base",
-    "mBERT": "bert-base-multilingual-cased",
-}
 
 
 # ---------------------------------------------------------------------------

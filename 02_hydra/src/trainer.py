@@ -32,7 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from shared.data_loader import HierarchicalProductDataset, build_parent_child_matrix
 from shared.metrics import compute_all_metrics
-from shared.utils import set_seed, get_device, ENCODERS
+from shared.utils import set_seed, get_device, ENCODERS, enforce_hierarchy
 
 from .models import create_hydra_model
 from .losses import HYDRALoss
@@ -115,8 +115,10 @@ class HYDRATrainer:
         seed: int = 42,
         warmup_ratio: float = 0.1,
         fp16: bool = True,
+        resume_from: str | None = None,
     ):
         set_seed(seed)
+        self.resume_from = resume_from
         self.device = get_device()
         self.variant = variant
         self.encoder_name = encoder_name
@@ -160,6 +162,13 @@ class HYDRATrainer:
             project_embedding=project_embedding,
         ).to(self.device)
 
+        # DataParallel if multiple GPUs available
+        self._base_model = self.model
+        n_gpus = torch.cuda.device_count()
+        if n_gpus > 1:
+            print(f"[Trainer] Using DataParallel on {n_gpus} GPUs")
+            self.model = torch.nn.DataParallel(self.model)
+
         # Loss
         self.criterion = HYDRALoss(
             architecture=variant,
@@ -190,11 +199,7 @@ class HYDRATrainer:
 
     def _enforce_hierarchy(self, logits_l1: torch.Tensor, logits_l2: torch.Tensor) -> torch.Tensor:
         """Mask invalid L2 predictions based on predicted L1 parent."""
-        preds_l1 = torch.argmax(logits_l1, dim=-1)
-        valid_l2_mask = self.parent_child_matrix[preds_l1]
-        masked = logits_l2.clone()
-        masked[valid_l2_mask == 0] = float("-inf")
-        return masked
+        return enforce_hierarchy(logits_l1, logits_l2, self.parent_child_matrix)
 
     @torch.no_grad()
     def evaluate(self, dataloader: DataLoader) -> dict[str, float]:
@@ -222,11 +227,16 @@ class HYDRATrainer:
             all_labels_l1.extend(batch["label_l1"].numpy())
             all_labels_l2.extend(batch["label_l2"].numpy())
 
-        return compute_all_metrics(
+        metrics = compute_all_metrics(
             all_labels_l1, all_preds_l1,
             all_labels_l2, all_preds_l2,
             self.l2_to_l1_mapping,
         )
+        metrics["_preds_l1"] = all_preds_l1
+        metrics["_preds_l2"] = all_preds_l2
+        metrics["_labels_l1"] = all_labels_l1
+        metrics["_labels_l2"] = all_labels_l2
+        return metrics
 
     def train(self) -> dict:
         """Run the full training loop."""
@@ -262,6 +272,7 @@ class HYDRATrainer:
             import mlflow
             mlflow.set_experiment(model_key)
             mlflow.start_run()
+            gpu_type = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
             mlflow.log_params({
                 "variant": self.variant,
                 "encoder": self.encoder_name,
@@ -273,6 +284,13 @@ class HYDRATrainer:
                 "gradient_accumulation_steps": self.gradient_accumulation_steps,
                 "num_classes_l1": self.num_classes_l1,
                 "num_classes_l2": self.num_classes_l2,
+                "weight_decay": self.weight_decay,
+                "max_length": self.max_length,
+                "max_grad_norm": self.max_grad_norm,
+                "level_weight_l1": self.level_weight_l1,
+                "early_stopping_patience": self.early_stopping_patience,
+                "early_stopping_min_delta": self.early_stopping_min_delta,
+                "gpu_type": gpu_type,
             })
             mlflow_active = True
         except Exception:
@@ -281,14 +299,37 @@ class HYDRATrainer:
         # Training state
         best_val_f1 = 0.0
         epochs_without_improvement = 0
-        history = {"epoch": [], "train_loss": [], "val_f1_l2_macro": [], "val_metrics": []}
+        start_epoch = 0
+        history = {
+            "epoch": [], "train_loss": [],
+            "val_f1_l1_macro": [], "val_f1_l2_macro": [],
+            "val_hcr": [],
+        }
         model_dir = self.save_dir / model_key
         model_dir.mkdir(parents=True, exist_ok=True)
 
         start_time = time.time()
         global_step = 0
 
-        for epoch in range(self.epochs):
+        # Resume from checkpoint if provided
+        if self.resume_from:
+            print(f"[Resume] Loading checkpoint from {self.resume_from}")
+            ckpt = torch.load(self.resume_from, map_location=self.device, weights_only=False)
+            self._base_model.load_state_dict(ckpt["model_state_dict"])
+            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+            self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+            self.scaler.load_state_dict(ckpt["scaler_state_dict"])
+            start_epoch = ckpt["epoch"]
+            global_step = ckpt["global_step"]
+            best_val_f1 = ckpt["best_val_f1"]
+            epochs_without_improvement = ckpt["epochs_without_improvement"]
+            history = ckpt.get("history", history)
+            print(
+                f"[Resume] Reprise à epoch {start_epoch}, "
+                f"step {global_step}, best F1={best_val_f1:.4f}"
+            )
+
+        for epoch in range(start_epoch, self.epochs):
             self.model.train()
             epoch_loss = 0.0
             num_batches = 0
@@ -343,8 +384,9 @@ class HYDRATrainer:
 
             history["epoch"].append(epoch + 1)
             history["train_loss"].append(avg_train_loss)
+            history["val_f1_l1_macro"].append(val_metrics["f1_l1_macro"])
             history["val_f1_l2_macro"].append(val_f1_l2)
-            history["val_metrics"].append(val_metrics)
+            history["val_hcr"].append(val_metrics.get("hcr", 0.0))
 
             print(
                 f"  Loss: {avg_train_loss:.4f} | "
@@ -360,6 +402,7 @@ class HYDRATrainer:
                         "train_loss": avg_train_loss,
                         "val_f1_l1_macro": val_metrics["f1_l1_macro"],
                         "val_f1_l2_macro": val_f1_l2,
+                        "val_hcr": val_metrics.get("hcr", 0.0),
                     }, step=epoch + 1)
                 except Exception:
                     pass
@@ -370,16 +413,16 @@ class HYDRATrainer:
                 epochs_without_improvement = 0
                 torch.save(
                     {
-                        "model_state_dict": self.model.state_dict(),
+                        "model_state_dict": self._base_model.state_dict(),
                         "config": {
                             "variant": self.variant,
                             "encoder_name": self.encoder_name,
                             "num_classes_l1": self.num_classes_l1,
                             "num_classes_l2": self.num_classes_l2,
-                            "pooling": self.model.pooling,
-                            "project_embedding": self.model.project_embedding,
-                            "dropout": self.model.level_1_head[3].p,
-                            "hidden_dim": self.model.hidden_dim,
+                            "pooling": self._base_model.pooling,
+                            "project_embedding": self._base_model.project_embedding,
+                            "dropout": self._base_model.level_1_head[3].p,
+                            "hidden_dim": self._base_model.hidden_dim,
                         },
                         "best_val_f1_l2": best_val_f1,
                         "epoch": epoch + 1,
@@ -389,6 +432,33 @@ class HYDRATrainer:
                 print(f"  -> New best model saved (F1 L2: {best_val_f1:.4f})")
             else:
                 epochs_without_improvement += 1
+
+            # Save full checkpoint for resume (every epoch, overwritten)
+            torch.save(
+                {
+                    "model_state_dict": self._base_model.state_dict(),
+                    "optimizer_state_dict": self.optimizer.state_dict(),
+                    "scheduler_state_dict": self.scheduler.state_dict(),
+                    "scaler_state_dict": self.scaler.state_dict(),
+                    "epoch": epoch + 1,
+                    "global_step": global_step,
+                    "best_val_f1": best_val_f1,
+                    "epochs_without_improvement": epochs_without_improvement,
+                    "history": history,
+                    "config": {
+                        "variant": self.variant,
+                        "encoder_name": self.encoder_name,
+                        "num_classes_l1": self.num_classes_l1,
+                        "num_classes_l2": self.num_classes_l2,
+                        "pooling": self._base_model.pooling,
+                        "project_embedding": self._base_model.project_embedding,
+                        "dropout": self._base_model.level_1_head[3].p,
+                        "hidden_dim": self._base_model.hidden_dim,
+                    },
+                },
+                model_dir / "checkpoint_latest.pt",
+            )
+            print(f"  -> Checkpoint saved (epoch {epoch + 1}, step {global_step})")
 
             if epochs_without_improvement >= self.early_stopping_patience:
                 print(f"  Early stopping after {epoch + 1} epochs.")
@@ -405,9 +475,17 @@ class HYDRATrainer:
         print(f"Test HCR: {test_metrics.get('hcr', 0):.4f}")
         print(f"{'='*60}")
 
-        # MLflow: log final metrics and model artifact
+        # MLflow: log final metrics, audit artifacts, and model
         if mlflow_active:
             try:
+                from shared.metrics import (
+                    compute_per_class_f1,
+                    plot_confusion_matrix,
+                    plot_per_class_f1,
+                    plot_training_curves,
+                )
+                import matplotlib.pyplot as plt
+
                 mlflow.log_metrics({
                     "test_f1_l1_macro": test_metrics["f1_l1_macro"],
                     "test_f1_l2_macro": test_metrics["f1_l2_macro"],
@@ -415,6 +493,45 @@ class HYDRATrainer:
                     "total_time_s": total_time,
                 })
                 mlflow.log_artifact(str(model_dir / "best_model.pt"))
+
+                # Audit visualizations (on validation set, not test)
+                val_audit = self.evaluate(val_loader)
+                preds_l1 = val_audit.get("_preds_l1", [])
+                labels_l1 = val_audit.get("_labels_l1", [])
+                preds_l2 = val_audit.get("_preds_l2", [])
+                labels_l2 = val_audit.get("_labels_l2", [])
+
+                if labels_l1:
+                    fig = plot_confusion_matrix(
+                        labels_l1, preds_l1, self.l1_encoder,
+                        title="Matrice de Confusion — L1",
+                    )
+                    mlflow.log_figure(fig, "confusion_matrix_l1.png")
+                    plt.close(fig)
+
+                    fig = plot_confusion_matrix(
+                        labels_l2, preds_l2, self.l2_encoder,
+                        title="Matrice de Confusion — L2 (top 50)", top_n=50,
+                    )
+                    mlflow.log_figure(fig, "confusion_matrix_l2_top50.png")
+                    plt.close(fig)
+
+                    f1_l1 = compute_per_class_f1(labels_l1, preds_l1, self.l1_encoder)
+                    fig = plot_per_class_f1(f1_l1, "F1 par classe — L1")
+                    mlflow.log_figure(fig, "f1_per_class_l1.png")
+                    plt.close(fig)
+                    mlflow.log_dict(f1_l1, "f1_per_class_l1.json")
+
+                    f1_l2 = compute_per_class_f1(labels_l2, preds_l2, self.l2_encoder)
+                    fig = plot_per_class_f1(f1_l2, "F1 par classe — L2 (top/bottom 30)")
+                    mlflow.log_figure(fig, "f1_per_class_l2.png")
+                    plt.close(fig)
+
+                if history["epoch"]:
+                    fig = plot_training_curves(history)
+                    mlflow.log_figure(fig, "training_curves.png")
+                    plt.close(fig)
+
                 mlflow.end_run()
             except Exception:
                 pass

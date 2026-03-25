@@ -124,9 +124,9 @@ Les produits systematiquement mal classes a *chaque epoque* revelent du bruit d'
 
 ## Phase 7 : Pilotage "Dual-Speed" et Flexibilite Materielle
 
-### Scheduler a deux vitesses
+### Évaluation à deux vitesses
 
-- **Sniper (~15 min / 400 steps)** : surveille la training loss, `ReduceLROnPlateau` intervient (factor=0.85) si stagnation
+- **Sniper (~15 min / 400 steps)** : surveille la training loss, détecte les anomalies rapidement
 - **Audit (~1h / 1600 steps)** : calcul des F1 sur validation + extraction des hard examples
 
 ### Agnosticisme materiel
@@ -186,7 +186,7 @@ Verification ligne par ligne contre le repo officiel (FKarl). Correspondances ex
 | Composant | Officiel | Notre version | Justification |
 |-----------|----------|---------------|---------------|
 | Perte | BCE | **Focal Loss** (gamma=2.0) | Dataset desequilibre (6 100 classes) |
-| Scheduler | Linear Warmup+Decay | **ReduceLROnPlateau** | Adaptatif aux zigzags sur 8M |
+| Scheduler | Linear Warmup+Decay | **LR constant** | Simplicité, pas de réduction prématurée |
 | Tache | Multi-label (Sigmoide) | **Single-label** (Softmax) | Un produit = une categorie |
 | Audit | Aucun | **Error tracking** | Detection du label noise |
 | Memoire | Tout en RAM | **Sharding disque** | Necessaire pour 8M produits |

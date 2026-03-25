@@ -28,11 +28,7 @@ if _HYDRA_ROOT not in sys.path:
 
 from src.models import create_hydra_model
 
-ENCODERS = {
-    "CamemBERT": "camembert-base",
-    "XLM-RoBERTa": "xlm-roberta-base",
-    "mBERT": "bert-base-multilingual-cased",
-}
+from shared.utils import ENCODERS
 
 
 def load_model(

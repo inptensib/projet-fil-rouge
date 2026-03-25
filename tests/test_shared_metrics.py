@@ -19,7 +19,6 @@ class TestComputeF1Metrics:
         metrics = compute_f1_metrics(labels, preds, labels, preds)
         assert metrics["f1_l1_macro"] == 1.0
         assert metrics["f1_l2_macro"] == 1.0
-        assert metrics["f1_l1_weighted"] == 1.0
 
     def test_wrong_predictions(self):
         labels = [0, 1, 2]

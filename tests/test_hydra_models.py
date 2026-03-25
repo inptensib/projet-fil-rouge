@@ -384,7 +384,7 @@ class TestEnforceHierarchy:
         # L2 logits: highest is class 0, but it's invalid for L1=1
         logits_l2 = torch.tensor([[5.0, 4.0, 3.0, 2.0, 1.0, 0.0]])
 
-        masked = _predict_mod._enforce_hierarchy(logits_l1, logits_l2, parent_child_matrix)
+        masked = _predict_mod.enforce_hierarchy(logits_l1, logits_l2, parent_child_matrix)
         pred_l2 = torch.argmax(masked, dim=-1).item()
         # Must be 2 or 3 (valid children of L1=1)
         assert pred_l2 in (2, 3)

@@ -29,7 +29,7 @@ import torch.distributed as dist
 import torch.nn.functional as F
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 from transformers import AutoTokenizer
@@ -47,7 +47,14 @@ from shared.data_loader import (
     HierarchicalProductDataset,
     build_parent_child_matrix,
 )
-from shared.metrics import compute_all_metrics
+from shared.metrics import (
+    compute_all_metrics,
+    compute_per_class_f1,
+    plot_confusion_matrix,
+    plot_per_class_f1,
+    plot_training_curves,
+)
+from shared.utils import ENCODERS, enforce_hierarchy
 
 # Models and losses from 02_hydra
 _HYDRA_ROOT = os.path.join(_PROJECT_ROOT, "02_hydra")
@@ -63,12 +70,6 @@ from .ddp_utils import cleanup_ddp, print_rank0
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-ENCODERS = {
-    "XLM-RoBERTa": "xlm-roberta-base",
-    "CamemBERT": "camembert-base",
-    "mBERT": "bert-base-multilingual-cased",
-}
-
 HYDRA_VARIANTS = ["local", "global", "nested"]
 
 MODEL_CLASSES = {
@@ -139,6 +140,7 @@ class HYDRATrainerDDP:
         level_weight_l1: float = 0.5,
         focal_gamma: float = 2.0,
         grad_clip_max_norm: float = GRAD_CLIP_MAX_NORM,
+        warmup_ratio: float = 0.1,
     ):
         self.max_length = max_length
         self.batch_size = batch_size
@@ -157,6 +159,7 @@ class HYDRATrainerDDP:
         self.level_weight_l1 = level_weight_l1
         self.focal_gamma = focal_gamma
         self.grad_clip_max_norm = grad_clip_max_norm
+        self.warmup_ratio = warmup_ratio
 
         # DDP info
         self.rank = rank
@@ -259,11 +262,7 @@ class HYDRATrainerDDP:
         self, logits_l1: torch.Tensor, logits_l2: torch.Tensor
     ) -> torch.Tensor:
         """Mask L2 logits to enforce parent-child consistency."""
-        preds_l1 = torch.argmax(logits_l1, dim=-1)
-        valid_l2_mask = self.parent_child_matrix[preds_l1]
-        masked_logits_l2 = logits_l2.clone()
-        masked_logits_l2[valid_l2_mask == 0] = float("-inf")
-        return masked_logits_l2
+        return enforce_hierarchy(logits_l1, logits_l2, self.parent_child_matrix)
 
     @staticmethod
     def _get_base_model(model: torch.nn.Module) -> torch.nn.Module:
@@ -378,6 +377,11 @@ class HYDRATrainerDDP:
             all_labels_l2, all_preds_l2,
             l2_to_l1_mapping=self.l2_to_l1_mapping,
         )
+        # Attach raw predictions for audit visualizations
+        metrics["_preds_l1"] = all_preds_l1
+        metrics["_preds_l2"] = all_preds_l2
+        metrics["_labels_l1"] = all_labels_l1
+        metrics["_labels_l2"] = all_labels_l2
         return metrics, error_details
 
     # ------------------------------------------------------------------
@@ -432,7 +436,6 @@ class HYDRATrainerDDP:
         Implements the full training loop with:
         - Gradient accumulation with DDP no_sync
         - Gradient clipping (max_norm configurable, default 1.0)
-        - Dual-speed adaptive LR via ReduceLROnPlateau on training loss
         - Intra-epoch evaluation on validation set
         - Early stopping synchronized across all ranks
         - MLflow logging (rank 0 only)
@@ -454,6 +457,7 @@ class HYDRATrainerDDP:
         if self.rank == 0:
             mlflow.set_experiment("HYDRA_Hierarchical_Classification")
             mlflow.start_run(run_name=model_key)
+            gpu_type = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
             mlflow.log_params({
                 "encoder": encoder_name,
                 "variant": variant,
@@ -465,6 +469,16 @@ class HYDRATrainerDDP:
                 "world_size": self.world_size,
                 "total_epochs": self.epochs,
                 "grad_clip_max_norm": self.grad_clip_max_norm,
+                "hidden_dim": 256,
+                "pooling": self.pooling,
+                "project_embedding": self.project_embedding,
+                "level_weight_l1": self.level_weight_l1,
+                "focal_gamma": self.focal_gamma,
+                "warmup_ratio": self.warmup_ratio,
+                "early_stopping_patience": self.early_stopping_patience,
+                "early_stopping_min_delta": self.early_stopping_min_delta,
+                "gradient_accumulation_steps": self.gradient_accumulation_steps,
+                "gpu_type": gpu_type,
             })
 
         # -- Data loaders -----------------------------------------------
@@ -530,17 +544,27 @@ class HYDRATrainerDDP:
             focal_gamma=self.focal_gamma,
         )
 
-        optimizer = AdamW(
-            model.parameters(), lr=self.lr, weight_decay=self.weight_decay
-        )
+        # Weight decay différencié : pas de decay sur bias et LayerNorm
+        no_decay = ["bias", "LayerNorm.weight"]
+        optimizer = AdamW([
+            {"params": [p for n, p in model.named_parameters()
+                        if not any(nd in n for nd in no_decay)],
+             "weight_decay": self.weight_decay},
+            {"params": [p for n, p in model.named_parameters()
+                        if any(nd in n for nd in no_decay)],
+             "weight_decay": 0.0},
+        ], lr=self.lr)
 
         total_steps = len(train_loader) * self.epochs // self.gradient_accumulation_steps
+        warmup_steps = int(total_steps * self.warmup_ratio)
 
-        # Dual-speed adaptive LR scheduler on training loss
-        scheduler = ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.85, patience=1,
-            threshold=0.01, min_lr=1e-6,
-        )
+        # Warmup linéaire puis LR constant
+        def lr_lambda(current_step: int) -> float:
+            if current_step < warmup_steps:
+                return float(current_step) / float(max(1, warmup_steps))
+            return 1.0
+
+        scheduler = LambdaLR(optimizer, lr_lambda)
 
         if self.rank == 0:
             mlflow.log_params({
@@ -552,7 +576,11 @@ class HYDRATrainerDDP:
         start_time = time.time()
         best_val_f1 = 0.0
         epochs_without_improvement = 0
-        epoch_history = {"epoch": [], "train_loss": [], "val_f1_l2_macro": []}
+        epoch_history = {
+            "epoch": [], "train_loss": [],
+            "val_f1_l1_macro": [], "val_f1_l2_macro": [],
+            "val_hcr": [],
+        }
         model_dir = self._get_model_dir(encoder_name, variant)
 
         if self.rank == 0:
@@ -633,6 +661,7 @@ class HYDRATrainerDDP:
                         model.parameters(), max_norm=self.grad_clip_max_norm
                     )
                     optimizer.step()
+                    scheduler.step()
                     optimizer.zero_grad()
                     global_step += 1
 
@@ -679,19 +708,6 @@ class HYDRATrainerDDP:
                         mlflow.log_metric(
                             "avg_train_loss_interval", avg_loss, step=global_step,
                         )
-
-                        # Adaptive LR based on training loss
-                        old_lr = optimizer.param_groups[0]["lr"]
-                        scheduler.step(avg_loss)
-                        new_lr = optimizer.param_groups[0]["lr"]
-
-                        if new_lr < old_lr:
-                            print(
-                                f"\n   [LR] Loss plateau at {avg_loss:.4f}. "
-                                f"LR reduced: {old_lr:.2e} -> {new_lr:.2e}"
-                            )
-
-                        mlflow.log_metric("lr_adaptive", new_lr, step=global_step)
 
                     # -- Evaluation checkpoint ---------------------------
                     if is_eval_step or is_epoch_end:
@@ -761,6 +777,14 @@ class HYDRATrainerDDP:
                                 f"   [Eval] Done. Val F1 avg: {val_f1_avg:.4f}"
                             )
 
+                        # Update epoch history for training curves
+                        if is_epoch_end and self.rank == 0:
+                            epoch_history["epoch"].append(epoch + 1)
+                            epoch_history["train_loss"].append(avg_loss)
+                            epoch_history["val_f1_l1_macro"].append(val_metrics["f1_l1_macro"])
+                            epoch_history["val_f1_l2_macro"].append(val_metrics["f1_l2_macro"])
+                            epoch_history["val_hcr"].append(val_metrics.get("hcr", 0.0))
+
                         # Synchronized early stopping
                         early_stop_tensor = torch.tensor([0], device=self.device)
                         if self.rank == 0:
@@ -812,10 +836,62 @@ class HYDRATrainerDDP:
                     train_error_details = []
                     model.train()
 
-        # -- End of training ---------------------------------------------
+        # -- End of training: audit artifacts ----------------------------
         if self.rank == 0:
             total_duration = time.time() - start_time
             mlflow.log_metric("total_training_duration_sec", total_duration)
+
+            # Generate audit visualizations on validation set
+            try:
+                base_model = self._get_base_model(model)
+                val_audit_metrics, _ = self._evaluate_model(
+                    base_model, val_loader, variant, collect_errors=False,
+                )
+                all_preds_l1, all_labels_l1 = val_audit_metrics.get("_preds_l1", []), val_audit_metrics.get("_labels_l1", [])
+                all_preds_l2, all_labels_l2 = val_audit_metrics.get("_preds_l2", []), val_audit_metrics.get("_labels_l2", [])
+
+                if all_labels_l1:
+                    # Confusion matrices
+                    fig_cm_l1 = plot_confusion_matrix(
+                        all_labels_l1, all_preds_l1, self.l1_encoder,
+                        title="Matrice de Confusion — L1 (157 classes)",
+                    )
+                    mlflow.log_figure(fig_cm_l1, "confusion_matrix_l1.png")
+                    plt.close(fig_cm_l1)
+
+                    fig_cm_l2 = plot_confusion_matrix(
+                        all_labels_l2, all_preds_l2, self.l2_encoder,
+                        title="Matrice de Confusion — L2 (top 50)",
+                        top_n=50,
+                    )
+                    mlflow.log_figure(fig_cm_l2, "confusion_matrix_l2_top50.png")
+                    plt.close(fig_cm_l2)
+
+                    # Per-class F1
+                    f1_l1 = compute_per_class_f1(all_labels_l1, all_preds_l1, self.l1_encoder)
+                    fig_f1_l1 = plot_per_class_f1(f1_l1, "F1 par classe — L1", top_n=30)
+                    mlflow.log_figure(fig_f1_l1, "f1_per_class_l1.png")
+                    plt.close(fig_f1_l1)
+                    mlflow.log_dict(f1_l1, "f1_per_class_l1.json")
+
+                    f1_l2 = compute_per_class_f1(all_labels_l2, all_preds_l2, self.l2_encoder)
+                    fig_f1_l2 = plot_per_class_f1(f1_l2, "F1 par classe — L2 (top/bottom 30)", top_n=30)
+                    mlflow.log_figure(fig_f1_l2, "f1_per_class_l2.png")
+                    plt.close(fig_f1_l2)
+                    mlflow.log_dict(
+                        {k: v for i, (k, v) in enumerate(f1_l2.items()) if i < 30 or i >= len(f1_l2) - 30},
+                        "f1_per_class_l2_extremes.json",
+                    )
+
+                # Training curves
+                if epoch_history["epoch"]:
+                    fig_curves = plot_training_curves(epoch_history)
+                    mlflow.log_figure(fig_curves, "training_curves.png")
+                    plt.close(fig_curves)
+
+            except Exception as e:
+                print(f"   [Audit] Warning: could not generate audit artifacts: {e}")
+
             mlflow.end_run()
 
         if dist.is_initialized():
