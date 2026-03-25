@@ -92,6 +92,47 @@ def extract_level_2(producttype) -> Optional[str]:
     return None
 
 
+def load_jsonl_full(file_path: str) -> pd.DataFrame:
+    """Load all records from a JSONL file.
+
+    Args:
+        file_path: Path to the JSONL file.
+
+    Returns:
+        DataFrame with all valid records.
+    """
+    data = []
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            try:
+                data.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+
+    df = pd.DataFrame(data)
+    del data
+    gc.collect()
+
+    print(f"[Data] Loaded {len(df):,} records from {file_path}.")
+    return df
+
+
+def _preprocess_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Extract hierarchical labels and text from a raw JSONL DataFrame.
+
+    Returns DataFrame with columns: text, level_1, level_2.
+    Drops rows with invalid L2 labels.
+    """
+    df["level_1"] = df["typelabel"].fillna("Unknown")
+    df["level_2_raw"] = df["producttype"].apply(extract_level_2)
+    df = df[df["level_2_raw"].notna()].copy()
+    df["level_2"] = df["level_2_raw"]
+    df["designation"] = df["designation"].fillna("")
+    df["description"] = df["description"].fillna("")
+    df["text"] = df["designation"] + ". " + df["description"]
+    return df[["text", "level_1", "level_2"]]
+
+
 def prepare_hierarchical_data(
     file_path: str,
     n_samples: int = 10_000,
@@ -114,18 +155,7 @@ def prepare_hierarchical_data(
         l2_to_l1_mapping, num_classes_l1, num_classes_l2.
     """
     df = load_random_sample(file_path, n_samples=n_samples, seed=seed)
-
-    # Extract hierarchical labels
-    df["level_1"] = df["typelabel"].fillna("Unknown")
-    df["level_2_raw"] = df["producttype"].apply(extract_level_2)
-    df = df[df["level_2_raw"].notna()].copy()
-    df["level_2"] = df["level_2_raw"]
-
-    # Concatenate title + description as input text
-    df["designation"] = df["designation"].fillna("")
-    df["description"] = df["description"].fillna("")
-    df["text"] = df["designation"] + ". " + df["description"]
-    df = df[["text", "level_1", "level_2"]]
+    df = _preprocess_df(df)
 
     print(f"[Data] Valid hierarchical samples: {len(df):,}")
 
@@ -168,6 +198,93 @@ def prepare_hierarchical_data(
         "X_train": X_train, "X_val": X_val, "X_test": X_test,
         "y_l1_train": y1_train, "y_l1_val": y1_val, "y_l1_test": y1_test,
         "y_l2_train": y2_train, "y_l2_val": y2_val, "y_l2_test": y2_test,
+        "l1_encoder": l1_encoder, "l2_encoder": l2_encoder,
+        "l2_to_l1_mapping": l2_to_l1,
+        "num_classes_l1": len(l1_encoder.classes_),
+        "num_classes_l2": len(l2_encoder.classes_),
+    }
+
+
+def prepare_hierarchical_data_from_splits(
+    train_path: str,
+    val_path: str,
+    test_path: str,
+    n_samples: Optional[int] = None,
+    seed: int = 42,
+) -> dict:
+    """Load pre-split JSONL files and prepare hierarchical labels.
+
+    Returns the same dict format as prepare_hierarchical_data().
+    LabelEncoders are fitted on the union of labels from all 3 splits.
+
+    Args:
+        train_path: Path to train_split.jsonl.
+        val_path: Path to val_split.jsonl.
+        test_path: Path to test_split.jsonl.
+        n_samples: If set, sample this many total (proportional per split).
+                   If None, load all data.
+        seed: Random seed for optional sampling.
+
+    Returns:
+        Dictionary with keys: X_train, X_val, X_test, y_l1_train, y_l1_val,
+        y_l1_test, y_l2_train, y_l2_val, y_l2_test, l1_encoder, l2_encoder,
+        l2_to_l1_mapping, num_classes_l1, num_classes_l2.
+    """
+    if n_samples is not None:
+        n_train = int(n_samples * 0.70)
+        n_val = int(n_samples * 0.15)
+        n_test = n_samples - n_train - n_val
+        df_train = _preprocess_df(load_random_sample(train_path, n_train, seed))
+        df_val = _preprocess_df(load_random_sample(val_path, n_val, seed))
+        df_test = _preprocess_df(load_random_sample(test_path, n_test, seed))
+    else:
+        df_train = _preprocess_df(load_jsonl_full(train_path))
+        df_val = _preprocess_df(load_jsonl_full(val_path))
+        df_test = _preprocess_df(load_jsonl_full(test_path))
+
+    print(
+        f"[Data] Pre-split loaded: "
+        f"{len(df_train):,} train / {len(df_val):,} val / {len(df_test):,} test"
+    )
+
+    # Fit encoders on the union of all labels
+    all_l1 = pd.concat([df_train["level_1"], df_val["level_1"], df_test["level_1"]])
+    all_l2 = pd.concat([df_train["level_2"], df_val["level_2"], df_test["level_2"]])
+
+    l1_encoder = LabelEncoder()
+    l2_encoder = LabelEncoder()
+    l1_encoder.fit(all_l1)
+    l2_encoder.fit(all_l2)
+
+    del all_l1, all_l2
+
+    # Encode each split
+    y_l1_train = pd.Series(l1_encoder.transform(df_train["level_1"]), index=df_train.index)
+    y_l2_train = pd.Series(l2_encoder.transform(df_train["level_2"]), index=df_train.index)
+    y_l1_val = pd.Series(l1_encoder.transform(df_val["level_1"]), index=df_val.index)
+    y_l2_val = pd.Series(l2_encoder.transform(df_val["level_2"]), index=df_val.index)
+    y_l1_test = pd.Series(l1_encoder.transform(df_test["level_1"]), index=df_test.index)
+    y_l2_test = pd.Series(l2_encoder.transform(df_test["level_2"]), index=df_test.index)
+
+    # Build parent-child mapping from all data
+    import numpy as np
+    all_l1_enc = np.concatenate([y_l1_train.values, y_l1_val.values, y_l1_test.values])
+    all_l2_enc = np.concatenate([y_l2_train.values, y_l2_val.values, y_l2_test.values])
+    l2_to_l1 = build_parent_child_mapping(all_l1_enc, all_l2_enc)
+
+    del all_l1_enc, all_l2_enc
+
+    X_train = df_train["text"]
+    X_val = df_val["text"]
+    X_test = df_test["text"]
+
+    del df_train, df_val, df_test
+    gc.collect()
+
+    return {
+        "X_train": X_train, "X_val": X_val, "X_test": X_test,
+        "y_l1_train": y_l1_train, "y_l1_val": y_l1_val, "y_l1_test": y_l1_test,
+        "y_l2_train": y_l2_train, "y_l2_val": y_l2_val, "y_l2_test": y_l2_test,
         "l1_encoder": l1_encoder, "l2_encoder": l2_encoder,
         "l2_to_l1_mapping": l2_to_l1,
         "num_classes_l1": len(l1_encoder.classes_),

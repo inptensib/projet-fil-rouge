@@ -24,9 +24,11 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from shared.data_loader import (
+    _preprocess_df,
     build_parent_child_mapping,
     extract_level_2,
     load_random_sample,
+    prepare_hierarchical_data_from_splits,
 )
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -68,16 +70,7 @@ def prepare_shards(
 
     print(f"[Rank 0] Loading {n_samples:,} samples from {filename}...")
     df = load_random_sample(filename, n_samples=n_samples, seed=seed)
-
-    # Preprocess hierarchical labels
-    df["level_1"] = df["typelabel"].fillna("Unknown")
-    df["level_2_raw"] = df["producttype"].apply(extract_level_2)
-    df = df[df["level_2_raw"].notna()].copy()
-    df["level_2"] = df["level_2_raw"]
-    df["designation"] = df["designation"].fillna("")
-    df["description"] = df["description"].fillna("")
-    df["text"] = df["designation"] + ". " + df["description"]
-    df = df[["text", "level_1", "level_2"]]
+    df = _preprocess_df(df)
 
     print(f"[Rank 0] Hierarchical samples: {len(df):,}")
 
@@ -171,5 +164,101 @@ def prepare_shards(
     print(
         f"[Rank 0] Shards ready: {world_size} train shards, "
         f"{n_total:,} train / {len(X_val):,} val / {len(X_test):,} test samples."
+    )
+    return metadata
+
+
+def prepare_shards_from_splits(
+    train_path: str,
+    val_path: str,
+    test_path: str,
+    world_size: int,
+    shard_dir: str,
+    n_samples: Optional[int] = None,
+    seed: int = 42,
+) -> dict:
+    """Prepare DDP shards from pre-split JSONL files.
+
+    Produces the same shard format as prepare_shards():
+    train_shard_{rank}.pkl, val.pkl, test.pkl, metadata.pkl.
+
+    This function should only be called by rank 0.
+
+    Args:
+        train_path: Path to train_split.jsonl.
+        val_path: Path to val_split.jsonl.
+        test_path: Path to test_split.jsonl.
+        world_size: Number of distributed processes.
+        shard_dir: Directory to write shard files.
+        n_samples: If set, sample this many total (proportional per split).
+        seed: Random seed.
+
+    Returns:
+        Metadata dictionary.
+    """
+    if os.path.exists(shard_dir):
+        shutil.rmtree(shard_dir)
+    os.makedirs(shard_dir, exist_ok=True)
+
+    data = prepare_hierarchical_data_from_splits(
+        train_path, val_path, test_path, n_samples=n_samples, seed=seed,
+    )
+
+    # Write per-rank training shards
+    X_train_list = data["X_train"].tolist()
+    y1_train_list = data["y_l1_train"].tolist()
+    y2_train_list = data["y_l2_train"].tolist()
+    n_total = len(X_train_list)
+
+    for r in range(world_size):
+        start = r * n_total // world_size
+        end = (r + 1) * n_total // world_size
+        shard = {
+            "texts": X_train_list[start:end],
+            "labels_l1": y1_train_list[start:end],
+            "labels_l2": y2_train_list[start:end],
+        }
+        shard_path = os.path.join(shard_dir, f"train_shard_{r}.pkl")
+        with open(shard_path, "wb") as f:
+            pickle.dump(shard, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # Write shared validation and test sets
+    val_data = {
+        "texts": data["X_val"].tolist(),
+        "labels_l1": data["y_l1_val"].tolist(),
+        "labels_l2": data["y_l2_val"].tolist(),
+    }
+    test_data = {
+        "texts": data["X_test"].tolist(),
+        "labels_l1": data["y_l1_test"].tolist(),
+        "labels_l2": data["y_l2_test"].tolist(),
+    }
+
+    with open(os.path.join(shard_dir, "val.pkl"), "wb") as f:
+        pickle.dump(val_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    with open(os.path.join(shard_dir, "test.pkl"), "wb") as f:
+        pickle.dump(test_data, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # Write metadata
+    metadata = {
+        "l1_encoder": data["l1_encoder"],
+        "l2_encoder": data["l2_encoder"],
+        "num_classes_l1": data["num_classes_l1"],
+        "num_classes_l2": data["num_classes_l2"],
+        "l2_to_l1_mapping": data["l2_to_l1_mapping"],
+        "world_size": world_size,
+        "n_train_total": n_total,
+        "n_val": len(data["X_val"]),
+        "n_test": len(data["X_test"]),
+    }
+    with open(os.path.join(shard_dir, "metadata.pkl"), "wb") as f:
+        pickle.dump(metadata, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    del data
+    gc.collect()
+
+    print(
+        f"[Rank 0] Shards ready (from splits): {world_size} train shards, "
+        f"{n_total:,} train / {metadata['n_val']:,} val / {metadata['n_test']:,} test."
     )
     return metadata
