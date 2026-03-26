@@ -23,7 +23,7 @@ from .models import create_hydra_model
 class _TextDataset(Dataset):
     """Simple dataset for batch inference."""
 
-    def __init__(self, texts: list[str], tokenizer, max_length: int = 128):
+    def __init__(self, texts: list[str], tokenizer, max_length: int = 256):
         self.texts = texts
         self.tokenizer = tokenizer
         self.max_length = max_length
@@ -86,7 +86,7 @@ def predict(
     l1_encoder,
     l2_encoder,
     device: torch.device,
-    max_length: int = 128,
+    max_length: int = 256,
     parent_child_matrix: torch.Tensor | None = None,
 ) -> dict:
     """Run inference on a single text input.
@@ -141,7 +141,7 @@ def predict_batch(
     l1_encoder,
     l2_encoder,
     device: torch.device,
-    max_length: int = 128,
+    max_length: int = 256,
     batch_size: int = 64,
     parent_child_matrix: torch.Tensor | None = None,
 ) -> list[dict]:

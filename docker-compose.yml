@@ -3,7 +3,7 @@
 # ==============================================================================
 # Usage:
 #   docker compose up mlflow                                    # MLflow UI :5000
-#   docker compose run --rm --profile test test                 # Tests (61)
+#   docker compose run --rm --profile test test                 # Tests (77)
 #   docker compose run --rm --profile gpu train                 # HYDRA training
 #   docker compose run --rm --profile baselines baseline-tfidf  # TF-IDF baseline
 #

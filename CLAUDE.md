@@ -8,7 +8,6 @@ Encodeur : `camembert-base`. Donnees : texte (designation + description) en fran
 
 **Metriques cles** (toutes dans `shared/metrics.py`) :
 - `f1_l1_macro`, `f1_l2_macro` — metriques principales (macro = chaque classe pese egalement)
-- `f1_l1_weighted`, `f1_l2_weighted` — ponderees par frequence
 - `constrained_f1` — F1 L2 valide uniquement si L1 parent correct
 - `hierarchical_consistency_rate` (HCR) — % de predictions ou L2 est enfant valide de L1
 
@@ -53,11 +52,11 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 ## Conventions techniques
 
 - Variantes HYDRA : `local`, `global`, `nested` (jamais `hybrid`)
-- Constantes : **157** classes L1, **6100+** classes L2, `max_length=128`
+- Constantes : **157** classes L1, **6100+** classes L2, `max_length=256`
 - Encodeur : `camembert-base`
 - FocalLoss sans alpha : `-(1-p_t)^gamma * log(p_t)`, `gamma=2.0`
 - Source de verite pour les hyperparametres : `02_hydra/configs/default.yaml`
-  - `dropout=0.3`, `lr=3.5e-5`, `batch_size=128`, `hidden_dim=256`, `epochs=10`, `level_weight_l1=0.5`
+  - `dropout=0.3`, `lr=3.5e-5`, `batch_size=64`, `hidden_dim=256`, `epochs=10`, `level_weight_l1=0.5`
 - Tout default dans le code Python DOIT matcher ce fichier YAML
 
 ## Structure du projet
@@ -69,7 +68,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 03_production/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
 shared/                data_loader.py, metrics.py, utils.py
 shared/dataset/        products.jsonl (non versionne — obtenir aupres de Rakuten)
-tests/                 61 tests pytest
+tests/                 77 tests pytest
 notebooks/             explorations, visualisations
 blog.md                article technique du projet
 docker-compose.yml     services : test, training, baselines, mlflow
@@ -127,7 +126,7 @@ Invoquer le skill correspondant est **OBLIGATOIRE** dans chaque situation listee
 |:------|:------|:---------|
 | Code Python, docs (.md), ou configs (.yaml) modifies | `/sync-check` | Detecte TOUT drift entre code, configs, READMEs et blog.md. Sans lui, des incoherences passent silencieusement. |
 | Refactoring, nouvelle feature, ou >3 fichiers touches | `/simplify` | Detecte code duplique, abstractions inutiles, imports morts. Garantit un code minimal. |
-| Avant tout commit (BLOQUANT) | `/pre-commit` | Pipeline complet : lint + 61 tests + sync-check + scan securite. Ne JAMAIS committer sans. Inclut deja `/sync-check`. |
+| Avant tout commit (BLOQUANT) | `/pre-commit` | Pipeline complet : lint + 77 tests + sync-check + scan securite. Ne JAMAIS committer sans. Inclut deja `/sync-check`. |
 | requirements.txt modifie, import ajoute/supprime, nouveau fichier .py | `/dep-audit` | Croise imports reels vs requirements.txt. Package manquant = crash en prod. |
 
 ### Experimentation & Training — cycle complet

@@ -95,7 +95,7 @@ def predict(
     l1_encoder,
     l2_encoder,
     device: torch.device,
-    max_length: int = 128,
+    max_length: int = 256,
 ) -> dict:
     """Run inference on a single text input.
 
@@ -148,7 +148,7 @@ def predict_batch(
     l1_encoder,
     l2_encoder,
     device: torch.device,
-    max_length: int = 128,
+    max_length: int = 256,
     batch_size: int = 32,
 ) -> list[dict]:
     """Run inference on a batch of texts.

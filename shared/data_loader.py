@@ -349,7 +349,7 @@ class HierarchicalProductDataset(Dataset):
         max_length: Maximum token sequence length.
     """
 
-    def __init__(self, texts, labels_l1, labels_l2, tokenizer, max_length: int = 128):
+    def __init__(self, texts, labels_l1, labels_l2, tokenizer, max_length: int = 256):
         import numpy as np
         self.texts = texts.tolist() if hasattr(texts, "tolist") else list(texts)
         self.labels_l1 = np.asarray(labels_l1) if not isinstance(labels_l1, np.ndarray) else labels_l1

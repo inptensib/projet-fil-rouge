@@ -27,7 +27,7 @@ Implémentation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hi
 | `variant` | `local` | `local` / `global` / `nested` |
 | `dropout` | `0.3` | Dropout avant heads |
 | `lr` | `3.5e-5` | Learning rate |
-| `batch_size` | `128` | Taille de batch |
+| `batch_size` | `64` | Taille de batch |
 | `epochs` | `10` | Nombre d'époques |
 | `loss` | `cross_entropy` | `cross_entropy` / `focal` |
 | `level_weights` | `[0.5]` | Poids L1 (L2 implicitement 1.0) |

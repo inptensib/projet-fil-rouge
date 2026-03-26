@@ -34,7 +34,7 @@ def main():
                         choices=["local", "global", "nested"])
     parser.add_argument("--encoder", type=str, default="CamemBERT",
                         choices=["CamemBERT", "XLM-RoBERTa", "mBERT"])
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--epochs", type=int, default=10)
     parser.add_argument("--lr", type=float, default=3.5e-5)
     parser.add_argument("--shard_dir", type=str, default="shards")
