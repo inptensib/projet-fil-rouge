@@ -892,6 +892,26 @@ class HYDRATrainerDDP:
             except Exception as e:
                 print(f"   [Audit] Warning: could not generate audit artifacts: {e}")
 
+            # Explainability report (on validation set)
+            try:
+                from shared.explainability import generate_explainability_report
+                val_texts = self.X_val.tolist() if hasattr(self.X_val, "tolist") else list(self.X_val)
+                explain_html = generate_explainability_report(
+                    model=base_model,
+                    tokenizer=tokenizer,
+                    texts=val_texts,
+                    labels_l1=list(self.y_l1_val),
+                    labels_l2=list(self.y_l2_val),
+                    preds_l1=all_preds_l1,
+                    preds_l2=all_preds_l2,
+                    l1_encoder=self.l1_encoder,
+                    l2_encoder=self.l2_encoder,
+                    device=self.device,
+                )
+                mlflow.log_text(explain_html, "explainability_report.html")
+            except Exception as e:
+                print(f"   [Explain] Warning: could not generate explainability report: {e}")
+
             mlflow.end_run()
 
         if dist.is_initialized():

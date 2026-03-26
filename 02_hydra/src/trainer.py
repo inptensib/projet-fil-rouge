@@ -532,6 +532,26 @@ class HYDRATrainer:
                     mlflow.log_figure(fig, "training_curves.png")
                     plt.close(fig)
 
+                # Explainability report (on validation set)
+                try:
+                    from shared.explainability import generate_explainability_report
+                    val_texts = self.data["X_val"].tolist() if hasattr(self.data["X_val"], "tolist") else list(self.data["X_val"])
+                    explain_html = generate_explainability_report(
+                        model=self._base_model,
+                        tokenizer=self.tokenizer,
+                        texts=val_texts,
+                        labels_l1=list(self.data["y_l1_val"]),
+                        labels_l2=list(self.data["y_l2_val"]),
+                        preds_l1=preds_l1,
+                        preds_l2=preds_l2,
+                        l1_encoder=self.l1_encoder,
+                        l2_encoder=self.l2_encoder,
+                        device=self.device,
+                    )
+                    mlflow.log_text(explain_html, "explainability_report.html")
+                except Exception:
+                    pass
+
                 mlflow.end_run()
             except Exception:
                 pass
