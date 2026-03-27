@@ -2,299 +2,226 @@
 
 # 🛒 Rakuten Hierarchical Product Classification
 
-**Classification hiérarchique de 8M+ produits e-commerce en 157 catégories et 6 059 sous-catégories**
+**8M+ produits · 157 catégories · 6 059 sous-catégories · CamemBERT**
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-yellow?logo=huggingface&logoColor=white)
 ![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?logo=mlflow&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-77%20passed-brightgreen?logo=pytest&logoColor=white)
+![SLURM](https://img.shields.io/badge/SLURM-Multi--GPU-orange)
 
-> Projet académique **Télécom Paris** (IP Paris) × **Rakuten Institute of Technology**
+> **Télécom Paris** (IP Paris) × **Rakuten Institute of Technology**
 
 </div>
 
 ---
 
-## 📌 À propos
+## 📌 Le projet en 30 secondes
 
-Ce projet compare deux architectures de classification hiérarchique de texte, appliquées au catalogue produits de Rakuten France :
+Un produit arrive avec un titre et une description en français. Le modèle prédit **simultanément** sa catégorie (L1) et sa sous-catégorie (L2) :
 
-- **HYDRA** (EMNLP 2025) — Multi-tête encoder-only, avec têtes parallèles L1/L2
-- **HLPD** (ECIR 2025) — Décodeur non-autorégressif avec attention hiérarchique *(en cours)*
+```
+"Coque iPhone 12 silicone transparente"
+          │
+          ▼
+    ┌─ HYDRA ─┐
+    │CamemBERT│
+    │  12 × 🔄 │
+    └────┬────┘
+    ┌────┴────┐
+    ▼         ▼
+ L1: 157   L2: 6 059
+Électronique  Coque téléphone
+```
 
-À partir du titre et de la description d'un produit en français, le modèle prédit simultanément :
-- La **catégorie L1** (157 classes) — ex: *Électronique*
-- La **sous-catégorie L2** (6 059 classes) — ex: *Coque téléphone*
-
-**Objectif** : maximiser le `f1_l2_macro` tout en maintenant un taux de cohérence hiérarchique (HCR) > 95%.
+Deux approches comparées :
+- **HYDRA** (EMNLP 2025) — Multi-tête encoder-only ✅
+- **HLPD** (ECIR 2025) — Décodeur non-autorégressif avec attention hiérarchique 🔧
 
 ---
 
-## 🏗️ Architectures
+## 🏗️ Architecture HYDRA
 
-### HYDRA — Multi-tête encoder-only (implémenté)
+```mermaid
+graph TD
+    A["📝 Texte produit<br/><i>designation + description</i>"] --> B
+    B["🔤 CamemBERT Tokenizer<br/><i>max_length=256</i>"] --> C
+    C["🧠 CamemBERT<br/><i>12 couches Transformer<br/>110M params, fine-tuné</i>"] --> D
+    D["📐 Projection 768 → 1536"] --> E1
+    D --> E2
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Texte produit                                                │
-│  "Coque iPhone 12 silicone transparente..."                   │
-└──────────────────────┬───────────────────────────────────────┘
-                       │
-                       ▼
-┌──────────────────────────────────────────────────────────────┐
-│  CamemBERT (12 couches Transformer, 110M params)             │
-│  Encodeur français — toutes couches fine-tunées               │
-└──────────────────────┬───────────────────────────────────────┘
-                       │ embedding 768d
-                       ▼
-┌──────────────────────────────────────────────────────────────┐
-│  Projection (768 → 1536)                                      │
-└──────────────────────┬───────────────────────────────────────┘
-                       │
-                 ┌─────┴─────┐
-                 ▼           ▼
-          ┌───────────┐ ┌───────────┐
-          │  Head L1   │ │  Head L2   │
-          │  (→ 157)   │ │  (→ 6059)  │
-          └─────┬─────┘ └─────┬─────┘
-                │             │
-                ▼             ▼
-           Catégorie    Sous-catégorie
+    E1["🏷️ Head L1<br/>Linear→LN→ReLU→Drop→Linear<br/><b>→ 157 classes</b>"]
+    E2["🏷️ Head L2<br/>Linear→LN→ReLU→Drop→Linear<br/><b>→ 6 059 classes</b>"]
+
+    E1 --> F["🎯 Prédiction"]
+    E2 --> F
+
+    style C fill:#4A90D9,color:white
+    style E1 fill:#27AE60,color:white
+    style E2 fill:#E67E22,color:white
+    style F fill:#8E44AD,color:white
 ```
 
-| Variante | Description | Loss |
-|----------|-------------|------|
-| **Local** | Têtes L1/L2 indépendantes | 0.5 × CE(L1) + CE(L2) |
-| **Global** | + tête unifiée sur l'embedding | + α × unified_loss |
-| **Nested** | + MLP sur concat(logits L1, logits L2) | + α × unified_loss |
+**3 variantes testées :**
 
-### HLPD — Décodeur hiérarchique non-autorégressif (en cours)
-
-```
-Texte ──→ [CamemBERT Encodeur] ──→ H_enc
-                                      │
-Labels taxonomie ──→ [Embeddings] ──→ E_labels
-                                      │
-                    [Cross-attention H_enc × E_labels]
-                                      │
-                    [Self-attention hiérarchique] × N couches
-                                      │
-                    [Classification] ──→ Logits (1 + 157 + 6059)
-```
-
-| | HYDRA | HLPD |
-|---|---|---|
-| Paradigme | Multi-tête discriminatif | Encoder-Decoder |
-| Cohérence hiérarchique | Post-hoc (masque parent-child) | Par construction (attention hiérarchique) |
-| Loss | CrossEntropy / Focal | ZLPR (pairwise ranking) |
-| Statut | ✅ Implémenté | 🔧 En cours (Mehdi) |
+| | Local | Global | Nested |
+|---|---|---|---|
+| **Idée** | Têtes indépendantes | + tête unifiée L1+L2 | + MLP de raffinement |
+| **Loss** | `0.5·CE(L1) + CE(L2)` | + α · unified | + α · unified |
+| **Cohérence L1↔L2** | Post-hoc (masque) | Implicite | Par construction |
 
 ---
 
-## ✨ Fonctionnalités
+## ⚡ Fonctionnalités clés
 
-| Fonctionnalité | Description |
-|---------------|-------------|
-| **3 variantes HYDRA** | Local, Global, Nested — comparaison sur le même dataset |
-| **Fine-tuning complet** | Toutes les 12 couches CamemBERT fine-tunées |
-| **DataParallel** | Multi-GPU automatique (détection des GPUs disponibles) |
-| **DDP distribué** | Training multi-nœud sur cluster SLURM (P100 / RTX 3090) |
-| **Checkpoint resume** | Checkpoint tous les 10K steps + fin d'epoch, reprise automatique après interruption SLURM |
-| **MLflow enrichi** | 30+ params, confusion matrices, per-class F1, training curves, explicabilité — le tout à chaque epoch |
-| **Explicabilité** | Gradient × Input : rapport HTML avec tokens colorés montrant quels mots contribuent aux prédictions L1/L2 |
-| **Splits pré-générés** | 70/15/15 stratifié, hébergé sur HuggingFace Hub |
-| **77 tests pytest** | Couverture modèles, métriques, data loading, hiérarchie |
+<table>
+<tr>
+<td width="50%">
 
----
+**🔬 Training**
+- Fine-tuning complet (12 couches)
+- DataParallel multi-GPU automatique
+- DDP multi-nœud sur cluster SLURM
+- Checkpoint tous les 10K steps
+- Auto-resume après interruption SLURM
+- Early stopping sur `val_f1_l2_macro`
 
-## 🛠️ Stack technique
+</td>
+<td width="50%">
 
-| Composant | Technologie | Rôle |
-|-----------|-------------|------|
-| Encodeur | CamemBERT, XLM-RoBERTa, mBERT | Représentation textuelle française |
-| Framework | PyTorch, HuggingFace Transformers | Modèle + tokenization |
-| Baselines | scikit-learn (TF-IDF + SVM/SGD/LogReg) | Référence non-neuronale |
-| Distribué | PyTorch DDP, NCCL, RoCE, SLURM | Training multi-GPU/multi-nœud |
-| Tracking | MLflow | Params, métriques, artefacts visuels |
-| Infra | Docker Compose, HuggingFace Hub | Reproductibilité, partage dataset |
-| Tests | pytest | 77 tests automatisés |
+**📊 Audit & MLflow**
+- 30+ hyperparamètres loggés
+- Confusion matrices L1/L2 à chaque epoch
+- Per-class F1 (barplots triés)
+- Training curves (loss + F1 + HCR)
+- Explicabilité Gradient × Input (HTML)
+- 77 tests pytest
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## 🚀 Quick Start
 
-### Prérequis
-
-- Python 3.10+
-- GPU CUDA (recommandé : RTX 3090 24GB ou P100 16GB)
-
-### Installation
-
 ```bash
+# Installation
 git clone <repo-url> && cd rakuten-classification
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-```
 
-### Tests
+# Dataset (splits pré-générés sur HuggingFace Hub)
+export HF_TOKEN="hf_..."
+python scripts/download_dataset.py
 
-```bash
-python -m pytest tests/ -v    # 77 tests
-```
+# Training
+python scripts/run_train.py --split-dir ../dataset/ --variant local
 
-### Docker (alternatif)
+# SLURM (cluster GPU)
+sbatch scripts/run_train_p100.slurm local      # P100
+sbatch scripts/run_train_p100.slurm nested     # variante nested
+sbatch scripts/run_train_p100.slurm global     # variante global
 
-```bash
-docker compose run --rm --profile test test       # Tests
-docker compose up mlflow -d                       # MLflow UI → http://localhost:5000
-docker compose run --rm --profile gpu train       # Training (GPU)
+# Tests
+python -m pytest tests/ -v
 ```
 
 ---
 
 ## 📊 Dataset
 
-Le dataset Rakuten est propriétaire et **non inclus** dans ce repository.
+> Propriétaire — non inclus dans le repo. Hébergé sur HuggingFace Hub (privé).
 
-### Obtenir le dataset
-
-**Option 1 — HuggingFace Hub** (splits pré-générés, recommandé) :
-
-```bash
-export HF_TOKEN="hf_..."   # Token read-only (demander à Tahiana)
-python scripts/download_dataset.py
-```
-
-**Option 2 — Fichier brut** :
-
-1. Obtenir `products.jsonl` auprès du Rakuten Institute of Technology
-2. Le placer dans `../dataset/`
-3. Générer les splits : `sbatch scripts/run_split.slurm`
-
-### Format
-
-| Champ | Type | Description |
-|-------|------|-------------|
-| `designation` | str | Titre du produit |
-| `description` | str | Description détaillée |
-| `typelabel` | str | Catégorie L1 (157 classes) |
-| `producttype` | list[str] | Sous-catégorie L2 (6 059 classes) |
-
-### Splits
-
-| Split | Échantillons | % |
-|-------|-------------|---|
-| Train | 5 573 659 | 70% |
-| Validation | 1 194 355 | 15% |
-| Test | 1 194 356 | 15% |
+| Split | Échantillons | % | Champs |
+|-------|-------------|---|--------|
+| Train | 5 573 659 | 70% | `designation`, `description`, `typelabel` (L1), `producttype` (L2) |
+| Val | 1 194 355 | 15% | Split stratifié par L2, seed=42 |
+| Test | 1 194 356 | 15% | |
 
 ---
 
-## 🔬 Training
+## 🎯 Métriques & Audit
 
-### Single-GPU (prototypage)
+```mermaid
+graph LR
+    A["Fin d'epoch"] --> B["📈 Métriques MLflow"]
+    A --> C["🖼️ Artefacts visuels"]
+    A --> D["🔍 Explicabilité"]
 
-```bash
-python scripts/run_train.py --split-dir ../dataset/ --variant local
+    B --> B1["f1_l1_macro<br/>f1_l2_macro<br/>HCR<br/>constrained_f1"]
+    C --> C1["confusion_matrix_l1.png<br/>confusion_matrix_l2_top50.png<br/>f1_per_class_l1.png<br/>training_curves.png"]
+    D --> D1["explainability_report.html<br/><i>Gradient × Input<br/>10 erreurs + 10 correct<br/>tokens colorés L1 & L2</i>"]
+
+    style A fill:#E74C3C,color:white
+    style B fill:#3498DB,color:white
+    style C fill:#27AE60,color:white
+    style D fill:#9B59B6,color:white
 ```
 
-### Multi-GPU DataParallel (RTX 3090)
-
-```bash
-sbatch scripts/run_train_3090.slurm           # HYDRA Local
-sbatch scripts/run_train_3090_nested.slurm     # HYDRA Nested
-```
-
-### Multi-nœud DDP (cluster P100)
-
-```bash
-./03_production/scripts/launch_distributed.sh local CamemBERT 4
-```
-
-### Reprendre après interruption
-
-Le checkpoint est sauvegardé tous les 10 000 steps (~2h) et à chaque fin d'epoch. Il suffit de resoumettre le même job SLURM — la reprise est automatique (détection du `checkpoint_latest.pt`).
-
-### Configuration
-
-Source de vérité : `02_hydra/configs/default.yaml`
-
-| Paramètre | Valeur |
-|-----------|--------|
-| Encodeur | `camembert-base` |
-| `max_length` | 256 tokens |
-| `batch_size` | 64 (×2 GPUs = 128 effectif) |
-| `lr` | 3.5e-5 |
-| Warmup | Linéaire, 10% des steps |
-| Weight decay | 0.01 (sauf bias/LayerNorm) |
-| Early stopping | Patience 2, sur `val_f1_l2_macro` |
-| Epochs max | 10 |
+**Objectif** : maximiser `f1_l2_macro` avec HCR > 95%
 
 ---
 
-## 📈 Métriques
+## 🔍 Explicabilité (Gradient × Input)
 
-| Métrique | Description | Cible |
-|----------|-------------|-------|
-| `f1_l1_macro` | F1 macro sur les 157 catégories L1 | — |
-| `f1_l2_macro` | F1 macro sur les 6 059 sous-catégories L2 | **Maximiser** |
-| `constrained_f1` | F1 L2 valide uniquement si L1 parent correct | — |
-| `HCR` | % de prédictions où L2 est enfant valide de L1 | **> 95%** |
+Le rapport HTML montre quels mots ont contribué à chaque prédiction :
 
-### Dashboard MLflow
+```
+L1 — Vrai: Électronique | Prédit: Électronique (98%) ✔
+  Coque  iPhone  12  silicone  transparente
+   ░░    ██████  ░    ██        █
+         ↑ drive la prédiction L1
 
-Les artefacts suivants sont générés **à chaque fin d'epoch** (pas seulement en fin de training) :
-
-| Artefact | Description |
-|----------|-------------|
-| `confusion_matrix_l1.png` | Heatmap 157×157 classes L1 |
-| `confusion_matrix_l2_top50.png` | Heatmap top 50 classes L2 |
-| `f1_per_class_l1.png` + `.json` | Barplot F1 trié par classe L1 |
-| `f1_per_class_l2.png` | Top/bottom 30 classes L2 |
-| `training_curves.png` | Loss + F1 + HCR par epoch |
-| `explainability_report.html` | Gradient × Input : tokens colorés sur 20 exemples (10 erreurs + 10 correct) |
+L2 — Vrai: Coque téléphone | Prédit: Coque téléphone (91%) ✔
+  Coque  iPhone  12  silicone  transparente
+  █████  ████    ░    █████     █████████
+  ↑ drive la prédiction L2         ↑ aussi
+```
 
 ---
 
-## 📁 Structure du projet
+## ⚙️ Configuration
+
+Source de vérité : [`02_hydra/configs/default.yaml`](02_hydra/configs/default.yaml)
+
+| Paramètre | Valeur | | Paramètre | Valeur |
+|-----------|--------|-|-----------|--------|
+| Encodeur | `camembert-base` | | `batch_size` | 64 (×2 GPUs) |
+| `max_length` | 256 | | `lr` | 3.5e-5 |
+| Warmup | 10% (linéaire) | | Weight decay | 0.01 |
+| Gradient clip | 1.0 | | Early stop | patience 2 |
+
+---
+
+## 📁 Structure
 
 ```
 rakuten-classification/
-├── 01_baselines/src/          TF-IDF, Word2Vec, BERT flat (baselines)
+├── 01_baselines/              TF-IDF, Word2Vec, BERT flat
 ├── 02_hydra/
 │   ├── configs/default.yaml   Hyperparamètres (source de vérité)
-│   └── src/                   models.py, losses.py, trainer.py, predict.py
-├── 02b_hlpd/                  HLPD : décodeur hiérarchique (en cours)
-├── 03_production/
-│   ├── src/                   main.py, trainer_ddp.py, data_sharding.py
-│   └── scripts/               launch_distributed.sh, launch_node.sh
-├── shared/
-│   ├── data_loader.py         Chargement, encoding, splits
-│   ├── metrics.py             F1, HCR, confusion matrices, plots
-│   ├── explainability.py      Gradient × Input, rapport HTML
-│   └── utils.py               ENCODERS, enforce_hierarchy, seeds
-├── scripts/
-│   ├── split_dataset.py       Split 70/15/15 stratifié (2 passes)
-│   ├── download_dataset.py    Téléchargement depuis HF Hub
-│   ├── run_train.py           CLI single-GPU
-│   └── run_train_3090.slurm   Job SLURM RTX 3090
-├── tests/                     77 tests pytest
-├── models/                    Checkpoints (best_model.pt, checkpoint_latest.pt)
-├── Dockerfile                 Environnement reproductible
-├── docker-compose.yml         MLflow, tests, training
-└── blog.md                    Article technique détaillé
+│   └── src/                   models, losses, trainer, predict
+├── 02b_hlpd/                  HLPD (en cours)
+├── 03_production/             DDP multi-nœud, SLURM
+├── shared/                    data_loader, metrics, explainability, utils
+├── scripts/                   split, download, train, SLURM jobs
+├── tests/                     77 tests
+└── docker-compose.yml         MLflow, tests, training
 ```
 
 ---
 
 ## 📚 Références
 
-- **HYDRA** — Karl et al., *Hierarchical Multi-label Classification using Attention-based Architecture*, EMNLP 2025. [[GitHub]](https://github.com/FKarl/HYDRA)
-- **HLPD** — Torba, Laclau et al., *Hierarchical Label Pre-populated Decoder for Multi-label Text Classification*, ECIR 2025.
+- **HYDRA** — Karl et al., *Hierarchical Multi-label Classification*, EMNLP 2025 [[GitHub]](https://github.com/FKarl/HYDRA)
+- **HLPD** — Torba, Laclau et al., *Hierarchical Label Pre-populated Decoder*, ECIR 2025
 
 ---
 
-## 👥 Auteurs
+<div align="center">
 
-Tahiana H. Andriambahoaka, Mehdi Aithamma, Younes Boutrouft, Amir H. Kashani Rahimi
+**Tahiana H. Andriambahoaka · Mehdi Aithamma · Younes Boutrouft · Amir H. Kashani Rahimi**
+
+</div>
