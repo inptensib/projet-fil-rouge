@@ -433,15 +433,60 @@ class HYDRATrainer:
                 f"HCR: {val_metrics.get('hcr', 0):.4f}"
             )
 
-            # MLflow per-epoch logging
+            # MLflow per-epoch logging + audit artifacts
             if mlflow_active:
                 try:
+                    from shared.metrics import (
+                        compute_per_class_f1,
+                        plot_confusion_matrix,
+                        plot_per_class_f1,
+                        plot_training_curves,
+                    )
+                    import matplotlib.pyplot as plt
+
                     mlflow.log_metrics({
                         "train_loss": avg_train_loss,
                         "val_f1_l1_macro": val_metrics["f1_l1_macro"],
                         "val_f1_l2_macro": val_f1_l2,
                         "val_hcr": val_metrics.get("hcr", 0.0),
                     }, step=epoch + 1)
+
+                    # Audit visualizations (overwritten each epoch)
+                    v_preds_l1 = val_metrics.get("_preds_l1", [])
+                    v_labels_l1 = val_metrics.get("_labels_l1", [])
+                    v_preds_l2 = val_metrics.get("_preds_l2", [])
+                    v_labels_l2 = val_metrics.get("_labels_l2", [])
+
+                    if v_labels_l1:
+                        fig = plot_confusion_matrix(
+                            v_labels_l1, v_preds_l1, self.l1_encoder,
+                            title=f"Confusion L1 — epoch {epoch + 1}",
+                        )
+                        mlflow.log_figure(fig, "confusion_matrix_l1.png")
+                        plt.close(fig)
+
+                        fig = plot_confusion_matrix(
+                            v_labels_l2, v_preds_l2, self.l2_encoder,
+                            title=f"Confusion L2 (top 50) — epoch {epoch + 1}", top_n=50,
+                        )
+                        mlflow.log_figure(fig, "confusion_matrix_l2_top50.png")
+                        plt.close(fig)
+
+                        f1_l1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
+                        fig = plot_per_class_f1(f1_l1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
+                        mlflow.log_figure(fig, "f1_per_class_l1.png")
+                        plt.close(fig)
+                        mlflow.log_dict(f1_l1_pc, "f1_per_class_l1.json")
+
+                        f1_l2_pc = compute_per_class_f1(v_labels_l2, v_preds_l2, self.l2_encoder)
+                        fig = plot_per_class_f1(f1_l2_pc, f"F1 par classe L2 — epoch {epoch + 1}")
+                        mlflow.log_figure(fig, "f1_per_class_l2.png")
+                        plt.close(fig)
+
+                    if history["epoch"]:
+                        fig = plot_training_curves(history)
+                        mlflow.log_figure(fig, "training_curves.png")
+                        plt.close(fig)
                 except Exception:
                     pass
 
@@ -514,17 +559,9 @@ class HYDRATrainer:
         print(f"Test HCR: {test_metrics.get('hcr', 0):.4f}")
         print(f"{'='*60}")
 
-        # MLflow: log final metrics, audit artifacts, and model
+        # MLflow: log final test metrics + explainability
         if mlflow_active:
             try:
-                from shared.metrics import (
-                    compute_per_class_f1,
-                    plot_confusion_matrix,
-                    plot_per_class_f1,
-                    plot_training_curves,
-                )
-                import matplotlib.pyplot as plt
-
                 mlflow.log_metrics({
                     "test_f1_l1_macro": test_metrics["f1_l1_macro"],
                     "test_f1_l2_macro": test_metrics["f1_l2_macro"],
@@ -533,47 +570,10 @@ class HYDRATrainer:
                 })
                 mlflow.log_artifact(str(model_dir / "best_model.pt"))
 
-                # Audit visualizations (on validation set, not test)
-                val_audit = self.evaluate(val_loader)
-                preds_l1 = val_audit.get("_preds_l1", [])
-                labels_l1 = val_audit.get("_labels_l1", [])
-                preds_l2 = val_audit.get("_preds_l2", [])
-                labels_l2 = val_audit.get("_labels_l2", [])
-
-                if labels_l1:
-                    fig = plot_confusion_matrix(
-                        labels_l1, preds_l1, self.l1_encoder,
-                        title="Matrice de Confusion — L1",
-                    )
-                    mlflow.log_figure(fig, "confusion_matrix_l1.png")
-                    plt.close(fig)
-
-                    fig = plot_confusion_matrix(
-                        labels_l2, preds_l2, self.l2_encoder,
-                        title="Matrice de Confusion — L2 (top 50)", top_n=50,
-                    )
-                    mlflow.log_figure(fig, "confusion_matrix_l2_top50.png")
-                    plt.close(fig)
-
-                    f1_l1 = compute_per_class_f1(labels_l1, preds_l1, self.l1_encoder)
-                    fig = plot_per_class_f1(f1_l1, "F1 par classe — L1")
-                    mlflow.log_figure(fig, "f1_per_class_l1.png")
-                    plt.close(fig)
-                    mlflow.log_dict(f1_l1, "f1_per_class_l1.json")
-
-                    f1_l2 = compute_per_class_f1(labels_l2, preds_l2, self.l2_encoder)
-                    fig = plot_per_class_f1(f1_l2, "F1 par classe — L2 (top/bottom 30)")
-                    mlflow.log_figure(fig, "f1_per_class_l2.png")
-                    plt.close(fig)
-
-                if history["epoch"]:
-                    fig = plot_training_curves(history)
-                    mlflow.log_figure(fig, "training_curves.png")
-                    plt.close(fig)
-
                 # Explainability report (on validation set)
                 try:
                     from shared.explainability import generate_explainability_report
+                    val_audit = self.evaluate(val_loader)
                     val_texts = self.data["X_val"].tolist() if hasattr(self.data["X_val"], "tolist") else list(self.data["X_val"])
                     explain_html = generate_explainability_report(
                         model=self._base_model,
@@ -581,8 +581,8 @@ class HYDRATrainer:
                         texts=val_texts,
                         labels_l1=list(self.data["y_l1_val"]),
                         labels_l2=list(self.data["y_l2_val"]),
-                        preds_l1=preds_l1,
-                        preds_l2=preds_l2,
+                        preds_l1=val_audit.get("_preds_l1", []),
+                        preds_l2=val_audit.get("_preds_l2", []),
                         l1_encoder=self.l1_encoder,
                         l2_encoder=self.l2_encoder,
                         device=self.device,
