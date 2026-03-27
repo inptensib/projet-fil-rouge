@@ -116,9 +116,11 @@ class HYDRATrainer:
         warmup_ratio: float = 0.1,
         fp16: bool = True,
         resume_from: str | None = None,
+        checkpoint_every_n_steps: int = 10_000,
     ):
         set_seed(seed)
         self.resume_from = resume_from
+        self.checkpoint_every_n_steps = checkpoint_every_n_steps
         self.device = get_device()
         self.variant = variant
         self.encoder_name = encoder_name
@@ -311,6 +313,8 @@ class HYDRATrainer:
         start_time = time.time()
         global_step = 0
 
+        start_step_in_epoch = 0
+
         # Resume from checkpoint if provided
         if self.resume_from:
             print(f"[Resume] Loading checkpoint from {self.resume_from}")
@@ -324,9 +328,11 @@ class HYDRATrainer:
             best_val_f1 = ckpt["best_val_f1"]
             epochs_without_improvement = ckpt["epochs_without_improvement"]
             history = ckpt.get("history", history)
+            start_step_in_epoch = ckpt.get("step_in_epoch", 0)
             print(
                 f"[Resume] Reprise à epoch {start_epoch}, "
-                f"step {global_step}, best F1={best_val_f1:.4f}"
+                f"step_in_epoch {start_step_in_epoch}, "
+                f"global_step {global_step}, best F1={best_val_f1:.4f}"
             )
 
         for epoch in range(start_epoch, self.epochs):
@@ -336,6 +342,10 @@ class HYDRATrainer:
 
             pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{self.epochs}")
             for step, batch in enumerate(pbar):
+                # Fast-forward if resuming mid-epoch
+                if step < start_step_in_epoch:
+                    continue
+
                 input_ids = batch["input_ids"].to(self.device)
                 mask = batch["attention_mask"].to(self.device)
                 l1 = batch["label_l1"].to(self.device)
@@ -359,9 +369,37 @@ class HYDRATrainer:
                     self.scheduler.step()
                     global_step += 1
 
+                    # Intra-epoch checkpoint every N steps
+                    if global_step % self.checkpoint_every_n_steps == 0:
+                        torch.save(
+                            {
+                                "model_state_dict": self._base_model.state_dict(),
+                                "optimizer_state_dict": self.optimizer.state_dict(),
+                                "scheduler_state_dict": self.scheduler.state_dict(),
+                                "scaler_state_dict": self.scaler.state_dict(),
+                                "epoch": epoch,
+                                "step_in_epoch": step + 1,
+                                "global_step": global_step,
+                                "best_val_f1": best_val_f1,
+                                "epochs_without_improvement": epochs_without_improvement,
+                                "history": history,
+                                "config": {
+                                    "variant": self.variant,
+                                    "encoder_name": self.encoder_name,
+                                    "num_classes_l1": self.num_classes_l1,
+                                    "num_classes_l2": self.num_classes_l2,
+                                },
+                            },
+                            model_dir / "checkpoint_latest.pt",
+                        )
+                        print(f"\n  [Checkpoint] Step {global_step} saved")
+
                 epoch_loss += loss.item() * self.gradient_accumulation_steps
                 num_batches += 1
                 pbar.set_postfix({"loss": f"{epoch_loss / num_batches:.4f}"})
+
+            # Reset start_step for subsequent epochs
+            start_step_in_epoch = 0
 
             # Flush remaining accumulated gradients
             if num_batches % self.gradient_accumulation_steps != 0:
@@ -433,7 +471,7 @@ class HYDRATrainer:
             else:
                 epochs_without_improvement += 1
 
-            # Save full checkpoint for resume (every epoch, overwritten)
+            # Save full checkpoint for resume (end of epoch)
             torch.save(
                 {
                     "model_state_dict": self._base_model.state_dict(),
@@ -441,6 +479,7 @@ class HYDRATrainer:
                     "scheduler_state_dict": self.scheduler.state_dict(),
                     "scaler_state_dict": self.scaler.state_dict(),
                     "epoch": epoch + 1,
+                    "step_in_epoch": 0,
                     "global_step": global_step,
                     "best_val_f1": best_val_f1,
                     "epochs_without_improvement": epochs_without_improvement,
