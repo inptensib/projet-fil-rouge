@@ -100,8 +100,9 @@ Labels taxonomie ──→ [Embeddings] ──→ E_labels
 | **Fine-tuning complet** | Toutes les 12 couches CamemBERT fine-tunées |
 | **DataParallel** | Multi-GPU automatique (détection des GPUs disponibles) |
 | **DDP distribué** | Training multi-nœud sur cluster SLURM (P100 / RTX 3090) |
-| **Checkpoint resume** | Reprise automatique après interruption SLURM (36h) |
-| **MLflow enrichi** | 30+ params, confusion matrices, per-class F1, training curves |
+| **Checkpoint resume** | Checkpoint tous les 10K steps + fin d'epoch, reprise automatique après interruption SLURM |
+| **MLflow enrichi** | 30+ params, confusion matrices, per-class F1, training curves, explicabilité — le tout à chaque epoch |
+| **Explicabilité** | Gradient × Input : rapport HTML avec tokens colorés montrant quels mots contribuent aux prédictions L1/L2 |
 | **Splits pré-générés** | 70/15/15 stratifié, hébergé sur HuggingFace Hub |
 | **77 tests pytest** | Couverture modèles, métriques, data loading, hiérarchie |
 
@@ -213,7 +214,7 @@ sbatch scripts/run_train_3090_nested.slurm     # HYDRA Nested
 
 ### Reprendre après interruption
 
-Le checkpoint est sauvegardé à chaque epoch. Il suffit de resoumettre le même job SLURM — la reprise est automatique.
+Le checkpoint est sauvegardé tous les 10 000 steps (~2h) et à chaque fin d'epoch. Il suffit de resoumettre le même job SLURM — la reprise est automatique (détection du `checkpoint_latest.pt`).
 
 ### Configuration
 
@@ -243,16 +244,16 @@ Source de vérité : `02_hydra/configs/default.yaml`
 
 ### Dashboard MLflow
 
-Chaque run génère automatiquement :
+Les artefacts suivants sont générés **à chaque fin d'epoch** (pas seulement en fin de training) :
 
 | Artefact | Description |
 |----------|-------------|
 | `confusion_matrix_l1.png` | Heatmap 157×157 classes L1 |
 | `confusion_matrix_l2_top50.png` | Heatmap top 50 classes L2 |
-| `f1_per_class_l1.png` | Barplot F1 trié par classe L1 |
+| `f1_per_class_l1.png` + `.json` | Barplot F1 trié par classe L1 |
 | `f1_per_class_l2.png` | Top/bottom 30 classes L2 |
 | `training_curves.png` | Loss + F1 + HCR par epoch |
-| `hard_val_step_*.json` | Exemples difficiles (erreurs + low confidence) |
+| `explainability_report.html` | Gradient × Input : tokens colorés sur 20 exemples (10 erreurs + 10 correct) |
 
 ---
 
@@ -271,6 +272,7 @@ rakuten-classification/
 ├── shared/
 │   ├── data_loader.py         Chargement, encoding, splits
 │   ├── metrics.py             F1, HCR, confusion matrices, plots
+│   ├── explainability.py      Gradient × Input, rapport HTML
 │   └── utils.py               ENCODERS, enforce_hierarchy, seeds
 ├── scripts/
 │   ├── split_dataset.py       Split 70/15/15 stratifié (2 passes)
