@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/screenshots/hero.jpg" alt="HieraCat" width="80%" style="border-radius:12px; margin-bottom:16px"/>
+
 # 🛒 Rakuten Hierarchical Product Classification
 
 **8M+ produits · 157 catégories · 6 059 sous-catégories · CamemBERT**
