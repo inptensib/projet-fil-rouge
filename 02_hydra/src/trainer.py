@@ -272,6 +272,8 @@ class HYDRATrainer:
         mlflow_active = False
         try:
             import mlflow
+            db_path = Path(__file__).resolve().parents[2] / "mlflow.db"
+            mlflow.set_tracking_uri(f"sqlite:///{db_path}")
             mlflow.set_experiment(model_key)
             mlflow.start_run()
             gpu_type = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
@@ -295,8 +297,9 @@ class HYDRATrainer:
                 "gpu_type": gpu_type,
             })
             mlflow_active = True
-        except Exception:
-            pass
+            print(f"[MLflow] Tracking active → {db_path}")
+        except Exception as e:
+            print(f"[MLflow] Warning: logging disabled ({e})")
 
         # Training state
         best_val_f1 = 0.0
@@ -505,8 +508,8 @@ class HYDRATrainer:
                             device=self.device,
                         )
                         mlflow.log_text(explain_html, "explainability_report.html")
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"  [MLflow] Warning: per-epoch artifacts failed ({e})")
 
             # Early stopping & checkpointing on f1_l2_macro only
             if val_f1_l2 > best_val_f1 + self.early_stopping_min_delta:
@@ -588,8 +591,8 @@ class HYDRATrainer:
                 })
                 mlflow.log_artifact(str(model_dir / "best_model.pt"))
                 mlflow.end_run()
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[MLflow] Warning: final logging failed ({e})")
 
         return {
             "history": history,
