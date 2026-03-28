@@ -127,6 +127,8 @@ class HYDRATrainer:
         self.batch_size = batch_size
         self.epochs = epochs
         self.max_length = max_length
+        self.weight_decay = weight_decay
+        self.level_weight_l1 = level_weight_l1
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.max_grad_norm = max_grad_norm
         self.early_stopping_patience = early_stopping_patience
