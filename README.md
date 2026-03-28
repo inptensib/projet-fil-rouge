@@ -11,7 +11,7 @@
 ![Tests](https://img.shields.io/badge/Tests-77%20passed-brightgreen?logo=pytest&logoColor=white)
 ![SLURM](https://img.shields.io/badge/SLURM-Multi--GPU-orange)
 
-> **Télécom Paris** (IP Paris) × **Rakuten Institute of Technology**
+> **Télécom Paris** (IP Paris) × **Rakuten France**
 
 </div>
 
