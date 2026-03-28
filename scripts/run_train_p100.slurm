@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=hydra-p100
 #SBATCH --partition=P100
-#SBATCH --nodelist=node46
+#SBATCH --exclude=node40
 #SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=35G
