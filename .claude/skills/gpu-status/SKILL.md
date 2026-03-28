@@ -41,4 +41,4 @@ Presenter un tableau :
 Conclure avec une recommandation :
 - Combien de nodes/GPUs sont disponibles maintenant
 - Quelle partition utiliser (P100 vs 3090)
-- Batch size recommande selon la memoire disponible (P100: 16GB → BS=128, 3090: 24GB → BS=256)
+- Batch size recommande selon la memoire disponible (P100: 16GB → BS=64, 3090: 24GB → BS=64)

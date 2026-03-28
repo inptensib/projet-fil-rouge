@@ -33,7 +33,7 @@ Sinon, verifier au minimum :
 /home/infres/tandriam-25/fil_rouge/venv/bin/python -m pytest tests/ -x -q --tb=short
 ```
 
-Les 61 tests doivent passer. Arret immediat si echec.
+Les 77 tests doivent passer. Arret immediat si echec.
 
 ### 3. Sync Check
 
@@ -60,7 +60,7 @@ grep -rn "password\|api_key\|secret\|token" --include="*.py" $(git diff --cached
 | Etape | Statut | Details |
 |-------|--------|---------|
 | Lint | PASS/FAIL | ... |
-| Tests (61) | PASS/FAIL | ... |
+| Tests (77) | PASS/FAIL | ... |
 | Sync Check | PASS/FAIL | ... |
 | Securite | PASS/FAIL | ... |
 

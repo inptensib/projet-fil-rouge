@@ -130,7 +130,7 @@ class HYDRATrainerDDP:
         weight_decay: float = 0.01,
         loss_alpha: float = 1.0,
         save_dir: str = "models",
-        gradient_accumulation_steps: int = 4,
+        gradient_accumulation_steps: int = 1,
         project_embedding: bool = True,
         pooling: str = "cls",
         use_unified_predictions: bool = True,

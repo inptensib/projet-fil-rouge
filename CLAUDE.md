@@ -133,7 +133,7 @@ Invoquer le skill correspondant est **OBLIGATOIRE** dans chaque situation listee
 
 | Quand | Skill | Pourquoi |
 |:------|:------|:---------|
-| Avant tout training : verifier les ressources GPU | `/gpu-status` | Scan du cluster : nodes, GPUs libres, memoire, partitions. Recommande batch_size selon GPU (P100→128, 3090→256). **TOUJOURS avant** `/slurm submit`. |
+| Avant tout training : verifier les ressources GPU | `/gpu-status` | Scan du cluster : nodes, GPUs libres, memoire, partitions. Recommande batch_size selon GPU (P100→64, 3090→64). **TOUJOURS avant** `/slurm submit`. |
 | Avant tout training DDP : valider les shards | `/shard-check [shard_dir]` | Verifie integrite des shards : pas d'overlap, couverture 157 L1, equilibrage entre ranks. Shard corrompu = resultats faux silencieusement. |
 | Lancer un training distribue | `/slurm submit [variant] [encoder] [nb_nodes] [gpu_type]` | Soumet le job DDP via SLURM avec la bonne config. Retourne le job_id. |
 | Monitorer un training en cours | `/slurm status` | Vue synthetique : jobs actifs, progression, nodes. |
