@@ -222,6 +222,6 @@ rakuten-classification/
 
 <div align="center">
 
-**Tahiana H. Andriambahoaka · Mehdi Aithamma · Younes Boutrouft · Amir H. Kashani Rahimi**
+**[Tahiana H. Andriambahoaka](https://github.com/tahianahajanirina) · [Mehdi Aithamma](https://github.com/MehdiiAH) · [Younes Boutrouft](https://github.com/inptensib) · Amir H. Kashani Rahimi**
 
 </div>
