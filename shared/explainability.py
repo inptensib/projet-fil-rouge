@@ -190,6 +190,7 @@ def generate_explainability_report(
     l1_encoder,
     l2_encoder,
     device: torch.device,
+    confs_l2: Optional[list[float]] = None,
     n_errors: int = 10,
     n_correct: int = 10,
 ) -> str:
@@ -197,6 +198,9 @@ def generate_explainability_report(
 
     Selects error cases and correct predictions, computes attributions,
     and generates highlighted HTML for each.
+
+    Errors are sorted by highest confidence (model sure but wrong).
+    Correct predictions are sorted by lowest confidence (model unsure but right).
 
     Args:
         model: Unwrapped HYDRA model.
@@ -206,6 +210,7 @@ def generate_explainability_report(
         preds_l1, preds_l2: Predicted encoded labels.
         l1_encoder, l2_encoder: Fitted LabelEncoders.
         device: Torch device.
+        confs_l2: Optional L2 confidence scores for ranking.
         n_errors: Number of error samples to include.
         n_correct: Number of correct samples to include.
 
@@ -220,6 +225,12 @@ def generate_explainability_report(
             errors_idx.append(i)
         else:
             correct_idx.append(i)
+
+    if confs_l2:
+        # Errors: highest confidence first (model sure but wrong = hardest)
+        errors_idx.sort(key=lambda i: confs_l2[i], reverse=True)
+        # Correct: lowest confidence first (model unsure but right)
+        correct_idx.sort(key=lambda i: confs_l2[i])
 
     selected_errors = errors_idx[:n_errors]
     selected_correct = correct_idx[:n_correct]

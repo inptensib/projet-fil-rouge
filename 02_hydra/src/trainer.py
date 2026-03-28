@@ -211,6 +211,7 @@ class HYDRATrainer:
         self.model.eval()
         all_preds_l1, all_preds_l2 = [], []
         all_labels_l1, all_labels_l2 = [], []
+        all_confs_l1, all_confs_l2 = [], []
 
         for batch in dataloader:
             input_ids = batch["input_ids"].to(self.device)
@@ -223,11 +224,15 @@ class HYDRATrainer:
             if self.check_hierarchy:
                 logits_l2 = self._enforce_hierarchy(logits_l1, logits_l2)
 
-            preds_l1 = torch.argmax(logits_l1, dim=-1).cpu().numpy()
-            preds_l2 = torch.argmax(logits_l2, dim=-1).cpu().numpy()
+            probs_l1 = torch.softmax(logits_l1, dim=-1)
+            probs_l2 = torch.softmax(logits_l2, dim=-1)
+            confs_l1, preds_l1 = probs_l1.max(dim=-1)
+            confs_l2, preds_l2 = probs_l2.max(dim=-1)
 
-            all_preds_l1.extend(preds_l1)
-            all_preds_l2.extend(preds_l2)
+            all_preds_l1.extend(preds_l1.cpu().numpy())
+            all_preds_l2.extend(preds_l2.cpu().numpy())
+            all_confs_l1.extend(confs_l1.cpu().numpy())
+            all_confs_l2.extend(confs_l2.cpu().numpy())
             all_labels_l1.extend(batch["label_l1"].numpy())
             all_labels_l2.extend(batch["label_l2"].numpy())
 
@@ -240,6 +245,8 @@ class HYDRATrainer:
         metrics["_preds_l2"] = all_preds_l2
         metrics["_labels_l1"] = all_labels_l1
         metrics["_labels_l2"] = all_labels_l2
+        metrics["_confs_l1"] = all_confs_l1
+        metrics["_confs_l2"] = all_confs_l2
         return metrics
 
     def train(self) -> dict:
@@ -461,6 +468,8 @@ class HYDRATrainer:
                     v_labels_l1 = val_metrics.get("_labels_l1", [])
                     v_preds_l2 = val_metrics.get("_preds_l2", [])
                     v_labels_l2 = val_metrics.get("_labels_l2", [])
+                    v_confs_l1 = val_metrics.get("_confs_l1", [])
+                    v_confs_l2 = val_metrics.get("_confs_l2", [])
 
                     if v_labels_l1:
                         fig = plot_confusion_matrix(
@@ -505,6 +514,7 @@ class HYDRATrainer:
                             labels_l2=list(self.data["y_l2_val"]),
                             preds_l1=v_preds_l1,
                             preds_l2=v_preds_l2,
+                            confs_l2=v_confs_l2,
                             l1_encoder=self.l1_encoder,
                             l2_encoder=self.l2_encoder,
                             device=self.device,
