@@ -19,9 +19,9 @@ echo "=============================================="
 PREV_JOB=""
 for i in $(seq 1 "$N_JOBS"); do
     if [ -z "$PREV_JOB" ]; then
-        JOB=$(sbatch --parsable scripts/run_train_p100.slurm "$VARIANT")
+        JOB=$(sbatch --parsable --export=ALL,HYDRA_VARIANT="$VARIANT" scripts/run_train_p100.slurm "$VARIANT")
     else
-        JOB=$(sbatch --parsable --dependency=afterany:"$PREV_JOB" scripts/run_train_p100.slurm "$VARIANT")
+        JOB=$(sbatch --parsable --dependency=afterany:"$PREV_JOB" --export=ALL,HYDRA_VARIANT="$VARIANT" scripts/run_train_p100.slurm "$VARIANT")
     fi
     echo "  Job $i/$N_JOBS : $JOB (depends=${PREV_JOB:-none})"
     PREV_JOB=$JOB

@@ -16,7 +16,7 @@ export TRANSFORMERS_OFFLINE=1
 export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
 
 # Auto-resume : détecte un checkpoint existant
-VARIANT="${1:-local}"
+VARIANT="${HYDRA_VARIANT:-${1:-local}}"
 MODEL_DIR="models/HYDRA_${VARIANT}_CamemBERT"
 CKPT="${MODEL_DIR}/checkpoint_latest.pt"
 COMPLETE="${MODEL_DIR}/training_complete.txt"
