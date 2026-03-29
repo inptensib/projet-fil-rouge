@@ -17,7 +17,18 @@ export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
 
 # Auto-resume : détecte un checkpoint existant
 VARIANT="${1:-local}"
-CKPT="models/HYDRA_${VARIANT}_CamemBERT/checkpoint_latest.pt"
+MODEL_DIR="models/HYDRA_${VARIANT}_CamemBERT"
+CKPT="${MODEL_DIR}/checkpoint_latest.pt"
+COMPLETE="${MODEL_DIR}/training_complete.txt"
+
+# Si le training est déjà terminé, on skip
+if [ -f "$COMPLETE" ]; then
+    echo "Training déjà terminé pour $VARIANT :"
+    cat "$COMPLETE"
+    echo "Rien à faire, job terminé."
+    exit 0
+fi
+
 RESUME_FLAG=""
 if [ -f "$CKPT" ]; then
     echo "Checkpoint trouvé : $CKPT — reprise du training"

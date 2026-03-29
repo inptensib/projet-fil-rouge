@@ -581,6 +581,11 @@ class HYDRATrainer:
                 print(f"  Early stopping after {epoch + 1} epochs.")
                 break
 
+        # Mark training as complete
+        (model_dir / "training_complete.txt").write_text(
+            f"Training finished. Epochs: {epoch + 1}, Best F1 L2: {best_val_f1:.4f}\n"
+        )
+
         # Final test evaluation
         test_metrics = self.evaluate(test_loader)
         total_time = time.time() - start_time
