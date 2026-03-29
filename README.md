@@ -121,10 +121,13 @@ python scripts/download_dataset.py
 # Training
 python scripts/run_train.py --split-dir ../dataset/ --variant local
 
-# SLURM (cluster GPU)
-sbatch scripts/run_train_p100.slurm local      # P100
-sbatch scripts/run_train_p100.slurm nested     # variante nested
-sbatch scripts/run_train_p100.slurm global     # variante global
+# SLURM — job unique (P100 ou 3090, auto-détecté)
+sbatch scripts/run_train_p100.slurm local
+
+# SLURM — chaînage automatique jusqu'à 10 epochs
+./scripts/chain_submit.sh local 6
+./scripts/chain_submit.sh nested 6
+./scripts/chain_submit.sh global 6
 
 # Tests
 python -m pytest tests/ -v
