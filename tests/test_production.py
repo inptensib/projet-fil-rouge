@@ -6,7 +6,6 @@ import sys
 from unittest import mock
 
 import pytest
-
 from helpers import import_from_production
 
 

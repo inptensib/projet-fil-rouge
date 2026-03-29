@@ -5,11 +5,11 @@ Uses mocked HuggingFace models to avoid downloading weights.
 
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 import torch
 import torch.nn as nn
-from unittest import mock
-
 from helpers import import_from_hydra
 
 _losses_mod = import_from_hydra("losses")
@@ -294,8 +294,8 @@ class TestCheckpointRoundTrip:
 class TestPredictFunctions:
     def test_predict_single(self, mock_auto_model):
         """predict() returns correct structure on synthetic input."""
-        from sklearn.preprocessing import LabelEncoder
         import numpy as np
+        from sklearn.preprocessing import LabelEncoder
         _predict_mod = import_from_hydra("predict")
 
         model = HYDRALocal(
@@ -335,8 +335,8 @@ class TestPredictFunctions:
 
     def test_predict_batch(self, mock_auto_model):
         """predict_batch() returns one result per input text."""
-        from sklearn.preprocessing import LabelEncoder
         import numpy as np
+        from sklearn.preprocessing import LabelEncoder
         _predict_mod = import_from_hydra("predict")
 
         model = HYDRALocal(

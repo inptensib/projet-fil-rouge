@@ -13,7 +13,6 @@ from typing import Optional
 
 import torch
 import torch.nn.functional as F
-from transformers import AutoTokenizer
 
 # ---------------------------------------------------------------------------
 # Cross-directory imports
@@ -26,9 +25,8 @@ _HYDRA_ROOT = os.path.join(_PROJECT_ROOT, "02_hydra")
 if _HYDRA_ROOT not in sys.path:
     sys.path.insert(0, _HYDRA_ROOT)
 
-from src.models import create_hydra_model
-
 from shared.utils import ENCODERS
+from src.models import create_hydra_model
 
 
 def load_model(

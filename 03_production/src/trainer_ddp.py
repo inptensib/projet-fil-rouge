@@ -62,10 +62,9 @@ if _HYDRA_ROOT not in sys.path:
     sys.path.insert(0, _HYDRA_ROOT)
 
 from src.losses import HYDRALoss
-from src.models import HYDRALocal, HYDRAGlobal, HYDRANested
+from src.models import HYDRAGlobal, HYDRALocal, HYDRANested
 
 from .ddp_utils import cleanup_ddp, print_rank0
-
 
 # ---------------------------------------------------------------------------
 # Constants

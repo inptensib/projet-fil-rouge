@@ -9,7 +9,6 @@ Environment variables (set by launch_node.sh):
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 
@@ -24,7 +23,7 @@ _HYDRA_ROOT = str(Path(__file__).resolve().parents[2] / "02_hydra")
 if _HYDRA_ROOT not in sys.path:
     sys.path.insert(0, _HYDRA_ROOT)
 
-from .ddp_utils import setup_ddp, cleanup_ddp
+from .ddp_utils import cleanup_ddp, setup_ddp
 from .trainer_ddp import HYDRATrainerDDP
 
 

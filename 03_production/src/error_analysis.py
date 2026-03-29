@@ -17,7 +17,6 @@ import glob
 import os
 import pickle
 import sys
-from typing import Optional
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -46,7 +45,6 @@ if _HYDRA_ROOT not in sys.path:
     sys.path.insert(0, _HYDRA_ROOT)
 
 from src.models import create_hydra_model
-
 
 # ---------------------------------------------------------------------------
 # Model loading

@@ -14,28 +14,27 @@ Features:
 
 from __future__ import annotations
 
-import os
+import sys
 import time
 from pathlib import Path
 
 import torch
+import yaml
 from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer
-import yaml
 
-import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from shared.data_loader import HierarchicalProductDataset, build_parent_child_matrix
 from shared.metrics import compute_all_metrics
-from shared.utils import set_seed, get_device, ENCODERS, enforce_hierarchy
+from shared.utils import ENCODERS, enforce_hierarchy, get_device, set_seed
 
-from .models import create_hydra_model
 from .losses import HYDRALoss
+from .models import create_hydra_model
 
 # Path to default config
 _CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "default.yaml"
@@ -448,13 +447,14 @@ class HYDRATrainer:
             # MLflow per-epoch logging + audit artifacts
             if mlflow_active:
                 try:
+                    import matplotlib.pyplot as plt
+
                     from shared.metrics import (
                         compute_per_class_f1,
                         plot_confusion_matrix,
                         plot_per_class_f1,
                         plot_training_curves,
                     )
-                    import matplotlib.pyplot as plt
 
                     mlflow.log_metrics({
                         "train_loss": avg_train_loss,

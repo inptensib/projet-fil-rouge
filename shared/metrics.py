@@ -13,7 +13,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from sklearn.metrics import classification_report, confusion_matrix, f1_score
+from sklearn.metrics import confusion_matrix, f1_score
 
 matplotlib.use("Agg")
 

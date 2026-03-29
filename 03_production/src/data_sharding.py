@@ -14,8 +14,6 @@ import shutil
 import sys
 from typing import Optional
 
-import pandas as pd
-
 # ---------------------------------------------------------------------------
 # Path setup for cross-directory imports
 # ---------------------------------------------------------------------------
@@ -23,15 +21,15 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+
 from shared.data_loader import (
     _preprocess_df,
     build_parent_child_mapping,
-    extract_level_2,
     load_random_sample,
     prepare_hierarchical_data_from_splits,
 )
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
 
 
 def prepare_shards(

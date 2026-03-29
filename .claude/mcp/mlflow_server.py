@@ -10,8 +10,8 @@ import json
 import os
 
 import mlflow
-from mlflow.tracking import MlflowClient
 from mcp.server.fastmcp import FastMCP
+from mlflow.tracking import MlflowClient
 
 TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000")
 

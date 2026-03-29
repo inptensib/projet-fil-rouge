@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 import torch
-
 from helpers import import_from_hydra
 
 # Import at module level using helper

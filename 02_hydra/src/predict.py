@@ -6,17 +6,18 @@ with optional hierarchical enforcement.
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 import torch
 import torch.nn.functional as F
 from torch.amp import autocast
 from torch.utils.data import DataLoader, Dataset
-from transformers import AutoTokenizer
 
-import sys
-from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from shared.utils import ENCODERS, enforce_hierarchy
+
 from .models import create_hydra_model
 
 

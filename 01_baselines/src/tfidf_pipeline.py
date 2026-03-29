@@ -16,7 +16,6 @@ import json
 import os
 import sys
 import time
-from typing import Optional
 
 import joblib
 import nltk
@@ -36,7 +35,6 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from shared.data_loader import load_random_sample  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -36,7 +36,6 @@ if _PROJECT_ROOT not in sys.path:
 
 from shared.data_loader import load_random_sample  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
