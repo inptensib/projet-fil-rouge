@@ -140,7 +140,9 @@ class HYDRATrainerDDP:
         focal_gamma: float = 2.0,
         grad_clip_max_norm: float = GRAD_CLIP_MAX_NORM,
         warmup_ratio: float = 0.1,
+        condition_l2_on_l1: bool = False,
     ):
+        self.condition_l2_on_l1 = condition_l2_on_l1
         self.max_length = max_length
         self.batch_size = batch_size
         self.epochs = epochs
@@ -623,6 +625,15 @@ class HYDRATrainerDDP:
 
                 with sync_context:
                     level_outputs, unified_output = model(input_ids, mask)
+
+                    # Conditionner L2 sur le vrai L1 (teacher forcing)
+                    if self.condition_l2_on_l1:
+                        logits_l1, logits_l2 = level_outputs
+                        valid_mask = self.parent_child_matrix[l1]
+                        logits_l2 = logits_l2.clone()
+                        logits_l2[valid_mask == 0] = float("-inf")
+                        level_outputs = [logits_l1, logits_l2]
+
                     loss, _, _ = criterion(level_outputs, unified_output, l1, l2)
 
                     # Collect training errors (rank 0 only, limited)

@@ -32,7 +32,7 @@ def _map_config(cfg: dict) -> dict:
 
     # Direct mappings (same name)
     for key in ("variant", "batch_size", "epochs", "lr", "weight_decay",
-                "max_length", "seed"):
+                "max_length", "seed", "condition_l2_on_l1"):
         if key in cfg:
             kwargs[key] = cfg[key]
 

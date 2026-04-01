@@ -37,6 +37,7 @@ level_weights:
 
 # --- Hierarchy ---
 check_hierarchy: false
+condition_l2_on_l1: false     # Masquer L2 avec le vrai L1 pendant le training (teacher forcing)
 
 # --- Data ---
 num_workers: 4

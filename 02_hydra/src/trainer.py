@@ -116,10 +116,12 @@ class HYDRATrainer:
         fp16: bool = True,
         resume_from: str | None = None,
         checkpoint_every_n_steps: int = 10_000,
+        condition_l2_on_l1: bool = False,
     ):
         set_seed(seed)
         self.resume_from = resume_from
         self.checkpoint_every_n_steps = checkpoint_every_n_steps
+        self.condition_l2_on_l1 = condition_l2_on_l1
         self.device = get_device()
         self.variant = variant
         self.encoder_name = encoder_name
@@ -364,6 +366,15 @@ class HYDRATrainer:
 
                 with autocast("cuda", enabled=self.fp16):
                     level_outputs, unified_output = self.model(input_ids, mask)
+
+                    # Conditionner L2 sur le vrai L1 (teacher forcing)
+                    if self.condition_l2_on_l1:
+                        logits_l1, logits_l2 = level_outputs
+                        valid_mask = self.parent_child_matrix[l1]
+                        logits_l2 = logits_l2.clone()
+                        logits_l2[valid_mask == 0] = float("-inf")
+                        level_outputs = [logits_l1, logits_l2]
+
                     loss, _, _ = self.criterion(level_outputs, unified_output, l1, l2)
                     loss = loss / self.gradient_accumulation_steps
 
