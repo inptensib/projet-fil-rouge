@@ -526,7 +526,7 @@ class HYDRATrainer:
                             preds_l1=v_preds_l1,
                             preds_l2=v_preds_l2,
                             confs_l2=v_confs_l2,
-                            parent_child_matrix=self.parent_child_matrix,
+                            parent_child_matrix=self.parent_child_matrix if self.condition_l2_on_l1 else None,
                             l1_encoder=self.l1_encoder,
                             l2_encoder=self.l2_encoder,
                             device=self.device,
