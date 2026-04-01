@@ -18,6 +18,7 @@ def compute_token_attributions(
     tokenizer,
     text: str,
     device: torch.device,
+    parent_child_matrix: Optional[torch.Tensor] = None,
 ) -> dict:
     """Compute token-level attributions for L1 and L2 predictions.
 
@@ -29,6 +30,8 @@ def compute_token_attributions(
         tokenizer: HuggingFace tokenizer.
         text: Input text string.
         device: Torch device.
+        parent_child_matrix: Optional hierarchy matrix (num_l1, num_l2) for
+            masking L2 logits based on predicted L1.
 
     Returns:
         Dictionary with keys: tokens, attributions_l1, attributions_l2,
@@ -63,6 +66,13 @@ def compute_token_attributions(
 
     logits_l1 = model.level_1_head(pooled)
     logits_l2 = model.level_2_head(pooled)
+
+    # Masquer L2 invalides si la matrice hiérarchique est fournie
+    if parent_child_matrix is not None:
+        pred_l1_for_mask = torch.argmax(logits_l1, dim=-1)
+        valid_l2_mask = parent_child_matrix[pred_l1_for_mask]
+        logits_l2 = logits_l2.clone()
+        logits_l2[valid_l2_mask == 0] = float("-inf")
 
     probs_l1 = F.softmax(logits_l1, dim=-1)
     probs_l2 = F.softmax(logits_l2, dim=-1)
@@ -191,6 +201,7 @@ def generate_explainability_report(
     l2_encoder,
     device: torch.device,
     confs_l2: Optional[list[float]] = None,
+    parent_child_matrix: Optional[torch.Tensor] = None,
     n_errors: int = 10,
     n_correct: int = 10,
 ) -> str:
@@ -261,7 +272,7 @@ def generate_explainability_report(
         html_parts.append(f"<h2>&#10008; Erreurs ({len(selected_errors)} exemples)</h2>")
         for i in selected_errors:
             try:
-                attr = compute_token_attributions(model, tokenizer, texts[i], device)
+                attr = compute_token_attributions(model, tokenizer, texts[i], device, parent_child_matrix)
                 html_parts.append(generate_highlight_html(
                     tokens=attr["tokens"],
                     attributions_l1=attr["attributions_l1"],
@@ -281,7 +292,7 @@ def generate_explainability_report(
         html_parts.append(f'<h2 class="correct">&#10004; Pr&eacute;dictions correctes ({len(selected_correct)} exemples)</h2>')
         for i in selected_correct:
             try:
-                attr = compute_token_attributions(model, tokenizer, texts[i], device)
+                attr = compute_token_attributions(model, tokenizer, texts[i], device, parent_child_matrix)
                 html_parts.append(generate_highlight_html(
                     tokens=attr["tokens"],
                     attributions_l1=attr["attributions_l1"],
