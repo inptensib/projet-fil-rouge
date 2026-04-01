@@ -45,15 +45,36 @@
         nav a { margin-right: 16px; color: #3498db; text-decoration: none; font-weight: 500; }
         nav a:hover { text-decoration: underline; }
 
-        /* Fullscreen overlay */
+        /* Fullscreen overlay with zoom & pan */
         .overlay {
             display: none; position: fixed; top: 0; left: 0;
-            width: 100%; height: 100%; background: rgba(0,0,0,0.9);
-            z-index: 1000; cursor: zoom-out;
-            justify-content: center; align-items: center;
+            width: 100%; height: 100%; background: rgba(0,0,0,0.92);
+            z-index: 1000; overflow: hidden;
         }
-        .overlay.active { display: flex; }
-        .overlay img { max-width: 95%; max-height: 95%; object-fit: contain; }
+        .overlay.active { display: block; }
+        .overlay img {
+            position: absolute; cursor: grab;
+            transform-origin: 0 0; transition: none;
+        }
+        .overlay img.grabbing { cursor: grabbing; }
+        .overlay .controls {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 10px; z-index: 1001;
+        }
+        .overlay .controls button {
+            background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px; padding: 8px 16px; font-size: 16px; cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+        .overlay .controls button:hover { background: rgba(255,255,255,0.3); }
+        .overlay .zoom-level {
+            position: fixed; top: 20px; right: 20px; color: rgba(255,255,255,0.7);
+            font-size: 14px; z-index: 1001; font-family: monospace;
+        }
+        .overlay .hint {
+            position: fixed; top: 20px; left: 20px; color: rgba(255,255,255,0.5);
+            font-size: 13px; z-index: 1001;
+        }
     </style>
 </head>
 <body>
@@ -73,9 +94,17 @@
     <a href="#config">Configuration</a>
 </nav>
 
-<!-- Fullscreen overlay -->
-<div class="overlay" id="overlay" onclick="this.classList.remove('active')">
+<!-- Fullscreen overlay with zoom & pan -->
+<div class="overlay" id="overlay">
     <img id="overlay-img" src="" alt="Plein écran">
+    <div class="hint">Molette = zoom &bull; Clic-glisser = déplacer &bull; Double-clic = reset &bull; Echap = fermer</div>
+    <div class="zoom-level" id="zoom-level">100%</div>
+    <div class="controls">
+        <button onclick="zoomBy(1.5)">+ Zoom</button>
+        <button onclick="zoomBy(1/1.5)">&minus; Zoom</button>
+        <button onclick="resetView()">Reset</button>
+        <button onclick="closeOverlay()">Fermer (Echap)</button>
+    </div>
 </div>
 
 <h2 id="metriques">Métriques finales</h2>
@@ -664,14 +693,93 @@
 </table>
 
 <script>
-function openFullscreen(img) {
+(function() {
     const overlay = document.getElementById('overlay');
-    document.getElementById('overlay-img').src = img.src;
-    overlay.classList.add('active');
-}
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') document.getElementById('overlay').classList.remove('active');
-});
+    const oImg = document.getElementById('overlay-img');
+    const zoomLabel = document.getElementById('zoom-level');
+    let scale = 1, posX = 0, posY = 0;
+    let dragging = false, startX, startY, startPosX, startPosY;
+
+    window.openFullscreen = function(img) {
+        oImg.src = img.src;
+        overlay.classList.add('active');
+        oImg.onload = function() { resetView(); };
+        if (oImg.complete) resetView();
+    };
+
+    window.closeOverlay = function() {
+        overlay.classList.remove('active');
+    };
+
+    window.resetView = function() {
+        scale = 1;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const iw = oImg.naturalWidth, ih = oImg.naturalHeight;
+        const fitScale = Math.min((vw * 0.92) / iw, (vh * 0.85) / ih);
+        scale = fitScale;
+        posX = (vw - iw * scale) / 2;
+        posY = (vh - ih * scale) / 2;
+        applyTransform();
+    };
+
+    window.zoomBy = function(factor) {
+        const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+        zoomAt(cx, cy, factor);
+    };
+
+    function zoomAt(cx, cy, factor) {
+        const newScale = Math.max(0.1, Math.min(scale * factor, 30));
+        posX = cx - (cx - posX) * (newScale / scale);
+        posY = cy - (cy - posY) * (newScale / scale);
+        scale = newScale;
+        applyTransform();
+    }
+
+    function applyTransform() {
+        oImg.style.transform = 'translate(' + posX + 'px,' + posY + 'px) scale(' + scale + ')';
+        zoomLabel.textContent = Math.round(scale / (Math.min((window.innerWidth*0.92)/oImg.naturalWidth, (window.innerHeight*0.85)/oImg.naturalHeight)) * 100) + '%';
+    }
+
+    // Mouse wheel zoom
+    overlay.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+        zoomAt(e.clientX, e.clientY, factor);
+    }, { passive: false });
+
+    // Drag to pan
+    oImg.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        dragging = true;
+        startX = e.clientX; startY = e.clientY;
+        startPosX = posX; startPosY = posY;
+        oImg.classList.add('grabbing');
+        e.preventDefault();
+    });
+    window.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        posX = startPosX + (e.clientX - startX);
+        posY = startPosY + (e.clientY - startY);
+        applyTransform();
+    });
+    window.addEventListener('mouseup', function() {
+        dragging = false;
+        oImg.classList.remove('grabbing');
+    });
+
+    // Double-click to reset
+    oImg.addEventListener('dblclick', function() { resetView(); });
+
+    // Escape to close
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeOverlay();
+    });
+
+    // Click on background (not image) to close
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeOverlay();
+    });
+})();
 </script>
 
 </body>
