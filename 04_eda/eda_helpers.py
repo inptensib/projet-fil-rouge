@@ -23,7 +23,7 @@ import seaborn as sns
 # ---------------------------------------------------------------------------
 
 def gini_coefficient(values: np.ndarray) -> float:
-    """Calcule le coefficient de Gini (0 = egalite parfaite, 1 = inegalite max)."""
+    """Calcule le coefficient de Gini (0 = égalité parfaite, 1 = inegalite max)."""
     sorted_v = np.sort(np.asarray(values, dtype=float))
     n = len(sorted_v)
     index = np.arange(1, n + 1)
@@ -36,15 +36,15 @@ def lorenz_curve(values: np.ndarray, ax: plt.Axes, label: str, color: str = "#34
     cumulative = np.cumsum(sorted_v) / np.sum(sorted_v)
     x = np.linspace(0, 1, len(cumulative))
     ax.plot(x, cumulative, label=label, color=color, linewidth=2)
-    ax.plot([0, 1], [0, 1], "k--", alpha=0.4, label="Egalite parfaite")
+    ax.plot([0, 1], [0, 1], "k--", alpha=0.4, label="Égalité parfaite")
     ax.fill_between(x, cumulative, x, alpha=0.1, color=color)
-    ax.set_xlabel("Proportion cumulee des classes")
-    ax.set_ylabel("Proportion cumulee des echantillons")
+    ax.set_xlabel("Proportion cumulée des classes")
+    ax.set_ylabel("Proportion cumulée des échantillons")
     ax.legend()
 
 
 def head_medium_tail(counts: pd.Series, thresholds: tuple = (1000, 100)) -> pd.DataFrame:
-    """Classifie les categories en Head / Medium / Tail."""
+    """Classifie les catégories en Head / Medium / Tail."""
     high, low = thresholds
     data = {
         f"Head (>={high})": [(counts >= high).sum(), counts[counts >= high].sum()],
@@ -54,9 +54,9 @@ def head_medium_tail(counts: pd.Series, thresholds: tuple = (1000, 100)) -> pd.D
         ],
         f"Tail (<{low})": [(counts < low).sum(), counts[counts < low].sum()],
     }
-    df = pd.DataFrame(data, index=["Nb classes", "Nb echantillons"]).T
+    df = pd.DataFrame(data, index=["Nb classes", "Nb échantillons"]).T
     df["% classes"] = (df["Nb classes"] / df["Nb classes"].sum() * 100).round(1)
-    df["% echantillons"] = (df["Nb echantillons"] / df["Nb echantillons"].sum() * 100).round(1)
+    df["% échantillons"] = (df["Nb échantillons"] / df["Nb échantillons"].sum() * 100).round(1)
     return df
 
 
@@ -150,10 +150,10 @@ def plot_distribution_grid(
         mean_val = s.mean()
         med_val = s.median()
         ax.axvline(mean_val, color="#e74c3c", linestyle="--", linewidth=1.5, label=f"Moyenne: {mean_val:.0f}")
-        ax.axvline(med_val, color="#2ecc71", linestyle="-", linewidth=1.5, label=f"Mediane: {med_val:.0f}")
+        ax.axvline(med_val, color="#2ecc71", linestyle="-", linewidth=1.5, label=f"Médiane: {med_val:.0f}")
         ax.set_title(title, fontsize=12, fontweight="bold")
         ax.legend(fontsize=9)
-        ax.set_ylabel("Frequence")
+        ax.set_ylabel("Fréquence")
 
     # Masquer les axes inutilises
     for i in range(n, len(list(axes))):
@@ -171,14 +171,14 @@ def plot_category_barh(
     color: str = "#3498db",
     log_scale: bool = False,
 ) -> plt.Figure:
-    """Bar chart horizontal des top_n categories."""
+    """Bar chart horizontal des top_n catégories."""
     fig, ax = plt.subplots(figsize=figsize)
     data = counts.head(top_n).iloc[::-1]
     bars = ax.barh(range(len(data)), data.values, color=color, alpha=0.8)
     ax.set_yticks(range(len(data)))
     ax.set_yticklabels(data.index, fontsize=9)
     ax.set_title(title, fontsize=13, fontweight="bold")
-    ax.set_xlabel("Nombre d'echantillons")
+    ax.set_xlabel("Nombre d'échantillons")
     if log_scale:
         ax.set_xscale("log")
 
@@ -197,7 +197,7 @@ def plot_word_clouds(
     ncols: int = 3,
     figsize: tuple = (18, 10),
 ) -> plt.Figure:
-    """Grille de word clouds par categorie."""
+    """Grille de word clouds par catégorie."""
     from wordcloud import WordCloud
 
     categories = list(texts_by_category.keys())
@@ -220,7 +220,7 @@ def plot_word_clouds(
     for i in range(len(categories), nrows * ncols):
         axes_flat[i].set_visible(False)
 
-    fig.suptitle("Nuages de mots par categorie L1", fontsize=14, fontweight="bold", y=1.01)
+    fig.suptitle("Nuages de mots par catégorie L1", fontsize=14, fontweight="bold", y=1.01)
     fig.tight_layout()
     return fig
 
@@ -230,7 +230,7 @@ def plot_tfidf_top_terms(
     ncols: int = 2,
     figsize: tuple = (16, 20),
 ) -> plt.Figure:
-    """Grille de bar charts des termes TF-IDF les plus discriminants par categorie."""
+    """Grille de bar charts des termes TF-IDF les plus discriminants par catégorie."""
     categories = list(tfidf_scores.keys())
     nrows = (len(categories) + ncols - 1) // ncols
     fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
@@ -249,7 +249,7 @@ def plot_tfidf_top_terms(
     for i in range(len(categories), nrows * ncols):
         axes_flat[i].set_visible(False)
 
-    fig.suptitle("Termes les plus discriminants par categorie (TF-IDF)", fontsize=14, fontweight="bold", y=1.01)
+    fig.suptitle("Termes les plus discriminants par catégorie (TF-IDF)", fontsize=14, fontweight="bold", y=1.01)
     fig.tight_layout()
     return fig
 
