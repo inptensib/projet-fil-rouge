@@ -40,6 +40,8 @@ IMAGE_FILES = [
     "f1_per_class_l2.png",
 ]
 
+SKIP_PARAMS = {"gpu_type", "num_classes_l1", "num_classes_l2"}
+
 
 def encode_image(path: Path) -> str | None:
     if not path.exists():
@@ -77,7 +79,7 @@ def discover_hydra_models() -> list[dict]:
                     "SELECT key, value FROM latest_metrics WHERE run_uuid=?",
                     (run_id,),
                 ).fetchall()
-                m = {k: v for k, v in metrics_rows}
+                m = dict(metrics_rows)
                 models.append({
                     "id": f"hydra-{variant}-camembert",
                     "name": info["name"],
@@ -108,13 +110,13 @@ def discover_hydra_models() -> list[dict]:
         metrics_rows = conn.execute(
             "SELECT key, value FROM latest_metrics WHERE run_uuid=?", (run_id,),
         ).fetchall()
-        m = {k: v for k, v in metrics_rows}
+        m = dict(metrics_rows)
 
         # Paramètres
         params_rows = conn.execute(
             "SELECT key, value FROM params WHERE run_uuid=?", (run_id,),
         ).fetchall()
-        p = {k: v for k, v in params_rows}
+        p = dict(params_rows)
 
         # Historique par epoch
         history = {}
@@ -138,9 +140,7 @@ def discover_hydra_models() -> list[dict]:
             if encoded:
                 images[key] = encoded
 
-        # Filtrer les params non pertinents pour la comparaison
-        skip_params = {"gpu_type", "num_classes_l1", "num_classes_l2"}
-        params_clean = {k: v for k, v in p.items() if k not in skip_params}
+        params_clean = {k: v for k, v in p.items() if k not in SKIP_PARAMS}
 
         models.append({
             "id": f"hydra-{variant}-camembert",
