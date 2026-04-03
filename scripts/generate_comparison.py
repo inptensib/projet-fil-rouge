@@ -1,0 +1,712 @@
+#!/usr/bin/env python3
+"""Génère la page HTML de comparaison de tous les modèles.
+
+Usage:
+    python scripts/generate_comparison.py
+
+Lit les données depuis MLflow (mlflow.db) et results/, génère results/comparison.html.
+Pour ajouter un modèle : relancer le script après que les artefacts sont dans results/.
+"""
+
+import base64
+import json
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+RESULTS_DIR = PROJECT_ROOT / "results"
+MLFLOW_DB = PROJECT_ROOT / "mlflow.db"
+OUTPUT_HTML = RESULTS_DIR / "comparison.html"
+
+HYDRA_EXPERIMENTS = {
+    "1": {"variant": "local", "name": "HYDRA Local", "color": "#3498db"},
+    "2": {"variant": "nested", "name": "HYDRA Nested", "color": "#2ecc71"},
+    "3": {"variant": "global", "name": "HYDRA Global", "color": "#9b59b6"},
+}
+
+METRIC_KEYS = [
+    "train_loss", "val_f1_l1_macro", "val_f1_l2_macro", "val_hcr",
+    "test_f1_l1_macro", "test_f1_l2_macro", "test_hcr", "total_time_s",
+]
+
+HISTORY_KEYS = ["train_loss", "val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"]
+
+IMAGE_FILES = [
+    "training_curves.png",
+    "confusion_matrix_l1.png",
+    "confusion_matrix_l2_top50.png",
+    "f1_per_class_l1.png",
+    "f1_per_class_l2.png",
+]
+
+
+def encode_image(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
+def format_duration(seconds: float | None) -> str:
+    if seconds is None:
+        return "--"
+    h, rem = divmod(int(seconds), 3600)
+    m, s = divmod(rem, 60)
+    if h > 0:
+        return f"{h}h{m:02d}"
+    return f"{m}min{s:02d}s"
+
+
+def discover_hydra_models() -> list[dict]:
+    conn = sqlite3.connect(str(MLFLOW_DB))
+    models = []
+
+    for exp_id, info in HYDRA_EXPERIMENTS.items():
+        variant = info["variant"]
+        results_dir = RESULTS_DIR / f"hydra-{variant}-camembert"
+
+        # Meilleur run FINISHED
+        row = conn.execute(
+            "SELECT run_uuid FROM runs "
+            "WHERE experiment_id=? AND status='FINISHED' "
+            "ORDER BY end_time DESC LIMIT 1",
+            (exp_id,),
+        ).fetchone()
+
+        if row is None:
+            # Vérifier si en cours
+            running = conn.execute(
+                "SELECT run_uuid FROM runs "
+                "WHERE experiment_id=? AND status='RUNNING' "
+                "ORDER BY start_time DESC LIMIT 1",
+                (exp_id,),
+            ).fetchone()
+            if running:
+                run_id = running[0]
+                metrics_rows = conn.execute(
+                    "SELECT key, value FROM latest_metrics WHERE run_uuid=?",
+                    (run_id,),
+                ).fetchall()
+                m = {k: v for k, v in metrics_rows}
+                models.append({
+                    "id": f"hydra-{variant}-camembert",
+                    "name": info["name"],
+                    "family": "hydra",
+                    "subtitle": f"CamemBERT — variante {variant}",
+                    "status": "running",
+                    "color": info["color"],
+                    "metrics": {
+                        "test_f1_l1_macro": m.get("test_f1_l1_macro"),
+                        "test_f1_l2_macro": m.get("test_f1_l2_macro"),
+                        "test_hcr": m.get("test_hcr"),
+                    },
+                    "val_metrics": {
+                        "val_f1_l1_macro": m.get("val_f1_l1_macro"),
+                        "val_f1_l2_macro": m.get("val_f1_l2_macro"),
+                        "val_hcr": m.get("val_hcr"),
+                    },
+                    "training": {"duration_s": None, "duration_display": "en cours", "gpu": None, "params": {}},
+                    "history": None,
+                    "f1_per_class_l1": None,
+                    "images": {},
+                })
+            continue
+
+        run_id = row[0]
+
+        # Métriques
+        metrics_rows = conn.execute(
+            "SELECT key, value FROM latest_metrics WHERE run_uuid=?", (run_id,),
+        ).fetchall()
+        m = {k: v for k, v in metrics_rows}
+
+        # Paramètres
+        params_rows = conn.execute(
+            "SELECT key, value FROM params WHERE run_uuid=?", (run_id,),
+        ).fetchall()
+        p = {k: v for k, v in params_rows}
+
+        # Historique par epoch
+        history = {}
+        for key in HISTORY_KEYS:
+            rows = conn.execute(
+                "SELECT step, value FROM metrics WHERE run_uuid=? AND key=? ORDER BY step",
+                (run_id, key),
+            ).fetchall()
+            if rows:
+                history[key] = {"epochs": [r[0] for r in rows], "values": [r[1] for r in rows]}
+
+        # F1 par classe
+        f1_json_path = results_dir / "f1_per_class_l1.json"
+        f1_per_class = json.loads(f1_json_path.read_text()) if f1_json_path.exists() else None
+
+        # Images
+        images = {}
+        for fname in IMAGE_FILES:
+            key = fname.replace(".png", "")
+            encoded = encode_image(results_dir / fname)
+            if encoded:
+                images[key] = encoded
+
+        models.append({
+            "id": f"hydra-{variant}-camembert",
+            "name": info["name"],
+            "family": "hydra",
+            "subtitle": f"CamemBERT — variante {variant}",
+            "status": "finished",
+            "color": info["color"],
+            "metrics": {
+                "test_f1_l1_macro": m.get("test_f1_l1_macro"),
+                "test_f1_l2_macro": m.get("test_f1_l2_macro"),
+                "test_hcr": m.get("test_hcr"),
+            },
+            "val_metrics": {
+                "val_f1_l1_macro": m.get("val_f1_l1_macro"),
+                "val_f1_l2_macro": m.get("val_f1_l2_macro"),
+                "val_hcr": m.get("val_hcr"),
+            },
+            "training": {
+                "duration_s": m.get("total_time_s"),
+                "duration_display": format_duration(m.get("total_time_s")),
+                "gpu": p.get("gpu_type"),
+                "params": {k: v for k, v in p.items()},
+            },
+            "history": history if history else None,
+            "f1_per_class_l1": f1_per_class,
+            "images": images,
+        })
+
+    conn.close()
+    return models
+
+
+def discover_baseline_models() -> list[dict]:
+    json_path = RESULTS_DIR / "baselines" / "baseline_results.json"
+    if not json_path.exists():
+        return []
+    data = json.loads(json_path.read_text())
+    models = []
+    colors = {"tfidf": "#e67e22", "word2vec": "#e74c3c", "fasttext": "#1abc9c"}
+    for entry in data:
+        emb = entry["embedding"]
+        clf = entry["classifier"]
+        models.append({
+            "id": f"{emb}-{clf.lower().replace('/', '-').replace(' ', '')}",
+            "name": f"{emb.upper()} + {clf}" if emb != "fasttext" else "FastText",
+            "family": "baseline",
+            "subtitle": entry.get("subtitle", f"{emb} + {clf}"),
+            "status": "finished",
+            "color": colors.get(emb, "#95a5a6"),
+            "metrics": entry.get("metrics", {}),
+            "val_metrics": entry.get("val_metrics", {}),
+            "training": {
+                "duration_s": entry.get("duration_s"),
+                "duration_display": format_duration(entry.get("duration_s")),
+                "gpu": None,
+                "params": entry.get("params", {}),
+            },
+            "history": None,
+            "f1_per_class_l1": entry.get("f1_per_class_l1"),
+            "images": {},
+        })
+    return models
+
+
+def render_html(models_data: dict) -> str:
+    data_json = json.dumps(models_data, ensure_ascii=False, indent=2)
+    return HTML_TEMPLATE.replace("/* __MODELS_DATA__ */", data_json)
+
+
+HTML_TEMPLATE = r"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Comparaison des modèles — Rakuten Classification Hiérarchique</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+* { box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    max-width: 1200px; margin: 0 auto; padding: 20px 30px;
+    color: #333; background: #fff; line-height: 1.6;
+}
+h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 12px; }
+h2 { color: #2c3e50; margin-top: 40px; border-left: 4px solid #3498db; padding-left: 12px; }
+nav { background: #f8f9fa; padding: 16px; border-radius: 8px; margin: 20px 0; }
+nav a { margin-right: 16px; color: #3498db; text-decoration: none; font-weight: 500; }
+nav a:hover { text-decoration: underline; }
+
+/* Tables */
+.table-container { overflow-x: auto; margin: 16px 0; }
+table { border-collapse: collapse; width: 100%; }
+th { background: #f1f3f5; padding: 10px 12px; text-align: left; font-size: 0.85em; color: #495057; }
+td { padding: 8px 12px; border-bottom: 1px solid #f1f3f5; }
+.best-cell { background: #d4edda; font-weight: 700; }
+.worst-cell { background: #f8d7da; }
+.metric-main { font-weight: 700; font-size: 1.05em; }
+
+/* Badges */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75em; font-weight: 600; }
+.badge-finished { background: #d4edda; color: #155724; }
+.badge-running { background: #fff3cd; color: #856404; }
+.badge-planned { background: #e2e3e5; color: #383d41; }
+
+/* Charts */
+.chart-row { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+.chart-container { flex: 1; min-width: 400px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; }
+.chart-container.full-width { flex-basis: 100%; }
+.chart-container canvas { max-height: 400px; }
+
+/* Per-class controls */
+.controls-bar { display: flex; gap: 12px; margin: 12px 0; align-items: center; flex-wrap: wrap; }
+.controls-bar input, .controls-bar select {
+    padding: 8px 12px; border: 1px solid #dee2e6; border-radius: 6px;
+    font-size: 0.9em; font-family: inherit;
+}
+.controls-bar input { flex: 1; min-width: 200px; }
+
+/* Accordions */
+details { margin: 12px 0; border: 1px solid #e9ecef; border-radius: 8px; }
+details summary {
+    padding: 12px 16px; cursor: pointer; background: #f8f9fa; border-radius: 8px;
+    font-weight: 600; color: #2c3e50; list-style: none;
+}
+details summary::-webkit-details-marker { display: none; }
+details summary::before { content: "▶ "; font-size: 0.8em; }
+details[open] summary::before { content: "▼ "; }
+details[open] summary { border-radius: 8px 8px 0 0; }
+.detail-content { padding: 16px; }
+.img-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.img-container {
+    text-align: center; border: 1px solid #e9ecef; border-radius: 8px;
+    padding: 12px; background: #fafafa;
+}
+.img-container img {
+    max-width: 100%; height: auto; cursor: pointer;
+    border-radius: 4px; transition: transform 0.2s;
+}
+.img-container img:hover { transform: scale(1.02); }
+.img-caption { font-size: 0.85em; color: #6c757d; margin-top: 8px; font-style: italic; }
+
+/* Overlay zoom */
+.overlay {
+    display: none; position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%; background: rgba(0,0,0,0.92);
+    z-index: 1000; overflow: hidden;
+}
+.overlay.active { display: block; }
+.overlay img { position: absolute; cursor: grab; transform-origin: 0 0; transition: none; }
+.overlay img.grabbing { cursor: grabbing; }
+.overlay .controls {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 10px; z-index: 1001;
+}
+.overlay .controls button {
+    background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 6px; padding: 8px 16px; font-size: 16px; cursor: pointer;
+    backdrop-filter: blur(4px);
+}
+.overlay .controls button:hover { background: rgba(255,255,255,0.3); }
+.overlay .zoom-level { position: fixed; top: 20px; right: 20px; color: rgba(255,255,255,0.7); font-size: 14px; z-index: 1001; font-family: monospace; }
+.overlay .hint { position: fixed; top: 20px; left: 20px; color: rgba(255,255,255,0.5); font-size: 13px; z-index: 1001; }
+
+/* Color helpers */
+.f1-high { color: #27ae60; }
+.f1-mid { color: #e67e22; }
+.f1-low { color: #e74c3c; }
+
+@media (max-width: 768px) {
+    .chart-row { flex-direction: column; }
+    .chart-container { min-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<h1>Comparaison des modèles — Classification Hiérarchique Rakuten</h1>
+<p style="color:#6c757d">
+    157 catégories L1 · 6 126 catégories L2 · 8M+ produits<br>
+    Télécom Paris × Rakuten France · Généré le <span id="gen-date"></span>
+</p>
+
+<nav>
+    <a href="#recap">Récapitulatif</a>
+    <a href="#charts">Graphiques</a>
+    <a href="#per-class">F1 par classe</a>
+    <a href="#details">Détail par modèle</a>
+    <a href="#config">Configuration</a>
+</nav>
+
+<!-- Overlay zoom -->
+<div class="overlay" id="overlay">
+    <img id="overlay-img" src="" alt="Plein écran">
+    <div class="hint">Molette = zoom · Clic-glisser = déplacer · Double-clic = reset · Echap = fermer</div>
+    <div class="zoom-level" id="zoom-level">100%</div>
+    <div class="controls">
+        <button onclick="zoomBy(1.5)">+ Zoom</button>
+        <button onclick="zoomBy(1/1.5)">&minus; Zoom</button>
+        <button onclick="resetView()">Reset</button>
+        <button onclick="closeOverlay()">Fermer (Echap)</button>
+    </div>
+</div>
+
+<section id="recap"><h2>Tableau récapitulatif</h2><div class="table-container"><table id="recap-table"></table></div></section>
+<section id="charts">
+    <h2>Graphiques comparatifs</h2>
+    <div class="chart-row">
+        <div class="chart-container"><canvas id="chart-metrics"></canvas></div>
+        <div class="chart-container"><canvas id="chart-time"></canvas></div>
+    </div>
+    <div class="chart-row">
+        <div class="chart-container full-width"><canvas id="chart-convergence"></canvas></div>
+    </div>
+</section>
+<section id="per-class">
+    <h2>Comparaison par classe L1 (157 classes)</h2>
+    <div class="controls-bar">
+        <input type="text" id="class-search" placeholder="Filtrer par nom de classe...">
+        <select id="class-sort">
+            <option value="best-first">Meilleur F1 d'abord</option>
+            <option value="worst-first">Pire F1 d'abord</option>
+            <option value="alpha">Alphabétique</option>
+            <option value="diff">Plus grand écart</option>
+        </select>
+    </div>
+    <div class="table-container"><table id="per-class-table"></table></div>
+</section>
+<section id="details"><h2>Détail par modèle</h2><div id="accordions"></div></section>
+<section id="config"><h2>Hyperparamètres</h2><div class="table-container"><table id="config-table"></table></div></section>
+
+<script>
+const MODELS_DATA = /* __MODELS_DATA__ */;
+
+// --- Utils ---
+const fmt = (v, pct=true) => v != null ? (pct ? (v*100).toFixed(2)+'%' : v.toFixed(4)) : '--';
+const fmtTime = (s) => s != null ? (s > 3600 ? Math.round(s/3600)+'h' : Math.round(s/60)+'min') : '--';
+const f1Color = (v) => v == null ? '' : v >= 0.8 ? 'f1-high' : v >= 0.5 ? 'f1-mid' : 'f1-low';
+const badgeHtml = (status) => {
+    const cls = {'finished':'badge-finished','running':'badge-running','planned':'badge-planned'}[status] || '';
+    const txt = {'finished':'Terminé','running':'En cours','planned':'Planifié'}[status] || status;
+    return `<span class="badge ${cls}">${txt}</span>`;
+};
+const finished = MODELS_DATA.models.filter(m => m.status !== 'planned');
+
+// --- 1. Recap Table ---
+function renderRecapTable() {
+    const t = document.getElementById('recap-table');
+    const metrics = [
+        {key: 'test_f1_l1_macro', label: 'Test F1 L1 macro', main: false},
+        {key: 'test_f1_l2_macro', label: 'Test F1 L2 macro', main: true},
+        {key: 'test_hcr', label: 'HCR (test)', main: false},
+        {key: 'val_f1_l1_macro', label: 'Val F1 L1 macro', main: false, src: 'val_metrics'},
+        {key: 'val_f1_l2_macro', label: 'Val F1 L2 macro', main: false, src: 'val_metrics'},
+    ];
+    // Header
+    let html = '<thead><tr><th></th>';
+    for (const m of finished) {
+        html += `<th style="text-align:center;min-width:120px">
+            <span style="color:${m.color}">●</span> ${m.name}<br>${badgeHtml(m.status)}</th>`;
+    }
+    html += '</tr></thead><tbody>';
+    // Famille
+    html += '<tr><td style="font-weight:600">Famille</td>';
+    for (const m of finished) html += `<td style="text-align:center">${m.family === 'hydra' ? 'HYDRA' : 'Baseline'}</td>`;
+    html += '</tr>';
+    // Metrics rows
+    for (const mdef of metrics) {
+        const vals = finished.map(m => {
+            const src = mdef.src === 'val_metrics' ? m.val_metrics : m.metrics;
+            return src ? src[mdef.key] : null;
+        });
+        const validVals = vals.filter(v => v != null);
+        const best = validVals.length ? Math.max(...validVals) : null;
+        const worst = validVals.length > 1 ? Math.min(...validVals) : null;
+
+        html += `<tr><td style="font-weight:600">${mdef.label}</td>`;
+        for (let i = 0; i < finished.length; i++) {
+            const v = vals[i];
+            let cls = mdef.main ? 'metric-main' : '';
+            if (v != null && v === best && validVals.length > 1) cls += ' best-cell';
+            else if (v != null && v === worst && validVals.length > 1) cls += ' worst-cell';
+            html += `<td class="${cls}" style="text-align:center">
+                <span class="${f1Color(v)}">${fmt(v)}</span></td>`;
+        }
+        html += '</tr>';
+    }
+    // Duration
+    html += '<tr><td style="font-weight:600">Durée entraînement</td>';
+    for (const m of finished) html += `<td style="text-align:center">${m.training.duration_display || '--'}</td>`;
+    html += '</tr>';
+    // GPU
+    html += '<tr><td style="font-weight:600">GPU</td>';
+    for (const m of finished) html += `<td style="text-align:center">${m.training.gpu || 'CPU'}</td>`;
+    html += '</tr>';
+    html += '</tbody>';
+    t.innerHTML = html;
+}
+
+// --- 2. Charts ---
+function renderCharts() {
+    // Grouped bar: F1 L1, F1 L2, HCR
+    const labels = finished.map(m => m.name);
+    const colors = finished.map(m => m.color);
+    new Chart(document.getElementById('chart-metrics'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {label: 'F1 L1 macro', data: finished.map(m => m.metrics?.test_f1_l1_macro), backgroundColor: 'rgba(39,174,96,0.7)', borderColor: '#27ae60', borderWidth: 1},
+                {label: 'F1 L2 macro', data: finished.map(m => m.metrics?.test_f1_l2_macro), backgroundColor: 'rgba(41,128,185,0.7)', borderColor: '#2980b9', borderWidth: 1},
+                {label: 'HCR', data: finished.map(m => m.metrics?.test_hcr), backgroundColor: 'rgba(230,126,34,0.7)', borderColor: '#e67e22', borderWidth: 1},
+            ],
+        },
+        options: {
+            responsive: true,
+            plugins: {title: {display: true, text: 'Métriques de test (F1 macro + HCR)'}},
+            scales: {y: {beginAtZero: false, min: 0.4, max: 1.0, ticks: {callback: v => (v*100).toFixed(0)+'%'}}},
+        },
+    });
+
+    // Time bar
+    const durations = finished.map(m => m.training.duration_s).filter(d => d != null);
+    if (durations.length > 0) {
+        new Chart(document.getElementById('chart-time'), {
+            type: 'bar',
+            data: {
+                labels: finished.filter(m => m.training.duration_s != null).map(m => m.name),
+                datasets: [{
+                    label: 'Durée (heures)',
+                    data: finished.filter(m => m.training.duration_s != null).map(m => m.training.duration_s / 3600),
+                    backgroundColor: finished.filter(m => m.training.duration_s != null).map(m => m.color + 'BB'),
+                    borderColor: finished.filter(m => m.training.duration_s != null).map(m => m.color),
+                    borderWidth: 1,
+                }],
+            },
+            options: {
+                responsive: true,
+                plugins: {title: {display: true, text: "Durée d'entraînement (heures)"}},
+                scales: {y: {beginAtZero: true, title: {display: true, text: 'Heures'}}},
+            },
+        });
+    }
+
+    // Convergence curves (HYDRA only)
+    const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history?.val_f1_l2_macro);
+    if (hydraWithHistory.length > 0) {
+        const datasets = hydraWithHistory.map(m => ({
+            label: m.name,
+            data: m.history.val_f1_l2_macro.values.map((v, i) => ({x: m.history.val_f1_l2_macro.epochs[i], y: v})),
+            borderColor: m.color,
+            backgroundColor: m.color + '33',
+            fill: false,
+            tension: 0.3,
+            pointRadius: 4,
+        }));
+        new Chart(document.getElementById('chart-convergence'), {
+            type: 'line',
+            data: {datasets},
+            options: {
+                responsive: true,
+                plugins: {title: {display: true, text: 'Convergence — Val F1 L2 macro par epoch'}},
+                scales: {
+                    x: {type: 'linear', title: {display: true, text: 'Epoch'}},
+                    y: {title: {display: true, text: 'F1 L2 macro'}, ticks: {callback: v => (v*100).toFixed(1)+'%'}},
+                },
+            },
+        });
+    }
+}
+
+// --- 3. Per-class comparison ---
+function renderPerClassComparison() {
+    const modelsWithF1 = finished.filter(m => m.f1_per_class_l1);
+    if (modelsWithF1.length === 0) return;
+
+    const allClasses = [...new Set(modelsWithF1.flatMap(m => Object.keys(m.f1_per_class_l1)))];
+    let tableData = allClasses.map(cls => {
+        const row = {name: cls};
+        for (const m of modelsWithF1) row[m.id] = m.f1_per_class_l1[cls] ?? null;
+        const vals = modelsWithF1.map(m => m.f1_per_class_l1[cls]).filter(v => v != null);
+        row._avg = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
+        row._diff = vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : 0;
+        return row;
+    });
+
+    function renderTable(data) {
+        let html = '<thead><tr><th>Classe L1</th>';
+        for (const m of modelsWithF1) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
+        if (modelsWithF1.length > 1) html += '<th style="text-align:center">Écart</th>';
+        html += '</tr></thead><tbody>';
+        for (const row of data) {
+            html += `<tr><td style="white-space:nowrap;font-size:0.85em">${row.name}</td>`;
+            for (const m of modelsWithF1) {
+                const v = row[m.id];
+                const cls = f1Color(v);
+                html += `<td style="text-align:center" class="${cls}">${v != null ? v.toFixed(4) : '--'}</td>`;
+            }
+            if (modelsWithF1.length > 1) {
+                html += `<td style="text-align:center;font-size:0.85em">${row._diff.toFixed(4)}</td>`;
+            }
+            html += '</tr>';
+        }
+        html += '</tbody>';
+        document.getElementById('per-class-table').innerHTML = html;
+    }
+
+    function sortAndFilter() {
+        const search = document.getElementById('class-search').value.toLowerCase();
+        const sort = document.getElementById('class-sort').value;
+        let data = tableData.filter(r => r.name.toLowerCase().includes(search));
+        if (sort === 'alpha') data.sort((a,b) => a.name.localeCompare(b.name));
+        else if (sort === 'best-first') data.sort((a,b) => b._avg - a._avg);
+        else if (sort === 'worst-first') data.sort((a,b) => a._avg - b._avg);
+        else if (sort === 'diff') data.sort((a,b) => b._diff - a._diff);
+        renderTable(data);
+    }
+
+    document.getElementById('class-search').addEventListener('input', sortAndFilter);
+    document.getElementById('class-sort').addEventListener('change', sortAndFilter);
+    sortAndFilter();
+}
+
+// --- 4. Accordions ---
+function renderAccordions() {
+    const container = document.getElementById('accordions');
+    let html = '';
+    for (const m of finished) {
+        const metricsLine = [
+            m.metrics?.test_f1_l1_macro != null ? `F1 L1: ${fmt(m.metrics.test_f1_l1_macro)}` : null,
+            m.metrics?.test_f1_l2_macro != null ? `F1 L2: ${fmt(m.metrics.test_f1_l2_macro)}` : null,
+            m.metrics?.test_hcr != null ? `HCR: ${fmt(m.metrics.test_hcr)}` : null,
+        ].filter(Boolean).join(' · ');
+
+        html += `<details><summary>
+            <span style="color:${m.color}">●</span> ${m.name}
+            <span style="font-weight:400;color:#6c757d;margin-left:12px">${metricsLine}</span>
+            ${badgeHtml(m.status)}
+        </summary><div class="detail-content">`;
+        html += `<p style="color:#6c757d">${m.subtitle || ''}</p>`;
+
+        if (m.images && Object.keys(m.images).length > 0) {
+            const imgLabels = {
+                training_curves: 'Courbes d\'entraînement',
+                confusion_matrix_l1: 'Matrice de confusion L1',
+                confusion_matrix_l2_top50: 'Matrice de confusion L2 (top 50)',
+                f1_per_class_l1: 'F1 par classe L1',
+                f1_per_class_l2: 'F1 par classe L2',
+            };
+            html += '<div class="img-grid">';
+            for (const [key, src] of Object.entries(m.images)) {
+                html += `<div class="img-container">
+                    <img src="${src}" alt="${imgLabels[key] || key}" onclick="openOverlay(this)">
+                    <div class="img-caption">${imgLabels[key] || key}</div>
+                </div>`;
+            }
+            html += '</div>';
+            // Link to individual report
+            const reportPath = `hydra-${m.id.replace('hydra-','').replace('-camembert','')}-camembert/${m.id}.html`;
+            html += `<p style="margin-top:12px"><a href="${reportPath}">Voir le rapport individuel →</a></p>`;
+        } else {
+            html += '<table class="config-table"><thead><tr><th>Paramètre</th><th>Valeur</th></tr></thead><tbody>';
+            for (const [k,v] of Object.entries(m.training.params || {})) {
+                html += `<tr><td>${k}</td><td>${v}</td></tr>`;
+            }
+            html += '</tbody></table>';
+        }
+        html += '</div></details>';
+    }
+    container.innerHTML = html;
+}
+
+// --- 5. Config Table ---
+function renderConfigTable() {
+    const hydraModels = finished.filter(m => m.family === 'hydra');
+    if (hydraModels.length === 0) return;
+    const allKeys = [...new Set(hydraModels.flatMap(m => Object.keys(m.training.params || {})))];
+    const important = ['variant','encoder','epochs','lr','batch_size','max_length','dropout','hidden_dim','level_weight_l1','warmup_ratio','weight_decay','fp16'];
+    const sorted = important.filter(k => allKeys.includes(k)).concat(allKeys.filter(k => !important.includes(k)));
+
+    let html = '<thead><tr><th>Paramètre</th>';
+    for (const m of hydraModels) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
+    html += '</tr></thead><tbody>';
+    for (const key of sorted) {
+        html += `<tr><td style="font-weight:600">${key}</td>`;
+        for (const m of hydraModels) html += `<td style="text-align:center">${m.training.params?.[key] ?? '--'}</td>`;
+        html += '</tr>';
+    }
+    html += '</tbody>';
+    document.getElementById('config-table').innerHTML = html;
+}
+
+// --- Overlay Zoom (verbatim from individual reports) ---
+let scale = 1, panX = 0, panY = 0, dragging = false, startX, startY;
+const overlay = document.getElementById('overlay');
+const oImg = document.getElementById('overlay-img');
+
+function openOverlay(img) {
+    oImg.src = img.src;
+    overlay.classList.add('active');
+    resetView();
+}
+function closeOverlay() { overlay.classList.remove('active'); }
+function resetView() {
+    scale = 1; panX = 0; panY = 0;
+    oImg.style.left = '50%'; oImg.style.top = '50%';
+    oImg.style.transform = 'translate(-50%, -50%) scale(1)';
+    document.getElementById('zoom-level').textContent = '100%';
+}
+function applyTransform() {
+    oImg.style.left = '50%'; oImg.style.top = '50%';
+    oImg.style.transform = `translate(calc(-50% + ${panX}px), calc(-50% + ${panY}px)) scale(${scale})`;
+    document.getElementById('zoom-level').textContent = Math.round(scale*100) + '%';
+}
+function zoomBy(factor) { scale *= factor; applyTransform(); }
+overlay.addEventListener('wheel', e => { e.preventDefault(); zoomBy(e.deltaY < 0 ? 1.15 : 1/1.15); });
+oImg.addEventListener('mousedown', e => { dragging = true; startX = e.clientX - panX; startY = e.clientY - panY; oImg.classList.add('grabbing'); });
+window.addEventListener('mousemove', e => { if (dragging) { panX = e.clientX - startX; panY = e.clientY - startY; applyTransform(); } });
+window.addEventListener('mouseup', () => { dragging = false; oImg.classList.remove('grabbing'); });
+oImg.addEventListener('dblclick', resetView);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOverlay(); });
+overlay.addEventListener('click', e => { if (e.target === overlay) closeOverlay(); });
+
+// --- Init ---
+document.getElementById('gen-date').textContent = MODELS_DATA.meta.generated;
+renderRecapTable();
+renderCharts();
+renderPerClassComparison();
+renderAccordions();
+renderConfigTable();
+</script>
+</body>
+</html>"""
+
+
+def main():
+    print("Découverte des modèles HYDRA...")
+    hydra_models = discover_hydra_models()
+    print(f"  → {len(hydra_models)} variante(s) HYDRA")
+
+    print("Découverte des baselines...")
+    baseline_models = discover_baseline_models()
+    print(f"  → {len(baseline_models)} baseline(s)")
+
+    models_data = {
+        "meta": {
+            "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "project": "Rakuten Classification Hiérarchique",
+            "num_classes_l1": 157,
+            "num_classes_l2": 6126,
+        },
+        "models": hydra_models + baseline_models,
+    }
+
+    print("Génération du HTML...")
+    html = render_html(models_data)
+    OUTPUT_HTML.write_text(html, encoding="utf-8")
+    size_mb = OUTPUT_HTML.stat().st_size / 1024 / 1024
+    print(f"  → {OUTPUT_HTML} ({size_mb:.1f} Mo)")
+    print(f"  → {len(models_data['models'])} modèle(s) dans la comparaison")
+
+
+if __name__ == "__main__":
+    main()
