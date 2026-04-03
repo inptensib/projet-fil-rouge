@@ -27,7 +27,7 @@ HYDRA_EXPERIMENTS = {
 
 METRIC_KEYS = [
     "train_loss", "val_f1_l1_macro", "val_f1_l2_macro", "val_hcr",
-    "test_f1_l1_macro", "test_f1_l2_macro", "test_hcr", "total_time_s",
+    "test_f1_l1_macro", "test_f1_l2_macro", "test_hcr",
 ]
 
 HISTORY_KEYS = ["train_loss", "val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"]
@@ -45,16 +45,6 @@ def encode_image(path: Path) -> str | None:
     if not path.exists():
         return None
     return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
-
-
-def format_duration(seconds: float | None) -> str:
-    if seconds is None:
-        return "--"
-    h, rem = divmod(int(seconds), 3600)
-    m, s = divmod(rem, 60)
-    if h > 0:
-        return f"{h}h{m:02d}"
-    return f"{m}min{s:02d}s"
 
 
 def discover_hydra_models() -> list[dict]:
@@ -105,7 +95,7 @@ def discover_hydra_models() -> list[dict]:
                         "val_f1_l2_macro": m.get("val_f1_l2_macro"),
                         "val_hcr": m.get("val_hcr"),
                     },
-                    "training": {"duration_s": None, "duration_display": "en cours", "gpu": None, "params": {}},
+                    "training": {"params": {}},
                     "history": None,
                     "f1_per_class_l1": None,
                     "images": {},
@@ -148,6 +138,10 @@ def discover_hydra_models() -> list[dict]:
             if encoded:
                 images[key] = encoded
 
+        # Filtrer les params non pertinents pour la comparaison
+        skip_params = {"gpu_type", "num_classes_l1", "num_classes_l2"}
+        params_clean = {k: v for k, v in p.items() if k not in skip_params}
+
         models.append({
             "id": f"hydra-{variant}-camembert",
             "name": info["name"],
@@ -166,10 +160,7 @@ def discover_hydra_models() -> list[dict]:
                 "val_hcr": m.get("val_hcr"),
             },
             "training": {
-                "duration_s": m.get("total_time_s"),
-                "duration_display": format_duration(m.get("total_time_s")),
-                "gpu": p.get("gpu_type"),
-                "params": {k: v for k, v in p.items()},
+                "params": params_clean,
             },
             "history": history if history else None,
             "f1_per_class_l1": f1_per_class,
@@ -200,9 +191,6 @@ def discover_baseline_models() -> list[dict]:
             "metrics": entry.get("metrics", {}),
             "val_metrics": entry.get("val_metrics", {}),
             "training": {
-                "duration_s": entry.get("duration_s"),
-                "duration_display": format_duration(entry.get("duration_s")),
-                "gpu": None,
                 "params": entry.get("params", {}),
             },
             "history": None,
@@ -355,10 +343,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     <h2>Graphiques comparatifs</h2>
     <div class="chart-row">
         <div class="chart-container"><canvas id="chart-metrics"></canvas></div>
-        <div class="chart-container"><canvas id="chart-time"></canvas></div>
-    </div>
-    <div class="chart-row">
-        <div class="chart-container full-width"><canvas id="chart-convergence"></canvas></div>
+        <div class="chart-container"><canvas id="chart-convergence"></canvas></div>
     </div>
 </section>
 <section id="per-class">
@@ -382,7 +367,6 @@ const MODELS_DATA = /* __MODELS_DATA__ */;
 
 // --- Utils ---
 const fmt = (v, pct=true) => v != null ? (pct ? (v*100).toFixed(2)+'%' : v.toFixed(4)) : '--';
-const fmtTime = (s) => s != null ? (s > 3600 ? Math.round(s/3600)+'h' : Math.round(s/60)+'min') : '--';
 const f1Color = (v) => v == null ? '' : v >= 0.8 ? 'f1-high' : v >= 0.5 ? 'f1-mid' : 'f1-low';
 const badgeHtml = (status) => {
     const cls = {'finished':'badge-finished','running':'badge-running','planned':'badge-planned'}[status] || '';
@@ -433,14 +417,6 @@ function renderRecapTable() {
         }
         html += '</tr>';
     }
-    // Duration
-    html += '<tr><td style="font-weight:600">Durée entraînement</td>';
-    for (const m of finished) html += `<td style="text-align:center">${m.training.duration_display || '--'}</td>`;
-    html += '</tr>';
-    // GPU
-    html += '<tr><td style="font-weight:600">GPU</td>';
-    for (const m of finished) html += `<td style="text-align:center">${m.training.gpu || 'CPU'}</td>`;
-    html += '</tr>';
     html += '</tbody>';
     t.innerHTML = html;
 }
@@ -466,29 +442,6 @@ function renderCharts() {
             scales: {y: {beginAtZero: false, min: 0.4, max: 1.0, ticks: {callback: v => (v*100).toFixed(0)+'%'}}},
         },
     });
-
-    // Time bar
-    const durations = finished.map(m => m.training.duration_s).filter(d => d != null);
-    if (durations.length > 0) {
-        new Chart(document.getElementById('chart-time'), {
-            type: 'bar',
-            data: {
-                labels: finished.filter(m => m.training.duration_s != null).map(m => m.name),
-                datasets: [{
-                    label: 'Durée (heures)',
-                    data: finished.filter(m => m.training.duration_s != null).map(m => m.training.duration_s / 3600),
-                    backgroundColor: finished.filter(m => m.training.duration_s != null).map(m => m.color + 'BB'),
-                    borderColor: finished.filter(m => m.training.duration_s != null).map(m => m.color),
-                    borderWidth: 1,
-                }],
-            },
-            options: {
-                responsive: true,
-                plugins: {title: {display: true, text: "Durée d'entraînement (heures)"}},
-                scales: {y: {beginAtZero: true, title: {display: true, text: 'Heures'}}},
-            },
-        });
-    }
 
     // Convergence curves (HYDRA only)
     const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history?.val_f1_l2_macro);

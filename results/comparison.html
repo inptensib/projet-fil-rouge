@@ -136,10 +136,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     <h2>Graphiques comparatifs</h2>
     <div class="chart-row">
         <div class="chart-container"><canvas id="chart-metrics"></canvas></div>
-        <div class="chart-container"><canvas id="chart-time"></canvas></div>
-    </div>
-    <div class="chart-row">
-        <div class="chart-container full-width"><canvas id="chart-convergence"></canvas></div>
+        <div class="chart-container"><canvas id="chart-convergence"></canvas></div>
     </div>
 </section>
 <section id="per-class">
@@ -161,7 +158,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-03 09:56",
+    "generated": "2026-04-03 10:28",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -185,9 +182,6 @@ const MODELS_DATA = {
         "val_hcr": 0.8589288779299287
       },
       "training": {
-        "duration_s": 99851.7581255436,
-        "duration_display": "27h44",
-        "gpu": "NVIDIA GeForce RTX 3090",
         "params": {
           "variant": "local",
           "encoder": "CamemBERT",
@@ -197,15 +191,12 @@ const MODELS_DATA = {
           "warmup_ratio": "0.1",
           "fp16": "True",
           "gradient_accumulation_steps": "1",
-          "num_classes_l1": "157",
-          "num_classes_l2": "6126",
           "weight_decay": "0.01",
           "max_length": "256",
           "max_grad_norm": "1.0",
           "level_weight_l1": "0.5",
           "early_stopping_patience": "2",
-          "early_stopping_min_delta": "0.001",
-          "gpu_type": "NVIDIA GeForce RTX 3090"
+          "early_stopping_min_delta": "0.001"
         }
       },
       "history": {
@@ -467,9 +458,6 @@ const MODELS_DATA = {
         "val_hcr": 0.8589606942659427
       },
       "training": {
-        "duration_s": 84358.29800915718,
-        "duration_display": "23h25",
-        "gpu": "NVIDIA GeForce RTX 3090",
         "params": {
           "variant": "nested",
           "encoder": "CamemBERT",
@@ -479,15 +467,12 @@ const MODELS_DATA = {
           "warmup_ratio": "0.1",
           "fp16": "True",
           "gradient_accumulation_steps": "1",
-          "num_classes_l1": "157",
-          "num_classes_l2": "6126",
           "weight_decay": "0.01",
           "max_length": "256",
           "max_grad_norm": "1.0",
           "level_weight_l1": "0.5",
           "early_stopping_patience": "2",
-          "early_stopping_min_delta": "0.001",
-          "gpu_type": "NVIDIA GeForce RTX 3090"
+          "early_stopping_min_delta": "0.001"
         }
       },
       "history": {
@@ -741,9 +726,6 @@ const MODELS_DATA = {
         "val_hcr": 0.8565610727128868
       },
       "training": {
-        "duration_s": null,
-        "duration_display": "en cours",
-        "gpu": null,
         "params": {}
       },
       "history": null,
@@ -755,7 +737,6 @@ const MODELS_DATA = {
 
 // --- Utils ---
 const fmt = (v, pct=true) => v != null ? (pct ? (v*100).toFixed(2)+'%' : v.toFixed(4)) : '--';
-const fmtTime = (s) => s != null ? (s > 3600 ? Math.round(s/3600)+'h' : Math.round(s/60)+'min') : '--';
 const f1Color = (v) => v == null ? '' : v >= 0.8 ? 'f1-high' : v >= 0.5 ? 'f1-mid' : 'f1-low';
 const badgeHtml = (status) => {
     const cls = {'finished':'badge-finished','running':'badge-running','planned':'badge-planned'}[status] || '';
@@ -806,14 +787,6 @@ function renderRecapTable() {
         }
         html += '</tr>';
     }
-    // Duration
-    html += '<tr><td style="font-weight:600">Durée entraînement</td>';
-    for (const m of finished) html += `<td style="text-align:center">${m.training.duration_display || '--'}</td>`;
-    html += '</tr>';
-    // GPU
-    html += '<tr><td style="font-weight:600">GPU</td>';
-    for (const m of finished) html += `<td style="text-align:center">${m.training.gpu || 'CPU'}</td>`;
-    html += '</tr>';
     html += '</tbody>';
     t.innerHTML = html;
 }
@@ -839,29 +812,6 @@ function renderCharts() {
             scales: {y: {beginAtZero: false, min: 0.4, max: 1.0, ticks: {callback: v => (v*100).toFixed(0)+'%'}}},
         },
     });
-
-    // Time bar
-    const durations = finished.map(m => m.training.duration_s).filter(d => d != null);
-    if (durations.length > 0) {
-        new Chart(document.getElementById('chart-time'), {
-            type: 'bar',
-            data: {
-                labels: finished.filter(m => m.training.duration_s != null).map(m => m.name),
-                datasets: [{
-                    label: 'Durée (heures)',
-                    data: finished.filter(m => m.training.duration_s != null).map(m => m.training.duration_s / 3600),
-                    backgroundColor: finished.filter(m => m.training.duration_s != null).map(m => m.color + 'BB'),
-                    borderColor: finished.filter(m => m.training.duration_s != null).map(m => m.color),
-                    borderWidth: 1,
-                }],
-            },
-            options: {
-                responsive: true,
-                plugins: {title: {display: true, text: "Durée d'entraînement (heures)"}},
-                scales: {y: {beginAtZero: true, title: {display: true, text: 'Heures'}}},
-            },
-        });
-    }
 
     // Convergence curves (HYDRA only)
     const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history?.val_f1_l2_macro);
