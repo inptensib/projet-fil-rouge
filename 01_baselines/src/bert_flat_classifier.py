@@ -183,14 +183,8 @@ def _filter_rare_classes(
     label_column: str,
     min_samples: int = 5,
 ) -> pd.DataFrame:
-    """Remove classes with fewer than *min_samples* samples."""
-    counts = df[label_column].value_counts()
-    rare = counts[counts < min_samples].index.tolist()
-    if rare:
-        n_before = len(df)
-        df = df[~df[label_column].isin(rare)].copy()
-        print(f"[BERT] Removed {len(rare)} rare classes ({n_before - len(df)} samples)")
-    return df
+    from common import filter_rare_classes
+    return filter_rare_classes(df, label_column, min_samples, tag="BERT")
 
 
 # ---------------------------------------------------------------------------

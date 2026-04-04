@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=hydra-p100
-#SBATCH --partition=P100,3090
+#SBATCH --partition=3090
 #SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=35G

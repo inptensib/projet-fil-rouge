@@ -12,6 +12,7 @@ import logging
 import random
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
@@ -267,7 +268,6 @@ def prepare_hierarchical_data_from_splits(
     y_l2_test = pd.Series(l2_encoder.transform(df_test["level_2"]), index=df_test.index)
 
     # Build parent-child mapping from all data
-    import numpy as np
     all_l1_enc = np.concatenate([y_l1_train.values, y_l1_val.values, y_l1_test.values])
     all_l2_enc = np.concatenate([y_l2_train.values, y_l2_val.values, y_l2_test.values])
     l2_to_l1 = build_parent_child_mapping(all_l1_enc, all_l2_enc)
@@ -350,7 +350,6 @@ class HierarchicalProductDataset(Dataset):
     """
 
     def __init__(self, texts, labels_l1, labels_l2, tokenizer, max_length: int = 256):
-        import numpy as np
         self.texts = texts.tolist() if hasattr(texts, "tolist") else list(texts)
         self.labels_l1 = np.asarray(labels_l1) if not isinstance(labels_l1, np.ndarray) else labels_l1
         self.labels_l2 = np.asarray(labels_l2) if not isinstance(labels_l2, np.ndarray) else labels_l2

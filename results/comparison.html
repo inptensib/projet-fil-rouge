@@ -158,7 +158,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-03 11:50",
+    "generated": "2026-04-05 00:21",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -721,12 +721,41 @@ const MODELS_DATA = {
         "test_hcr": null
       },
       "val_metrics": {
-        "val_f1_l1_macro": 0.9278475472968167,
-        "val_f1_l2_macro": 0.6780307745039142,
-        "val_hcr": 0.8565610727128868
+        "val_f1_l1_macro": 0.9302399329463926,
+        "val_f1_l2_macro": 0.6891263199771945,
+        "val_hcr": 0.8573673656492417
       },
       "training": {
         "params": {}
+      },
+      "history": null,
+      "f1_per_class_l1": null,
+      "images": {}
+    },
+    {
+      "id": "fasttext-supervised",
+      "name": "FastText",
+      "family": "baseline",
+      "subtitle": "FastText Supervised — L1: softmax (25 epochs), L2: OVA (10 epochs)",
+      "status": "finished",
+      "color": "#1abc9c",
+      "metrics": {
+        "test_f1_l1_macro": 0.7186,
+        "test_f1_l2_macro": 0.102,
+        "test_hcr": 0.3015
+      },
+      "val_metrics": {},
+      "training": {
+        "params": {
+          "dim": 100,
+          "wordNgrams": 2,
+          "lr": 0.5,
+          "loss_l1": "softmax",
+          "epochs_l1": 25,
+          "loss_l2": "ova",
+          "epochs_l2": 10,
+          "thread": 10
+        }
       },
       "history": null,
       "f1_per_class_l1": null,

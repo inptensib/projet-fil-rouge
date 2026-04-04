@@ -24,5 +24,7 @@ class TestDDPUtils:
 
     def test_cleanup_ddp_when_not_initialized(self):
         ddp_utils = import_from_production("ddp_utils")
-        with mock.patch("torch.distributed.is_initialized", return_value=False):
+        with mock.patch("torch.distributed.is_initialized", return_value=False), \
+             mock.patch("torch.distributed.destroy_process_group") as mock_destroy:
             ddp_utils.cleanup_ddp()
+            mock_destroy.assert_not_called()

@@ -6,8 +6,11 @@ most to L1 and L2 predictions. Designed for MLflow artifact logging.
 
 from __future__ import annotations
 
+import logging
 from html import escape
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 import torch
 import torch.nn.functional as F
@@ -285,7 +288,8 @@ def generate_explainability_report(
                     confidence_l1=attr["confidence_l1"],
                     confidence_l2=attr["confidence_l2"],
                 ))
-            except Exception:
+            except Exception as e:
+                logger.warning("Attribution failed for sample %d: %s", i, e)
                 continue
 
     if selected_correct:
@@ -305,7 +309,8 @@ def generate_explainability_report(
                     confidence_l1=attr["confidence_l1"],
                     confidence_l2=attr["confidence_l2"],
                 ))
-            except Exception:
+            except Exception as e:
+                logger.warning("Attribution failed for sample %d: %s", i, e)
                 continue
 
     html_parts.append("</body></html>")
