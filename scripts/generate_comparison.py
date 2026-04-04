@@ -100,6 +100,7 @@ def discover_hydra_models() -> list[dict]:
                     "training": {"params": {}},
                     "history": None,
                     "f1_per_class_l1": None,
+                    "f1_per_class_l2": None,
                     "images": {},
                 })
             continue
@@ -131,6 +132,8 @@ def discover_hydra_models() -> list[dict]:
         # F1 par classe
         f1_json_path = results_dir / "f1_per_class_l1.json"
         f1_per_class = json.loads(f1_json_path.read_text()) if f1_json_path.exists() else None
+        f1_l2_json_path = results_dir / "f1_per_class_l2.json"
+        f1_per_class_l2 = json.loads(f1_l2_json_path.read_text()) if f1_l2_json_path.exists() else None
 
         # Images
         images = {}
@@ -164,6 +167,7 @@ def discover_hydra_models() -> list[dict]:
             },
             "history": history if history else None,
             "f1_per_class_l1": f1_per_class,
+            "f1_per_class_l2": f1_per_class_l2,
             "images": images,
         })
 
@@ -195,6 +199,7 @@ def discover_baseline_models() -> list[dict]:
             },
             "history": None,
             "f1_per_class_l1": entry.get("f1_per_class_l1"),
+            "f1_per_class_l2": entry.get("f1_per_class_l2"),
             "images": {},
         })
     return models
@@ -320,7 +325,8 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <nav>
     <a href="#recap">Récapitulatif</a>
     <a href="#charts">Graphiques</a>
-    <a href="#per-class">F1 par classe</a>
+    <a href="#per-class">F1 par classe L1</a>
+    <a href="#per-class-l2">F1 par classe L2</a>
     <a href="#details">Détail par modèle</a>
     <a href="#config">Configuration</a>
 </nav>
@@ -358,6 +364,20 @@ details[open] summary { border-radius: 8px 8px 0 0; }
         </select>
     </div>
     <div class="table-container"><table id="per-class-table"></table></div>
+</section>
+<section id="per-class-l2">
+    <h2>Comparaison par classe L2 (6 126 classes)</h2>
+    <div class="controls-bar">
+        <input type="text" id="class-l2-search" placeholder="Filtrer par nom de classe L2...">
+        <select id="class-l2-sort">
+            <option value="best-first">Meilleur F1 d'abord</option>
+            <option value="worst-first">Pire F1 d'abord</option>
+            <option value="alpha">Alphabétique</option>
+            <option value="diff">Plus grand écart</option>
+        </select>
+        <span id="class-l2-count" style="color:#6c757d;font-size:0.85em"></span>
+    </div>
+    <div class="table-container"><table id="per-class-l2-table"></table></div>
 </section>
 <section id="details"><h2>Détail par modèle</h2><div id="accordions"></div></section>
 <section id="config"><h2>Hyperparamètres</h2><div class="table-container"><table id="config-table"></table></div></section>
@@ -439,7 +459,7 @@ function renderCharts() {
         options: {
             responsive: true,
             plugins: {title: {display: true, text: 'Métriques de test (F1 macro + HCR)'}},
-            scales: {y: {beginAtZero: false, min: 0.4, max: 1.0, ticks: {callback: v => (v*100).toFixed(0)+'%'}}},
+            scales: {y: {beginAtZero: true, min: 0, max: 1.0, ticks: {callback: v => (v*100).toFixed(0)+'%'}}},
         },
     });
 
@@ -470,45 +490,58 @@ function renderCharts() {
     }
 }
 
-// --- 3. Per-class comparison ---
-function renderPerClassComparison() {
-    const modelsWithF1 = finished.filter(m => m.f1_per_class_l1);
-    if (modelsWithF1.length === 0) return;
+// --- 3. Per-class comparison (generic for L1 and L2) ---
+function renderPerClassGeneric(opts) {
+    const {dataKey, tableId, searchId, sortId, countId, maxRows} = opts;
+    const modelsWithData = finished.filter(m => m[dataKey]);
+    if (modelsWithData.length === 0) {
+        if (countId) document.getElementById(countId).textContent = 'Aucune donnée disponible';
+        return;
+    }
 
-    const allClasses = [...new Set(modelsWithF1.flatMap(m => Object.keys(m.f1_per_class_l1)))];
+    const allClasses = [...new Set(modelsWithData.flatMap(m => Object.keys(m[dataKey])))];
     let tableData = allClasses.map(cls => {
         const row = {name: cls};
-        for (const m of modelsWithF1) row[m.id] = m.f1_per_class_l1[cls] ?? null;
-        const vals = modelsWithF1.map(m => m.f1_per_class_l1[cls]).filter(v => v != null);
+        for (const m of finished) row[m.id] = m[dataKey]?.[cls] ?? null;
+        const vals = finished.map(m => m[dataKey]?.[cls]).filter(v => v != null);
         row._avg = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
         row._diff = vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : 0;
         return row;
     });
 
     function renderTable(data) {
-        let html = '<thead><tr><th>Classe L1</th>';
-        for (const m of modelsWithF1) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
-        if (modelsWithF1.length > 1) html += '<th style="text-align:center">Écart</th>';
+        const shown = maxRows ? data.slice(0, maxRows) : data;
+        if (countId) {
+            const msg = maxRows && data.length > maxRows
+                ? `${shown.length} / ${data.length} classes affichées`
+                : `${data.length} classes`;
+            document.getElementById(countId).textContent = msg;
+        }
+        let html = '<thead><tr><th>Classe</th>';
+        for (const m of finished) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
+        if (finished.length > 1) html += '<th style="text-align:center">Écart</th>';
         html += '</tr></thead><tbody>';
-        for (const row of data) {
+        for (const row of shown) {
             html += `<tr><td style="white-space:nowrap;font-size:0.85em">${row.name}</td>`;
-            for (const m of modelsWithF1) {
+            for (const m of finished) {
                 const v = row[m.id];
                 const cls = f1Color(v);
                 html += `<td style="text-align:center" class="${cls}">${v != null ? v.toFixed(4) : '--'}</td>`;
             }
-            if (modelsWithF1.length > 1) {
-                html += `<td style="text-align:center;font-size:0.85em">${row._diff.toFixed(4)}</td>`;
+            if (finished.length > 1) {
+                const vals = finished.map(m => row[m.id]).filter(v => v != null);
+                const diff = vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : 0;
+                html += `<td style="text-align:center;font-size:0.85em">${diff.toFixed(4)}</td>`;
             }
             html += '</tr>';
         }
         html += '</tbody>';
-        document.getElementById('per-class-table').innerHTML = html;
+        document.getElementById(tableId).innerHTML = html;
     }
 
     function sortAndFilter() {
-        const search = document.getElementById('class-search').value.toLowerCase();
-        const sort = document.getElementById('class-sort').value;
+        const search = document.getElementById(searchId).value.toLowerCase();
+        const sort = document.getElementById(sortId).value;
         let data = tableData.filter(r => r.name.toLowerCase().includes(search));
         if (sort === 'alpha') data.sort((a,b) => a.name.localeCompare(b.name));
         else if (sort === 'best-first') data.sort((a,b) => b._avg - a._avg);
@@ -517,9 +550,23 @@ function renderPerClassComparison() {
         renderTable(data);
     }
 
-    document.getElementById('class-search').addEventListener('input', sortAndFilter);
-    document.getElementById('class-sort').addEventListener('change', sortAndFilter);
+    document.getElementById(searchId).addEventListener('input', sortAndFilter);
+    document.getElementById(sortId).addEventListener('change', sortAndFilter);
     sortAndFilter();
+}
+
+function renderPerClassComparison() {
+    renderPerClassGeneric({
+        dataKey: 'f1_per_class_l1', tableId: 'per-class-table',
+        searchId: 'class-search', sortId: 'class-sort', countId: null, maxRows: null,
+    });
+}
+
+function renderPerClassL2Comparison() {
+    renderPerClassGeneric({
+        dataKey: 'f1_per_class_l2', tableId: 'per-class-l2-table',
+        searchId: 'class-l2-search', sortId: 'class-l2-sort', countId: 'class-l2-count', maxRows: 100,
+    });
 }
 
 // --- 4. Accordions ---
@@ -573,18 +620,20 @@ function renderAccordions() {
 
 // --- 5. Config Table ---
 function renderConfigTable() {
-    const hydraModels = finished.filter(m => m.family === 'hydra');
-    if (hydraModels.length === 0) return;
-    const allKeys = [...new Set(hydraModels.flatMap(m => Object.keys(m.training.params || {})))];
+    if (finished.length === 0) return;
+    const allKeys = [...new Set(finished.flatMap(m => Object.keys(m.training.params || {})))];
     const important = ['variant','encoder','epochs','lr','batch_size','max_length','dropout','hidden_dim','level_weight_l1','warmup_ratio','weight_decay','fp16'];
     const sorted = important.filter(k => allKeys.includes(k)).concat(allKeys.filter(k => !important.includes(k)));
 
     let html = '<thead><tr><th>Paramètre</th>';
-    for (const m of hydraModels) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
+    for (const m of finished) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
     html += '</tr></thead><tbody>';
+    html += '<tr><td style="font-weight:600">Famille</td>';
+    for (const m of finished) html += `<td style="text-align:center">${m.family === 'hydra' ? 'HYDRA' : 'Baseline'}</td>`;
+    html += '</tr>';
     for (const key of sorted) {
         html += `<tr><td style="font-weight:600">${key}</td>`;
-        for (const m of hydraModels) html += `<td style="text-align:center">${m.training.params?.[key] ?? '--'}</td>`;
+        for (const m of finished) html += `<td style="text-align:center">${m.training.params?.[key] ?? '--'}</td>`;
         html += '</tr>';
     }
     html += '</tbody>';
@@ -627,6 +676,7 @@ document.getElementById('gen-date').textContent = MODELS_DATA.meta.generated;
 renderRecapTable();
 renderCharts();
 renderPerClassComparison();
+renderPerClassL2Comparison();
 renderAccordions();
 renderConfigTable();
 </script>

@@ -506,6 +506,7 @@ class HYDRATrainer:
                         f1_l2_pc = compute_per_class_f1(v_labels_l2, v_preds_l2, self.l2_encoder)
                         fig = plot_per_class_f1(f1_l2_pc, f"F1 par classe L2 — epoch {epoch + 1}")
                         mlflow.log_figure(fig, "f1_per_class_l2.png")
+                        mlflow.log_dict(f1_l2_pc, "f1_per_class_l2.json")
                         plt.close(fig)
 
                     if history["epoch"]:
