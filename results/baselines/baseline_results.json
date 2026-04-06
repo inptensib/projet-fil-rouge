@@ -18,5 +18,44 @@
       "epochs_l2": 10,
       "thread": 10
     }
+  },
+  {
+    "embedding": "tfidf",
+    "classifier": "LinearSVC",
+    "subtitle": "TF-IDF (50K features, 1-2grams) + LinearSVC / SGDClassifier",
+    "metrics": {
+      "test_f1_l1_macro": 0.8209,
+      "test_f1_l2_macro": 0.4198,
+      "test_hcr": null
+    },
+    "params": {
+      "max_features": 50000,
+      "ngram_range": "1-2",
+      "sublinear_tf": true,
+      "min_df": 3,
+      "classifier_l1": "LinearSVC (C=1.0)",
+      "classifier_l2": "SGDClassifier (hinge)",
+      "xgboost_l1_f1": 0.8251
+    }
+  },
+  {
+    "embedding": "word2vec",
+    "classifier": "LinearSVC",
+    "subtitle": "Word2Vec (200d, Skip-gram) + LinearSVC / SGDClassifier",
+    "metrics": {
+      "test_f1_l1_macro": 0.6029,
+      "test_f1_l2_macro": 0.2336,
+      "test_hcr": null
+    },
+    "params": {
+      "vector_size": 200,
+      "window": 5,
+      "sg": 1,
+      "min_count": 3,
+      "epochs": 10,
+      "classifier_l1": "LinearSVC (C=1.0)",
+      "classifier_l2": "SGDClassifier (hinge)",
+      "xgboost_l1_f1": 0.7933
+    }
   }
 ]

@@ -3,25 +3,25 @@
 # Chaque job reprend le training la ou le precedent s'est arrete.
 #
 # Usage:
-#   ./scripts/chain_submit.sh <variant> [n_jobs]
+#   ./scripts/chain_submit.sh <variant> [n_jobs] [config]
 #   ./scripts/chain_submit.sh local 6
-#   ./scripts/chain_submit.sh nested 6
-#   ./scripts/chain_submit.sh global 6
+#   ./scripts/chain_submit.sh local 3 02_hydra/configs/hierarchy.yaml
 
 set -euo pipefail
 
-VARIANT=${1:?"Usage: $0 <variant> [n_jobs]  (variant: local|global|nested)"}
+VARIANT=${1:?"Usage: $0 <variant> [n_jobs] [config]  (variant: local|global|nested)"}
 N_JOBS=${2:-6}
+CONFIG=${3:-02_hydra/configs/default.yaml}
 
-echo "Soumission de $N_JOBS jobs pour HYDRA $VARIANT"
+echo "Soumission de $N_JOBS jobs pour HYDRA $VARIANT (config: $CONFIG)"
 echo "=============================================="
 
 PREV_JOB=""
 for i in $(seq 1 "$N_JOBS"); do
     if [ -z "$PREV_JOB" ]; then
-        JOB=$(sbatch --parsable --export=ALL,HYDRA_VARIANT="$VARIANT" scripts/run_train_p100.slurm "$VARIANT")
+        JOB=$(sbatch --parsable --export=ALL,HYDRA_VARIANT="$VARIANT",HYDRA_CONFIG="$CONFIG" scripts/run_train_p100.slurm "$VARIANT" "$CONFIG")
     else
-        JOB=$(sbatch --parsable --dependency=afterany:"$PREV_JOB" --export=ALL,HYDRA_VARIANT="$VARIANT" scripts/run_train_p100.slurm "$VARIANT")
+        JOB=$(sbatch --parsable --dependency=afterany:"$PREV_JOB" --export=ALL,HYDRA_VARIANT="$VARIANT",HYDRA_CONFIG="$CONFIG" scripts/run_train_p100.slurm "$VARIANT" "$CONFIG")
     fi
     echo "  Job $i/$N_JOBS : $JOB (depends=${PREV_JOB:-none})"
     PREV_JOB=$JOB

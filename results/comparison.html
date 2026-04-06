@@ -173,7 +173,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-05 18:49",
+    "generated": "2026-04-06 15:54",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -1009,6 +1009,65 @@ const MODELS_DATA = {
           "loss_l2": "ova",
           "epochs_l2": 10,
           "thread": 10
+        }
+      },
+      "history": null,
+      "f1_per_class_l1": null,
+      "f1_per_class_l2": null,
+      "images": {}
+    },
+    {
+      "id": "tfidf-linearsvc",
+      "name": "TFIDF + LinearSVC",
+      "family": "baseline",
+      "subtitle": "TF-IDF (50K features, 1-2grams) + LinearSVC / SGDClassifier",
+      "status": "finished",
+      "color": "#e67e22",
+      "metrics": {
+        "test_f1_l1_macro": 0.8209,
+        "test_f1_l2_macro": 0.4198,
+        "test_hcr": null
+      },
+      "val_metrics": {},
+      "training": {
+        "params": {
+          "max_features": 50000,
+          "ngram_range": "1-2",
+          "sublinear_tf": true,
+          "min_df": 3,
+          "classifier_l1": "LinearSVC (C=1.0)",
+          "classifier_l2": "SGDClassifier (hinge)",
+          "xgboost_l1_f1": 0.8251
+        }
+      },
+      "history": null,
+      "f1_per_class_l1": null,
+      "f1_per_class_l2": null,
+      "images": {}
+    },
+    {
+      "id": "word2vec-linearsvc",
+      "name": "WORD2VEC + LinearSVC",
+      "family": "baseline",
+      "subtitle": "Word2Vec (200d, Skip-gram) + LinearSVC / SGDClassifier",
+      "status": "finished",
+      "color": "#e74c3c",
+      "metrics": {
+        "test_f1_l1_macro": 0.6029,
+        "test_f1_l2_macro": 0.2336,
+        "test_hcr": null
+      },
+      "val_metrics": {},
+      "training": {
+        "params": {
+          "vector_size": 200,
+          "window": 5,
+          "sg": 1,
+          "min_count": 3,
+          "epochs": 10,
+          "classifier_l1": "LinearSVC (C=1.0)",
+          "classifier_l2": "SGDClassifier (hinge)",
+          "xgboost_l1_f1": 0.7933
         }
       },
       "history": null,
