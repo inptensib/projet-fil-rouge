@@ -43,11 +43,11 @@
     "embedding": "word2vec",
     "classifier": "LinearSVC",
     "subtitle": "Word2Vec (200d, Skip-gram) + LinearSVC / SGDClassifier",
-    "status": "running",
+    "status": "finished",
     "metrics": {
-      "test_f1_l1_macro": 0.6029,
-      "test_f1_l2_macro": 0.2336,
-      "test_hcr": null
+      "test_f1_l1_macro": 0.6024,
+      "test_f1_l2_macro": 0.2227,
+      "test_hcr": 0.2506
     },
     "params": {
       "vector_size": 200,
