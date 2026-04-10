@@ -4,7 +4,7 @@
 
 # 🛒 Rakuten Hierarchical Product Classification
 
-**8M+ produits · 157 catégories · 6 059 sous-catégories · CamemBERT**
+**8M+ produits · 157 catégories · 6 126 sous-catégories · CamemBERT**
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
@@ -33,13 +33,13 @@ Un produit arrive avec un titre et une description en français. Le modèle pré
     └────┬────┘
     ┌────┴────┐
     ▼         ▼
- L1: 157   L2: 6 059
+ L1: 157   L2: 6 126
 Électronique  Coque téléphone
 ```
 
 Deux approches comparées :
 - **HYDRA** (EMNLP 2025) — Multi-tête encoder-only ✅
-- **HLPD** (ECIR 2025) — Décodeur non-autorégressif avec attention hiérarchique 🔧
+- **HLPD** (ECIR 2025) — Décodeur non-autorégressif avec attention hiérarchique 📋 *(à venir)*
 
 ---
 
@@ -54,7 +54,7 @@ graph TD
     D --> E2
 
     E1["🏷️ Head L1<br/>Linear→LN→ReLU→Drop→Linear<br/><b>→ 157 classes</b>"]
-    E2["🏷️ Head L2<br/>Linear→LN→ReLU→Drop→Linear<br/><b>→ 6 059 classes</b>"]
+    E2["🏷️ Head L2<br/>Linear→LN→ReLU→Drop→Linear<br/><b>→ 6 126 classes</b>"]
 
     E1 --> F["🎯 Prédiction"]
     E2 --> F
@@ -72,6 +72,16 @@ graph TD
 | **Idée** | Têtes indépendantes | + tête unifiée L1+L2 | + MLP de raffinement |
 | **Loss** | `0.5·CE(L1) + CE(L2)` | + α · unified | + α · unified |
 | **Cohérence L1↔L2** | Post-hoc (masque) | Implicite | Par construction |
+
+---
+
+## 📏 Baselines
+
+| Modèle | F1 L1 | F1 L2 | HCR |
+|--------|-------|-------|-----|
+| TF-IDF + LinearSVC | 82.50% | 42.23% | 57.29% |
+| FastText Supervised | 83.72% | 9.48% | 28.60% |
+| Word2Vec + LinearSVC | 60.24% | 22.27% | 25.06% |
 
 ---
 
@@ -119,15 +129,16 @@ export HF_TOKEN="hf_..."
 python scripts/download_dataset.py
 
 # Training
-python scripts/run_train.py --split-dir ../dataset/ --variant local
+python scripts/run_train.py --split-dir /path/to/splits --variant local
 
-# SLURM — job unique (P100 ou 3090, auto-détecté)
-sbatch scripts/run_train_p100.slurm local
+# SLURM — job array par variante (10 tentatives, auto-resume)
+sbatch --job-name=hydra-local --array=0-9%1 scripts/run_train_variant.slurm local
 
-# SLURM — chaînage automatique jusqu'à 10 epochs
-./scripts/chain_submit.sh local 6
-./scripts/chain_submit.sh nested 6
-./scripts/chain_submit.sh global 6
+# SLURM — 3 variantes en parallèle
+sbatch scripts/run_train_array.slurm
+
+# SLURM — chaîner N arrays
+./scripts/chain_submit_array.sh 3
 
 # Tests
 python -m pytest tests/ -v
@@ -193,10 +204,13 @@ Source de vérité : [`02_hydra/configs/default.yaml`](02_hydra/configs/default.
 
 | Paramètre | Valeur | | Paramètre | Valeur |
 |-----------|--------|-|-----------|--------|
-| Encodeur | `camembert-base` | | `batch_size` | 64 (×2 GPUs) |
+| Encodeur | `camembert-base` | | `batch_size` | 64 |
 | `max_length` | 256 | | `lr` | 3.5e-5 |
 | Warmup | 10% (linéaire) | | Weight decay | 0.01 |
 | Gradient clip | 1.0 | | Early stop | patience 2 |
+| `dropout` | 0.3 | | `hidden_dim` | 256 |
+
+Variante hiérarchique : [`02_hydra/configs/hierarchy.yaml`](02_hydra/configs/hierarchy.yaml) — active `condition_l2_on_l1` (teacher forcing) et `check_hierarchy` (masque à l'inférence)
 
 ---
 
@@ -204,15 +218,17 @@ Source de vérité : [`02_hydra/configs/default.yaml`](02_hydra/configs/default.
 
 ```
 rakuten-classification/
-├── 01_baselines/              TF-IDF, Word2Vec, BERT flat
+├── 00_eda/                    Analyse exploratoire (EDA)
+├── 01_baselines/              FastText, TF-IDF+LinearSVC, Word2Vec+LinearSVC
 ├── 02_hydra/
-│   ├── configs/default.yaml   Hyperparamètres (source de vérité)
+│   ├── configs/               default.yaml, hierarchy.yaml
 │   └── src/                   models, losses, trainer, predict
-├── 02b_hlpd/                  HLPD (en cours)
-├── 03_production/             DDP multi-nœud, SLURM
-├── shared/                    data_loader, metrics, explainability, utils
-├── scripts/                   split, download, train, SLURM jobs
-├── tests/                     77 tests
+├── 02b_hlpd/                  HLPD (à venir — Mehdi Aithamma)
+├── 03_distributed/             DDP multi-nœud, SLURM
+├── shared/                    data_loader, metrics, utils
+├── scripts/                   train, SLURM arrays, évaluation, comparaison
+├── results/                   Rapports HTML, métriques par modèle
+├── tests/                     77 tests pytest
 └── docker-compose.yml         MLflow, tests, training
 ```
 

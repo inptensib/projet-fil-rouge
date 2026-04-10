@@ -42,13 +42,8 @@ from shared.data_loader import load_random_sample  # noqa: E402
 
 def _get_stopwords() -> set[str]:
     """Return combined French + English stopword set."""
-    for resource in ("corpora/stopwords",):
-        try:
-            nltk.data.find(resource)
-        except LookupError:
-            nltk.download("stopwords", quiet=True)
-    from nltk.corpus import stopwords
-    return set(stopwords.words("french") + stopwords.words("english"))
+    from .common import get_stopwords
+    return get_stopwords()
 
 
 def _tokenize(text: str, stop_words: set[str]) -> list[str]:
@@ -110,14 +105,8 @@ def _filter_rare_classes(
     label_column: str,
     min_samples: int = 5,
 ) -> pd.DataFrame:
-    """Remove classes with fewer than *min_samples* samples."""
-    counts = df[label_column].value_counts()
-    rare = counts[counts < min_samples].index.tolist()
-    if rare:
-        n_before = len(df)
-        df = df[~df[label_column].isin(rare)].copy()
-        print(f"[W2V] Removed {len(rare)} rare classes ({n_before - len(df)} samples)")
-    return df
+    from .common import filter_rare_classes
+    return filter_rare_classes(df, label_column, min_samples, tag="W2V")
 
 
 # ---------------------------------------------------------------------------

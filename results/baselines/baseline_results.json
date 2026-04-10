@@ -1,0 +1,62 @@
+[
+  {
+    "embedding": "fasttext",
+    "classifier": "Supervised",
+    "subtitle": "FastText Supervised — L1: softmax (25 epochs), L2: OVA (10 epochs)",
+    "status": "finished",
+    "metrics": {
+      "test_f1_l1_macro": 0.8372,
+      "test_f1_l2_macro": 0.0948,
+      "test_hcr": 0.2860
+    },
+    "params": {
+      "dim": 100,
+      "wordNgrams": 2,
+      "lr": 0.5,
+      "loss_l1": "softmax",
+      "epochs_l1": 25,
+      "loss_l2": "ova",
+      "epochs_l2": 10,
+      "thread": 10
+    }
+  },
+  {
+    "embedding": "tfidf",
+    "classifier": "LinearSVC",
+    "subtitle": "TF-IDF (50K features, 1-2grams) + LinearSVC / SGDClassifier",
+    "status": "finished",
+    "metrics": {
+      "test_f1_l1_macro": 0.8250,
+      "test_f1_l2_macro": 0.4223,
+      "test_hcr": 0.5729
+    },
+    "params": {
+      "max_features": 50000,
+      "ngram_range": "1-2",
+      "sublinear_tf": true,
+      "min_df": 3,
+      "classifier_l1": "LinearSVC (C=1.0, class_weight=balanced)",
+      "classifier_l2": "SGDClassifier (hinge, class_weight=balanced)"
+    }
+  },
+  {
+    "embedding": "word2vec",
+    "classifier": "LinearSVC",
+    "subtitle": "Word2Vec (200d, Skip-gram) + LinearSVC / SGDClassifier",
+    "status": "finished",
+    "metrics": {
+      "test_f1_l1_macro": 0.6024,
+      "test_f1_l2_macro": 0.2227,
+      "test_hcr": 0.2506
+    },
+    "params": {
+      "vector_size": 200,
+      "window": 5,
+      "sg": 1,
+      "min_count": 3,
+      "epochs": 10,
+      "classifier_l1": "LinearSVC (C=1.0, class_weight=balanced)",
+      "classifier_l2": "SGDClassifier (hinge, class_weight=balanced, n_jobs=1)"
+    }
+  }
+]

@@ -37,10 +37,10 @@ Pour chaque import tiers dans le code :
 
 | Package pip | Import Python | Utilise dans |
 |-------------|---------------|--------------|
-| `torch` | `torch` | 02_hydra/, 03_production/ |
+| `torch` | `torch` | 02_hydra/, 03_distributed/ |
 | `transformers` | `transformers` | 02_hydra/src/models.py |
 | `scikit-learn` | `sklearn` | 01_baselines/ |
-| `mlflow` | `mlflow` | 03_production/src/trainer_ddp.py |
+| `mlflow` | `mlflow` | 03_distributed/src/trainer_ddp.py |
 | `sentence-transformers` | `sentence_transformers` | notebooks/ |
 | `pyyaml` | `yaml` | 02_hydra/src/trainer.py |
 

@@ -10,7 +10,7 @@
 #   docker compose run --rm --profile gpu flat-hydra            # FlatHydra GPU complet
 #
 # Dataset : placer products.jsonl dans shared/dataset/ avant le training.
-# Multi-GPU SLURM : ./03_production/scripts/launch_distributed.sh
+# Multi-GPU SLURM : ./03_distributed/scripts/launch_distributed.sh
 # ==============================================================================
 
 # --- Anchor YAML (not a service, ignored by Compose) ---

@@ -1,0 +1,59 @@
+# ==============================================================================
+# HYDRA -- Configuration avec conditioning hiérarchique L2|L1
+# ==============================================================================
+# Identique à default.yaml sauf :
+#   - condition_l2_on_l1: true  (teacher forcing pendant le training)
+#   - check_hierarchy: true     (enforce_hierarchy à l'inférence)
+#   - save_dir: models_hierarchy (séparer des modèles sans conditioning)
+
+# --- Encoder ---
+encoder: camembert-base
+max_length: 256
+freeze_encoder: false
+
+# --- Architecture ---
+variant: local            # local | global | nested
+num_levels: 2
+hidden_dim: 256
+dropout: 0.3
+pooling: cls              # cls | mean | max | last
+project_embedding: true
+
+# --- Training ---
+batch_size: 64
+epochs: 10
+lr: 3.5e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+scheduler: linear
+max_grad_norm: 1.0
+gradient_accumulation_steps: 1
+
+# --- Early stopping ---
+early_stopping_patience: 2
+early_stopping_min_delta: 0.001
+
+# --- Multi-task loss ---
+use_focal: false
+focal_gamma: 2.0
+level_weights:
+  - 0.5                  # L1 weight (L2 is implicitly 1.0)
+
+# --- Hierarchy (ACTIVÉ) ---
+check_hierarchy: true
+condition_l2_on_l1: true
+
+# --- Save ---
+save_dir: models_hierarchy
+
+# --- Data ---
+num_workers: 4
+pin_memory: true
+
+# --- Reproducibility ---
+seed: 42
+deterministic: true
+
+# --- Hardware ---
+device: auto
+fp16: true

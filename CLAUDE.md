@@ -2,7 +2,7 @@
 
 ## Contexte projet
 
-Classification hierarchique de **8M+ produits Rakuten** en **157 categories L1** et **6100+ categories L2**.
+Classification hierarchique de **8M+ produits Rakuten** en **157 categories L1** et **6 126 categories L2**.
 Architecture principale : **HYDRA** (multi-tete encoder-only, EMNLP 2025), 3 variantes : `local`, `global`, `nested`.
 Encodeur : `camembert-base`. Donnees : texte (designation + description) en francais.
 
@@ -52,24 +52,32 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 ## Conventions techniques
 
 - Variantes HYDRA : `local`, `global`, `nested` (jamais `hybrid`)
-- Constantes : **157** classes L1, **6100+** classes L2, `max_length=256`
+- Constantes : **157** classes L1, **6 126** classes L2, `max_length=256`
 - Encodeur : `camembert-base`
 - FocalLoss sans alpha : `-(1-p_t)^gamma * log(p_t)`, `gamma=2.0`
 - Source de verite pour les hyperparametres : `02_hydra/configs/default.yaml`
   - `dropout=0.3`, `lr=3.5e-5`, `batch_size=64`, `hidden_dim=256`, `epochs=10`, `level_weight_l1=0.5`
-- Tout default dans le code Python DOIT matcher ce fichier YAML
+- Variante hierarchique : `02_hydra/configs/hierarchy.yaml`
+  - `condition_l2_on_l1: true` — teacher forcing (L1 ground truth pendant le training)
+  - `check_hierarchy: true` — masque hierarchique a l'inference
+  - `save_dir: models_hierarchy`
+- Tout default dans le code Python DOIT matcher le fichier YAML correspondant
 
 ## Structure du projet
 
 ```
+00_eda/                Analyse exploratoire (EDA)
 01_baselines/src/      tfidf_pipeline.py, word2vec_pipeline.py, bert_flat_classifier.py, evaluate.py
+01_baselines/notebooks/ fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb
 02_hydra/src/          models.py, losses.py, trainer.py, predict.py
-02_hydra/configs/      default.yaml (source de verite hyperparametres)
-03_production/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
+02_hydra/configs/      default.yaml, hierarchy.yaml (source de verite hyperparametres)
+02b_hlpd/              HLPD (a venir — Mehdi Aithamma)
+03_distributed/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
 shared/                data_loader.py, metrics.py, utils.py
-shared/dataset/        products.jsonl (non versionne — obtenir aupres de Rakuten)
+scripts/               run_train.py, generate_comparison.py, generate_f1_per_class.py, eval_hierarchy.py
+                       run_train_variant.slurm, run_train_array.slurm, chain_submit_array.sh
+results/               comparison.html, rapports HTML par modele, metriques JSON
 tests/                 77 tests pytest
-notebooks/             explorations, visualisations
 blog.md                article technique du projet
 docker-compose.yml     services : test, training, baselines, mlflow
 ```
@@ -84,9 +92,10 @@ docker-compose.yml     services : test, training, baselines, mlflow
 ## Donnees
 
 - **Format** : JSONL (`products.jsonl`), champs : `designation`, `description`, `typelabel` (L1), `producttype` (L2)
-- **Chargement** : `shared/data_loader.py` → `prepare_hierarchical_data()` (split 80/20, validation 12.5%)
-- **Sharding DDP** : `03_production/src/data_sharding.py` → valider avec `/shard-check` avant tout training distribue
-- **Pas de data dans le repo** : le fichier `shared/dataset/products.jsonl` doit etre place manuellement
+- **Chargement** : `shared/data_loader.py` → `prepare_hierarchical_data_from_splits()` (splits pre-generes)
+- **Couverture L2** : `_ensure_l2_coverage()` duplique ~923 echantillons pour garantir que chaque classe L2 apparait dans chaque split
+- **Sharding DDP** : `03_distributed/src/data_sharding.py` → valider avec `/shard-check` avant tout training distribue
+- **Pas de data dans le repo** : les splits JSONL doivent etre places manuellement
 
 ## Experimentation & MLflow
 

@@ -12,6 +12,7 @@ import logging
 import random
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 import torch
 from sklearn.model_selection import train_test_split
@@ -205,6 +206,40 @@ def prepare_hierarchical_data(
     }
 
 
+def _ensure_l2_coverage(
+    df_train: pd.DataFrame,
+    df_val: pd.DataFrame,
+    df_test: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Garantit que chaque classe L2 a au moins 1 échantillon dans chaque split.
+
+    Pour les classes absentes d'un split, duplique un échantillon depuis un autre split.
+    Cela permet aux modèles d'apprendre et d'évaluer toutes les classes L2.
+    """
+    all_l2 = set(df_train["level_2"]) | set(df_val["level_2"]) | set(df_test["level_2"])
+    splits = {"train": df_train, "val": df_val, "test": df_test}
+
+    rows_to_add: dict[str, list] = {"train": [], "val": [], "test": []}
+    for l2_class in all_l2:
+        present = {name for name, df in splits.items() if l2_class in df["level_2"].values}
+        missing = set(splits) - present
+        if not missing or not present:
+            continue
+        source_name = next(iter(present))
+        sample = splits[source_name][splits[source_name]["level_2"] == l2_class].iloc[[0]]
+        for name in missing:
+            rows_to_add[name].append(sample)
+
+    added = sum(len(v) for v in rows_to_add.values())
+    if added > 0:
+        for name in splits:
+            if rows_to_add[name]:
+                splits[name] = pd.concat([splits[name]] + rows_to_add[name], ignore_index=True)
+        print(f"[Data] {added} échantillons dupliqués pour couvrir toutes les classes L2 dans chaque split")
+
+    return splits["train"], splits["val"], splits["test"]
+
+
 def prepare_hierarchical_data_from_splits(
     train_path: str,
     val_path: str,
@@ -247,6 +282,9 @@ def prepare_hierarchical_data_from_splits(
         f"{len(df_train):,} train / {len(df_val):,} val / {len(df_test):,} test"
     )
 
+    # Garantir que chaque classe L2 a au moins 1 échantillon dans chaque split
+    df_train, df_val, df_test = _ensure_l2_coverage(df_train, df_val, df_test)
+
     # Fit encoders on the union of all labels
     all_l1 = pd.concat([df_train["level_1"], df_val["level_1"], df_test["level_1"]])
     all_l2 = pd.concat([df_train["level_2"], df_val["level_2"], df_test["level_2"]])
@@ -267,7 +305,6 @@ def prepare_hierarchical_data_from_splits(
     y_l2_test = pd.Series(l2_encoder.transform(df_test["level_2"]), index=df_test.index)
 
     # Build parent-child mapping from all data
-    import numpy as np
     all_l1_enc = np.concatenate([y_l1_train.values, y_l1_val.values, y_l1_test.values])
     all_l2_enc = np.concatenate([y_l2_train.values, y_l2_val.values, y_l2_test.values])
     l2_to_l1 = build_parent_child_mapping(all_l1_enc, all_l2_enc)
@@ -350,7 +387,6 @@ class HierarchicalProductDataset(Dataset):
     """
 
     def __init__(self, texts, labels_l1, labels_l2, tokenizer, max_length: int = 256):
-        import numpy as np
         self.texts = texts.tolist() if hasattr(texts, "tolist") else list(texts)
         self.labels_l1 = np.asarray(labels_l1) if not isinstance(labels_l1, np.ndarray) else labels_l1
         self.labels_l2 = np.asarray(labels_l2) if not isinstance(labels_l2, np.ndarray) else labels_l2

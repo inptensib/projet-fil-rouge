@@ -148,9 +148,10 @@ class TestPrepareFromSplits:
     def test_split_sizes(self, tmp_path):
         train_p, val_p, test_p = self._create_split_files(tmp_path)
         result = prepare_hierarchical_data_from_splits(train_p, val_p, test_p)
-        assert len(result["X_train"]) == 7
-        assert len(result["X_val"]) == 2
-        assert len(result["X_test"]) == 2
+        # _ensure_l2_coverage peut ajouter des échantillons dupliqués
+        assert len(result["X_train"]) >= 7
+        assert len(result["X_val"]) >= 2
+        assert len(result["X_test"]) >= 2
 
     def test_encoders_union(self, tmp_path):
         """Labels from val/test that don't appear in train must be in encoders."""
