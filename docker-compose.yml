@@ -3,9 +3,11 @@
 # ==============================================================================
 # Usage:
 #   docker compose up mlflow                                    # MLflow UI :5000
-#   docker compose run --rm --profile test test                 # Tests (77)
-#   docker compose run --rm --profile gpu train                 # HYDRA training
+#   docker compose run --rm --profile test test                 # Tests
+#   docker compose run --rm --profile gpu train                 # HYDRA training (GPU)
 #   docker compose run --rm --profile baselines baseline-tfidf  # TF-IDF baseline
+#   docker compose run --rm --profile baselines flat-hydra-cpu  # FlatHydra CPU (N_SAMPLES=1000)
+#   docker compose run --rm --profile gpu flat-hydra            # FlatHydra GPU complet
 #
 # Dataset : placer products.jsonl dans shared/dataset/ avant le training.
 # Multi-GPU SLURM : ./03_production/scripts/launch_distributed.sh
@@ -103,6 +105,53 @@ services:
         --n_samples 10000
         --save_dir models/baseline_bert
     profiles: ["baselines"]
+
+  # --------------------------------------------------------------------------
+  # FlatHydra — Entraînement CPU local (vraies données, pas de GPU)
+  # Contrôle via variables d'environnement :
+  #   N_SAMPLES : nombre de samples (défaut: 1000)
+  #   N_EPOCHS  : nombre d'epochs   (défaut: 2)
+  #   BATCH     : batch size         (défaut: 16)
+  #
+  # Usage :
+  #   docker compose run --rm --profile baselines flat-hydra-cpu
+  #   N_SAMPLES=5000 N_EPOCHS=3 docker compose run --rm --profile baselines flat-hydra-cpu
+  # --------------------------------------------------------------------------
+  flat-hydra-cpu:
+    <<: *app
+    command: >
+      python scripts/run_flat_hydra.py
+        --data shared/dataset/products.jsonl
+        --config 01_baselines/configs/flat_hydra.yaml
+        --n-samples ${N_SAMPLES:-1000}
+        --epochs ${N_EPOCHS:-2}
+        --batch-size ${BATCH:-16}
+        --save-dir models/flat_hydra_cpu
+    environment:
+      HF_HOME: /app/.cache/huggingface
+      PYTHONPATH: /app
+      CUDA_VISIBLE_DEVICES: ""
+    profiles: ["baselines"]
+
+  # --------------------------------------------------------------------------
+  # FlatHydra — Training complet (GPU requis)
+  # Usage : docker compose run --rm --profile gpu flat-hydra
+  # --------------------------------------------------------------------------
+  flat-hydra:
+    <<: *app
+    command: >
+      python scripts/run_flat_hydra.py
+        --data shared/dataset/products.jsonl
+        --config 01_baselines/configs/flat_hydra.yaml
+        --n-samples 10000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    profiles: ["gpu"]
 
 volumes:
   mlflow-data:
