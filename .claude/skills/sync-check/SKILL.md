@@ -34,13 +34,13 @@ Verifier la coherence de ces valeurs entre code, configs, et docs :
 Cross-verifier les appels entre modules :
 - `create_hydra_model()` dans README vs `02_hydra/src/models.py`
 - `HYDRALoss()` dans README vs `02_hydra/src/losses.py`
-- `HYDRATrainerDDP` dans `03_production/src/main.py` vs `03_production/src/trainer_ddp.py`
+- `HYDRATrainerDDP` dans `03_distributed/src/main.py` vs `03_distributed/src/trainer_ddp.py`
 
 ### 5. Structure tree
 Verifier que les trees dans chaque README listent tous les fichiers existants :
 - `README.md` (racine)
 - `02_hydra/README.md`
-- `03_production/README.md`
+- `03_distributed/README.md`
 
 ### 6. Defaults code vs config
 Comparer les valeurs par defaut dans `02_hydra/src/models.py` avec `02_hydra/configs/default.yaml`

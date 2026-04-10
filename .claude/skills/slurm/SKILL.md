@@ -32,7 +32,7 @@ Presenter un tableau synthetique : jobs actifs, nodes disponibles, GPUs libres p
 
 Utiliser le script existant :
 ```bash
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification/03_production
+cd /home/infres/tandriam-25/fil_rouge/rakuten-classification/03_distributed
 ./scripts/launch_distributed.sh $1 $2 $3 $4
 ```
 Arguments : variant (local/global/nested), encoder (CamemBERT/XLM-RoBERTa/mBERT), nb_nodes, gpu_type (p100/rtx3090)

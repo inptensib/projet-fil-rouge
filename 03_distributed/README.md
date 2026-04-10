@@ -1,4 +1,4 @@
-# 03_production -- Training Distribué (DDP)
+# 03_distributed -- Training Distribué (DDP)
 
 Training Distributed Data Parallel des modèles HYDRA sur cluster SLURM multi-nœuds (NCCL/RoCE).
 
@@ -6,8 +6,8 @@ Training Distributed Data Parallel des modèles HYDRA sur cluster SLURM multi-n�
 
 ```bash
 # Depuis la racine du projet :
-./03_production/scripts/launch_distributed.sh local CamemBERT 4           # 4 nœuds P100
-./03_production/scripts/launch_distributed.sh nested XLM-RoBERTa 1 rtx3090  # 1 nœud RTX 3090
+./03_distributed/scripts/launch_distributed.sh local CamemBERT 4           # 4 nœuds P100
+./03_distributed/scripts/launch_distributed.sh nested XLM-RoBERTa 1 rtx3090  # 1 nœud RTX 3090
 ```
 
 ## Apports
@@ -23,7 +23,7 @@ Training Distributed Data Parallel des modèles HYDRA sur cluster SLURM multi-n�
 ## Structure
 
 ```
-03_production/
+03_distributed/
   src/
     main.py               # Point d'entrée CLI pour le training DDP
     ddp_utils.py          # Setup/teardown DDP, print rank-aware

@@ -10,7 +10,7 @@ from types import ModuleType
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 HYDRA_ROOT = os.path.join(PROJECT_ROOT, "02_hydra")
 HLPD_ROOT = os.path.join(PROJECT_ROOT, "02b_hlpd")
-PROD_ROOT = os.path.join(PROJECT_ROOT, "03_production")
+DISTRIBUTED_ROOT = os.path.join(PROJECT_ROOT, "03_distributed")
 
 
 def _import_from(root: str, module_name: str, exclude_roots: list[str] | None = None) -> ModuleType:
@@ -38,14 +38,14 @@ def _import_from(root: str, module_name: str, exclude_roots: list[str] | None = 
 
 def import_from_hydra(module_name: str) -> ModuleType:
     """Import a module from 02_hydra/src/."""
-    return _import_from(HYDRA_ROOT, module_name, exclude_roots=[HLPD_ROOT, PROD_ROOT])
+    return _import_from(HYDRA_ROOT, module_name, exclude_roots=[HLPD_ROOT, DISTRIBUTED_ROOT])
 
 
 def import_from_hlpd(module_name: str) -> ModuleType:
     """Import a module from 02b_hlpd/src/."""
-    return _import_from(HLPD_ROOT, module_name, exclude_roots=[HYDRA_ROOT, PROD_ROOT])
+    return _import_from(HLPD_ROOT, module_name, exclude_roots=[HYDRA_ROOT, DISTRIBUTED_ROOT])
 
 
-def import_from_production(module_name: str) -> ModuleType:
-    """Import a module from 03_production/src/."""
-    return _import_from(PROD_ROOT, module_name, exclude_roots=[HYDRA_ROOT, HLPD_ROOT])
+def import_from_distributed(module_name: str) -> ModuleType:
+    """Import a module from 03_distributed/src/."""
+    return _import_from(DISTRIBUTED_ROOT, module_name, exclude_roots=[HYDRA_ROOT, HLPD_ROOT])

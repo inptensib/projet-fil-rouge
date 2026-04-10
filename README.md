@@ -224,7 +224,7 @@ rakuten-classification/
 │   ├── configs/               default.yaml, hierarchy.yaml
 │   └── src/                   models, losses, trainer, predict
 ├── 02b_hlpd/                  HLPD (à venir — Mehdi Aithamma)
-├── 03_production/             DDP multi-nœud, SLURM
+├── 03_distributed/             DDP multi-nœud, SLURM
 ├── shared/                    data_loader, metrics, utils
 ├── scripts/                   train, SLURM arrays, évaluation, comparaison
 ├── results/                   Rapports HTML, métriques par modèle

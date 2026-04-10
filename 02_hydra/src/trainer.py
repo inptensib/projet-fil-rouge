@@ -1,7 +1,7 @@
 """Training loop for HYDRA models (single GPU version).
 
 This is the clean, single-GPU training loop. For distributed training
-with DDP, see 03_production/src/trainer_ddp.py.
+with DDP, see 03_distributed/src/trainer_ddp.py.
 
 Features:
 - Linear warmup scheduler (from YAML warmup_ratio).

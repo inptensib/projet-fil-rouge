@@ -72,7 +72,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 02_hydra/src/          models.py, losses.py, trainer.py, predict.py
 02_hydra/configs/      default.yaml, hierarchy.yaml (source de verite hyperparametres)
 02b_hlpd/              HLPD (a venir — Mehdi Aithamma)
-03_production/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
+03_distributed/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
 shared/                data_loader.py, metrics.py, utils.py
 scripts/               run_train.py, generate_comparison.py, generate_f1_per_class.py, eval_hierarchy.py
                        run_train_variant.slurm, run_train_array.slurm, chain_submit_array.sh
@@ -94,7 +94,7 @@ docker-compose.yml     services : test, training, baselines, mlflow
 - **Format** : JSONL (`products.jsonl`), champs : `designation`, `description`, `typelabel` (L1), `producttype` (L2)
 - **Chargement** : `shared/data_loader.py` → `prepare_hierarchical_data_from_splits()` (splits pre-generes)
 - **Couverture L2** : `_ensure_l2_coverage()` duplique ~923 echantillons pour garantir que chaque classe L2 apparait dans chaque split
-- **Sharding DDP** : `03_production/src/data_sharding.py` → valider avec `/shard-check` avant tout training distribue
+- **Sharding DDP** : `03_distributed/src/data_sharding.py` → valider avec `/shard-check` avant tout training distribue
 - **Pas de data dans le repo** : les splits JSONL doivent etre places manuellement
 
 ## Experimentation & MLflow
