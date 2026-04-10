@@ -129,10 +129,15 @@ def discover_hydra_models() -> list[dict]:
             if rows:
                 history[key] = {"epochs": [r[0] for r in rows], "values": [r[1] for r in rows]}
 
-        # F1 par classe
+        # F1 par classe (results/ puis fallback MLflow artifacts)
+        artifacts_dir = PROJECT_ROOT / "mlruns" / exp_id / run_id / "artifacts"
         f1_json_path = results_dir / "f1_per_class_l1.json"
+        if not f1_json_path.exists():
+            f1_json_path = artifacts_dir / "f1_per_class_l1.json"
         f1_per_class = json.loads(f1_json_path.read_text()) if f1_json_path.exists() else None
         f1_l2_json_path = results_dir / "f1_per_class_l2.json"
+        if not f1_l2_json_path.exists():
+            f1_l2_json_path = artifacts_dir / "f1_per_class_l2.json"
         f1_per_class_l2 = json.loads(f1_l2_json_path.read_text()) if f1_l2_json_path.exists() else None
 
         # Images
@@ -190,7 +195,7 @@ def discover_baseline_models() -> list[dict]:
             "name": f"{emb.upper()} + {clf}" if emb != "fasttext" else "FastText",
             "family": "baseline",
             "subtitle": entry.get("subtitle", f"{emb} + {clf}"),
-            "status": "finished",
+            "status": entry.get("status", "finished"),
             "color": colors.get(emb, "#95a5a6"),
             "metrics": entry.get("metrics", {}),
             "val_metrics": entry.get("val_metrics", {}),

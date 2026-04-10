@@ -173,7 +173,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-06 15:54",
+    "generated": "2026-04-09 23:49",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -994,9 +994,9 @@ const MODELS_DATA = {
       "status": "finished",
       "color": "#1abc9c",
       "metrics": {
-        "test_f1_l1_macro": 0.7186,
-        "test_f1_l2_macro": 0.102,
-        "test_hcr": 0.3015
+        "test_f1_l1_macro": 0.8372,
+        "test_f1_l2_macro": 0.0948,
+        "test_hcr": 0.286
       },
       "val_metrics": {},
       "training": {
@@ -1024,9 +1024,9 @@ const MODELS_DATA = {
       "status": "finished",
       "color": "#e67e22",
       "metrics": {
-        "test_f1_l1_macro": 0.8209,
-        "test_f1_l2_macro": 0.4198,
-        "test_hcr": null
+        "test_f1_l1_macro": 0.825,
+        "test_f1_l2_macro": 0.4223,
+        "test_hcr": 0.5729
       },
       "val_metrics": {},
       "training": {
@@ -1035,9 +1035,8 @@ const MODELS_DATA = {
           "ngram_range": "1-2",
           "sublinear_tf": true,
           "min_df": 3,
-          "classifier_l1": "LinearSVC (C=1.0)",
-          "classifier_l2": "SGDClassifier (hinge)",
-          "xgboost_l1_f1": 0.8251
+          "classifier_l1": "LinearSVC (C=1.0, class_weight=balanced)",
+          "classifier_l2": "SGDClassifier (hinge, class_weight=balanced)"
         }
       },
       "history": null,
@@ -1050,7 +1049,7 @@ const MODELS_DATA = {
       "name": "WORD2VEC + LinearSVC",
       "family": "baseline",
       "subtitle": "Word2Vec (200d, Skip-gram) + LinearSVC / SGDClassifier",
-      "status": "finished",
+      "status": "running",
       "color": "#e74c3c",
       "metrics": {
         "test_f1_l1_macro": 0.6029,
@@ -1065,9 +1064,8 @@ const MODELS_DATA = {
           "sg": 1,
           "min_count": 3,
           "epochs": 10,
-          "classifier_l1": "LinearSVC (C=1.0)",
-          "classifier_l2": "SGDClassifier (hinge)",
-          "xgboost_l1_f1": 0.7933
+          "classifier_l1": "LinearSVC (C=1.0, class_weight=balanced)",
+          "classifier_l2": "SGDClassifier (hinge, class_weight=balanced, n_jobs=1)"
         }
       },
       "history": null,
