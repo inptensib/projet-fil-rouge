@@ -1,23 +1,25 @@
-# Flat Classifier HYDRA — Conception
+# Flat Classifier HYDRA — Conception technique
 
-Document de conception pour l'implémentation du modèle `Flat` tel que
-défini dans le papier HYDRA (EMNLP 2025), avec le plan de lancement
-via les scripts existants.
+Spécification de l'implémentation du modèle `Flat` tel que défini dans le
+papier HYDRA (EMNLP 2025). Ce document couvre l'architecture, la loss, tous
+les paramètres d'apprentissage et les décisions d'implémentation.
+
+Référence officielle :
+[`modeling/baselines.py`](https://github.com/FKarl/HYDRA/blob/main/modeling/baselines.py)
 
 ---
 
 ## Table des matières
 
 - [Contexte et objectif](#contexte-et-objectif)
-- [Architecture du modèle Flat](#architecture-du-modèle-flat)
-- [Schéma du forward pass](#schéma-du-forward-pass)
-- [Comparaison avec les baselines existantes](#comparaison-avec-les-baselines-existantes)
-- [Conception de la loss](#conception-de-la-loss)
-- [Conception du pipeline d'entraînement](#conception-du-pipeline-dentraînement)
-- [Suivi des métriques](#suivi-des-métriques)
-- [Fichiers à créer ou modifier](#fichiers-à-créer-ou-modifier)
-- [Configuration YAML](#configuration-yaml)
-- [Lancer l'entraînement](#lancer-lentraînement)
+- [Architecture du modèle](#architecture-du-modèle)
+- [La loss : HYDRALoss (CrossEntropy)](#la-loss--hydraloss-crossentropy)
+- [Paramètres d'apprentissage](#paramètres-dapprentissage)
+- [Optimiseur et scheduling](#optimiseur-et-scheduling)
+- [Mixed precision (AMP)](#mixed-precision-amp)
+- [Early stopping](#early-stopping)
+- [Pipeline d'entraînement](#pipeline-dentraînement)
+- [Métriques de suivi](#métriques-de-suivi)
 - [Artefacts produits](#artefacts-produits)
 
 ---
@@ -25,19 +27,15 @@ via les scripts existants.
 ## Contexte et objectif
 
 Le papier HYDRA définit `Flat` comme la **baseline de référence** : un seul
-modèle qui prédit L1 et L2 simultanément via une unique tête unifiée, sans
-aucune modélisation de la hiérarchie.
+modèle qui prédit L1 (157 classes) et L2 (6 126 classes) simultanément via
+une unique tête unifiée, sans aucune modélisation de la hiérarchie.
 
-L'implémentation officielle est dans
-[`modeling/baselines.py`](https://github.com/FKarl/HYDRA/blob/main/modeling/baselines.py).
-
-**Objectif de ce document** : concevoir la réutilisation de l'architecture
-HYDRA (encoder + projection + tête) pour reproduire fidèlement ce `Flat`,
-et définir comment le lancer via les scripts existants dans `scripts/`.
+C'est la borne inférieure à battre avec les variantes `local`, `global`,
+`nested`.
 
 ---
 
-## Architecture du modèle Flat
+## Architecture du modèle
 
 ### Vue d'ensemble
 
@@ -47,27 +45,29 @@ Texte produit (designation + description)
         ▼
 ┌─────────────────────────────────────┐
 │  Tokenizer CamemBERT                │
-│  max_length = 256                   │
-│  → input_ids (B, 256)               │
+│  max_length = 256, padding fixe     │
+│  → input_ids      (B, 256)          │
 │  → attention_mask (B, 256)          │
 └─────────────┬───────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────┐
 │  CamemBERT Encoder                  │
-│  last_hidden_state (B, 256, 768)    │
+│  12 couches Transformer, 768 dims   │
+│  last_hidden_state  (B, 256, 768)   │
 └─────────────┬───────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────┐
-│  Embedding Projector  [optionnel]   │
+│  Embedding Projector                │
 │  Linear(768 → 1536)                 │
-│  last_hidden_state (B, 256, 1536)   │
+│  appliqué sur TOUT last_hidden_state│
+│  → (B, 256, 1536)                   │
 └─────────────┬───────────────────────┘
               │
               ▼
 ┌─────────────────────────────────────┐
-│  Pooling  (stratégie : CLS)         │
+│  CLS Pooling                        │
 │  token[:, 0, :]  →  (B, 1536)      │
 └─────────────┬───────────────────────┘
               │
@@ -77,548 +77,441 @@ Texte produit (designation + description)
 │  Linear(1536 → 1536)                │
 │  LayerNorm(1536)                    │
 │  ReLU                               │
-│  Dropout(0.2)                       │
-│  Linear(1536 → 6257)  ← 157 + 6100 │
+│  Dropout(p=0.2)                     │
+│  Linear(1536 → 6283)  ← 157 + 6126 │
 └─────────────┬───────────────────────┘
               │
     ┌─────────┴──────────┐
     ▼                    ▼
-logits_L1 (B, 157)   logits_L2 (B, 6100)
+logits_L1 (B, 157)   logits_L2 (B, 6126)
   slice [:157]          slice [157:]
 ```
 
-### Détail des dimensions
+### Point clé : projection AVANT pooling
 
-| Étape                  | Tenseur                   | Dimension     |
-|:-----------------------|:--------------------------|:-------------:|
-| Tokens                 | `input_ids`               | `(B, 256)`    |
-| Encoder output         | `last_hidden_state`       | `(B, 256, 768)` |
-| Après projection       | `projected`               | `(B, 256, 1536)` |
-| Après CLS pooling      | `embedding`               | `(B, 1536)`   |
-| Logits unifiés         | `unified_logits`          | `(B, 6257)`   |
-| Logits L1              | `unified_logits[:, :157]` | `(B, 157)`    |
-| Logits L2              | `unified_logits[:, 157:]` | `(B, 6100)`   |
-
-### Point clé : la projection est appliquée avant le pooling
+L'implémentation officielle projette `last_hidden_state` entier **avant**
+d'extraire le token CLS, contrairement à `HYDRABase` qui projette après :
 
 ```python
-# Officiel HYDRA baselines.py
+# Officiel Flat (baselines.py)
 outputs = self.embedding_projector(outputs.last_hidden_state)  # (B, 256, 1536)
 full_embedding = outputs[:, 0, :]                              # CLS → (B, 1536)
+
+# HYDRABase (différent)
+full_embedding = outputs.last_hidden_state[:, 0, :]            # CLS → (B, 768)
+embedding = self.projector(full_embedding)                     # → (B, 1536)
 ```
 
-Contrairement à `HYDRABase` qui projette **après** pooling, le `Flat`
-officiel projette le tenseur entier puis extrait le CLS. Cela signifie que
-le token CLS agrège l'information **dans l'espace projeté** — une différence
-subtile mais fidèle au papier.
+Conséquence : le token CLS agrège l'information **dans l'espace projeté**,
+ce qui lui donne accès à une représentation multi-niveau dès le pooling.
+
+### Dimensions
+
+| Étape                  | Tenseur                     | Dimension        |
+|:-----------------------|:----------------------------|:----------------:|
+| Tokens                 | `input_ids`                 | `(B, 256)`       |
+| Encoder output         | `last_hidden_state`         | `(B, 256, 768)`  |
+| Après projection       | `projected`                 | `(B, 256, 1536)` |
+| Après CLS pooling      | `embedding`                 | `(B, 1536)`      |
+| Logits unifiés         | `unified_logits`            | `(B, 6283)`      |
+| Logits L1              | `unified_logits[:, :157]`   | `(B, 157)`       |
+| Logits L2              | `unified_logits[:, 157:]`   | `(B, 6126)`      |
 
 ### Interface de retour
 
 ```python
 return [], unified_logits
-# ↑ level_outputs vides   ↑ output unifié (B, 6257)
-```
-
-Cette interface est identique à celle de `HYDRAGlobal` / `HYDRANested`,
-ce qui permet de réutiliser `HYDRALoss` sans modification.
-
----
-
-## Schéma du forward pass
-
-```
-input_ids, attention_mask
-         │
-         ▼
-   [ CamemBERT ]
-  last_hidden_state
-    (B, 256, 768)
-         │
-         │  project_embedding=True
-         ▼
-   Linear(768→1536)           ← projection AVANT pooling
-    (B, 256, 1536)
-         │
-         │  pooling='cls'
-         ▼
-    token CLS [:, 0, :]
-      (B, 1536)
-         │
-         ▼
-  ┌──────────────────┐
-  │ Linear(1536→1536)│
-  │ LayerNorm        │
-  │ ReLU             │
-  │ Dropout(0.2)     │
-  │ Linear(1536→6257)│
-  └────────┬─────────┘
-           │
-     unified_logits
-       (B, 6257)
-           │
-    ┌──────┴───────┐
-    ▼              ▼
- [:, :157]     [:, 157:]
- logits L1     logits L2
-  (B, 157)    (B, 6100)
+#  ↑ level_outputs vides (interface commune avec HYDRA)
+#                ↑ logits bruts non normalisés (B, 6283)
 ```
 
 ---
 
-## Comparaison avec les baselines existantes
+## La loss : HYDRALoss (CrossEntropy)
 
-| Critère                  | FlatCascade (actuel)      | **Flat HYDRA (à implémenter)** | HYDRALocal           |
-|:-------------------------|:--------------------------|:-------------------------------|:---------------------|
-| Nombre de modèles        | 2 indépendants            | **1**                          | 1                    |
-| Têtes de classification  | 1 par modèle              | **1 tête unifiée**             | 2 têtes séparées     |
-| Gradients L1/L2          | Séparés (0 partage)       | **Partagés (tête commune)**    | Partagés             |
-| Projection               | Aucune                    | **768 → 1536 (avant pooling)** | 768 → 1536 (après)  |
-| Loss                     | CE × 2 (indépendante)     | **CE L1 + CE L2 (slicing)**    | α·CE_L1 + CE_L2      |
-| Hiérarchie explicite     | Non                       | **Non**                        | Non                  |
-| Fidélité au papier       | Non                       | **Oui (reproduction exacte)**  | Oui                  |
-| Référence dans le papier | Non                       | **Baseline officielle**        | Variante locale       |
+### Choix par rapport à l'implémentation officielle
 
-> La `FlatCascade` reste utile comme **borne inférieure absolue**.
-> Le `Flat HYDRA` est la **baseline du papier**, à battre avec les variantes
-> `local`, `global`, `nested`.
+Le papier HYDRA utilise `F.binary_cross_entropy_with_logits` car ses benchmarks
+(EURLEX, WOS) sont **multi-label** — un document peut appartenir à plusieurs
+catégories simultanément.
 
----
+Rakuten est **single-label** : chaque produit appartient à exactement une L1
+et exactement une L2. Ce contexte justifie un choix différent :
 
-## Conception de la loss
+| Critère               | BCE (officiel HYDRA)              | CrossEntropy / HYDRALoss (notre choix) |
+|:----------------------|:----------------------------------|:---------------------------------------|
+| Paradigme             | Multi-label (N réponses possibles)| **Multi-classe (1 seule réponse)**     |
+| Normalisation         | Sigmoid indépendant par classe    | **Softmax sur toutes les classes**     |
+| Labels                | One-hot concaténé (B, 6283)       | **Entiers séparés L1 et L2**           |
+| Classes compétitives  | Non — chaque classe est seule     | **Oui — les classes s'excluent**       |
+| Rééquilibrage L1/L2   | Aucun (L2 domine par volume)      | **`level_weight_l1=0.5`**             |
+| Adapté à Rakuten      | Non                               | **Oui**                               |
 
-La loss réutilise `HYDRALoss` avec `architecture="global"` pour exploiter
-le mécanisme de slicing existant.
+Avec BCE uniforme sur 6283 positions, L2 dominerait mécaniquement le gradient
+(6126 positions contre 157). `HYDRALoss` avec `level_weight_l1=0.5` rééquilibre
+explicitement les deux niveaux.
+
+### Fonctionnement de HYDRALoss
+
+`HYDRALoss` est instanciée avec `architecture="global"` pour exploiter le
+mécanisme de slicing sur les logits unifiés :
 
 ```python
-# Dans HYDRALoss.forward() avec architecture="global" :
-unified_l1_logits = unified_output[:, :num_classes_l1]   # (B, 157)
-unified_l2_logits = unified_output[:, num_classes_l1:]   # (B, 6100)
-unified_loss_l1   = CE(unified_l1_logits, labels_l1)
-unified_loss_l2   = CE(unified_l2_logits, labels_l2)
-total_loss        = level_weight_l1 * unified_loss_l1 + unified_loss_l2
-```
-
-Paramètres retenus pour la baseline :
-
-| Paramètre         | Valeur     | Justification                             |
-|:------------------|:----------:|:------------------------------------------|
-| `use_focal`       | `false`    | Fidélité au papier (CE standard)          |
-| `level_weight_l1` | `0.5`      | L1 compte moins (157 classes vs 6100)     |
-| `alpha`           | `1.0`      | Pas de tête locale → unified_loss pèse 1 |
-| `architecture`    | `"global"` | Réutilise le slicing de `HYDRALoss`       |
-
----
-
-## Conception du pipeline d'entraînement
-
-### Nouveaux fichiers à créer
-
-```
-01_baselines/src/
-    flat_model.py         ← classe FlatHydra (le modèle)
-
-scripts/
-    run_flat_hydra.py     ← CLI entry point (miroir de run_train.py)
-    run_flat_3090.slurm   ← job SLURM (miroir de run_train_3090.slurm)
-    run_flat_p100.slurm   ← job SLURM partition P100
-```
-
-### Réutilisation maximale
-
-Le pipeline réutilise sans modification :
-
-| Composant               | Source                           | Rôle                       |
-|:------------------------|:---------------------------------|:---------------------------|
-| `HierarchicalProductDataset` | `shared/data_loader.py`     | Dataset L1+L2              |
-| `prepare_hierarchical_data`  | `shared/data_loader.py`     | Chargement + split         |
-| `HYDRALoss`             | `02_hydra/src/losses.py`         | Loss unifiée               |
-| `compute_all_metrics`   | `shared/metrics.py`              | F1 macro, HCR, constrained |
-| `AdamW` + warmup        | `torch` + `transformers`         | Optimiseur                 |
-| `GradScaler` AMP        | `torch.amp`                      | Mixed precision            |
-
-### Flux de données
-
-```
-products.jsonl
-      │
-      ▼  prepare_hierarchical_data()
-      │
-      ├── X_train  (textes)          ──┐
-      ├── y_l1_train (labels L1)     ──┤─► HierarchicalProductDataset ─► DataLoader
-      └── y_l2_train (labels L2)     ──┘          (train / val)
-
-DataLoader ──► FlatHydra.forward() ──► unified_logits (B, 6257)
-                                               │
-                                    HYDRALoss(architecture="global")
-                                               │
-                                          total_loss
-                                               │
-                                        loss.backward()
-                                         optimizer.step()
-```
-
----
-
-## Suivi des métriques
-
-### Flux global par epoch
-
-```
-Fin de chaque epoch
-        │
-        ├─► evaluate(val_loader)           ← boucle d'inférence sur le val set
-        │       │
-        │       └─► compute_all_metrics()  ← shared/metrics.py
-        │               │
-        │               ├── f1_l1_macro
-        │               ├── f1_l2_macro         ← critère d'early stopping
-        │               ├── constrained_f1_macro
-        │               └── hcr
-        │
-        ├─► history{}                      ← embarqué dans checkpoint_latest.pt
-        │
-        └─► mlflow.log_metrics()           ← scalaires + artefacts visuels
-```
-
-### Métriques calculées — `shared/metrics.py`
-
-`compute_all_metrics()` est appelé après chaque epoch de validation.
-Il retourne 4 métriques dérivées des prédictions L1 et L2 :
-
-| Métrique               | Ce qu'elle mesure                                         | Objectif      |
-|:-----------------------|:----------------------------------------------------------|:-------------:|
-| `f1_l1_macro`          | F1 macro sur les 157 classes L1                           | Référence     |
-| `f1_l2_macro`          | F1 macro sur les 6100+ classes L2                         | **Principal** |
-| `constrained_f1_macro` | F1 L2 compté seulement si L1 parent est correct           | Qualité       |
-| `hcr`                  | % de prédictions où L2 est enfant valide de L1 prédit     | Cible > 95%  |
-
-**`constrained_f1`** : si `pred_L1 ≠ true_L1`, la prédiction L2 est
-remplacée par `-1` (forcément fausse), même si elle était correcte.
-
-**`hcr`** : vérifie que `l2_to_l1_mapping[pred_L2] == pred_L1`. C'est
-une cohérence interne entre les deux prédictions, sans regarder la vérité terrain.
-
-### Adaptation nécessaire pour le `Flat`
-
-Le `Flat` retourne `[], unified_logits`. La méthode `evaluate()` de
-`HYDRATrainer` attend `level_outputs, _ = model(...)` puis
-`logits_l1, logits_l2 = level_outputs` — ce qui plante avec une liste vide.
-
-Le trainer `FlatHydra` devra extraire les logits par slicing avant
-d'appeler `compute_all_metrics()` :
-
-```python
-# Dans FlatHydraTrainer.evaluate()
-_, unified_logits = self.model(input_ids, attention_mask)
-logits_l1 = unified_logits[:, :self.num_classes_l1]   # (B, 157)
-logits_l2 = unified_logits[:, self.num_classes_l1:]   # (B, 6100)
-
-preds_l1 = logits_l1.argmax(dim=-1)
-preds_l2 = logits_l2.argmax(dim=-1)
-
-metrics = compute_all_metrics(
-    labels_l1, preds_l1, labels_l2, preds_l2, self.l2_to_l1_mapping
+self.criterion = HYDRALoss(
+    architecture="global",
+    alpha=1.0,               # poids de la unified_loss (pas de level_outputs)
+    num_classes_l1=157,
+    num_classes_l2=6126,
+    level_weight_l1=0.5,     # L1 pèse 0.5, L2 pèse 1.0
+    use_focal=False,         # CrossEntropy standard
+    focal_gamma=2.0,         # ignoré si use_focal=False
 )
 ```
 
-Tout le reste — `history`, early stopping, MLflow — est réutilisable
-sans modification.
-
-### Historique en mémoire
+En interne, `HYDRALoss` avec `architecture="global"` fait :
 
 ```python
-history = {
-    "epoch":           [],   # [1, 2, 3, ...]
-    "train_loss":      [],   # loss moyenne par epoch
-    "val_f1_l1_macro": [],
-    "val_f1_l2_macro": [],   # critère d'early stopping
-    "val_hcr":         [],
-}
+# Slicing des logits unifiés
+logits_l1 = unified_output[:, :num_classes_l1]   # (B, 157)
+logits_l2 = unified_output[:, num_classes_l1:]   # (B, 6126)
+
+# CrossEntropy par niveau (labels entiers)
+loss_l1 = CE(logits_l1, labels_l1)   # scalaire
+loss_l2 = CE(logits_l2, labels_l2)   # scalaire
+
+# Combinaison pondérée
+total_loss = alpha * (level_weight_l1 * loss_l1 + loss_l2)
+#          = 1.0  * (0.5 * loss_l1 + loss_l2)
 ```
 
-L'historique est sauvegardé dans `checkpoint_latest.pt` et restauré
-automatiquement lors d'une reprise (`--resume`).
+### Formule CrossEntropy
 
-### Early stopping
-
-Basé exclusivement sur `f1_l2_macro` (métrique principale) :
+Pour un batch de taille B et C classes :
 
 ```
-Si val_f1_l2 > best_val_f1 + min_delta (0.001) :
-    → sauvegarder best_model.pt
-    → réinitialiser le compteur de patience
-
-Sinon :
-    → incrémenter le compteur
-    → si compteur ≥ patience (2) : arrêt anticipé
+CE(logits, y) = -(1/B) · Σ_b log( exp(logit_{b,y_b}) / Σ_c exp(logit_{b,c}) )
+             = -(1/B) · Σ_b [ logit_{b,y_b} - log(Σ_c exp(logit_{b,c})) ]
 ```
 
-### Fallback local — `metrics.json`
+Le softmax normalise les logits en probabilités qui **somment à 1** — ce qui
+est cohérent avec le fait qu'un produit appartient à une seule classe.
 
-Si MLflow n'est pas disponible, les métriques sont persistées dans un
-fichier JSON dans le répertoire du modèle. Ce fichier est écrit à la fin
-de **chaque epoch**, ce qui le rend récupérable même en cas d'interruption :
+### Prédiction à l'inférence
+
+Avec CrossEntropy (softmax), la prédiction est l'`argmax` sur les probabilités
+de chaque niveau séparément :
 
 ```python
-# Dans FlatHydraTrainer.train(), après history[...].append(...)
-import json
-with open(model_dir / "metrics.json", "w") as f:
-    json.dump(history, f, indent=2)
-```
+# Slicing
+logits_l1 = unified_logits[:, :self.num_classes_l1]   # (B, 157)
+logits_l2 = unified_logits[:, self.num_classes_l1:]   # (B, 6126)
 
-Contenu du fichier après 3 epochs :
+# Softmax par niveau (cohérent avec CE à l'entraînement)
+probs_l1 = torch.softmax(logits_l1, dim=-1)
+probs_l2 = torch.softmax(logits_l2, dim=-1)
 
-```json
-{
-  "epoch":            [1, 2, 3],
-  "train_loss":       [1.823, 1.241, 0.987],
-  "val_f1_l1_macro":  [0.612, 0.701, 0.743],
-  "val_f1_l2_macro":  [0.381, 0.452, 0.489],
-  "val_hcr":          [0.921, 0.948, 0.961]
-}
-```
-
-Pour plotter les courbes après l'entraînement :
-
-```python
-import json
-from shared.metrics import plot_training_curves
-
-with open("models/flat_hydra/metrics.json") as f:
-    history = json.load(f)
-
-fig = plot_training_curves(history)
-fig.savefig("training_curves.png", dpi=150, bbox_inches="tight")
-```
-
-`plot_training_curves()` est déjà dans `shared/metrics.py` et génère les
-3 subplots (Loss / F1 L1+L2 / HCR) à partir du même dict `history`.
-
-> **Note** : l'`history` est aussi embarqué dans `checkpoint_latest.pt`,
-> mais charger un `.pt` de plusieurs Go juste pour plotter des courbes
-> n'est pas pratique. Le `metrics.json` est la solution légère.
-
-### Logging MLflow — par epoch
-
-Scalaires loggés à chaque epoch si MLflow est actif :
-
-```python
-mlflow.log_metrics({
-    "train_loss":       avg_train_loss,
-    "val_f1_l1_macro":  val_metrics["f1_l1_macro"],
-    "val_f1_l2_macro":  val_f1_l2,
-    "val_hcr":          val_metrics.get("hcr", 0.0),
-}, step=epoch + 1)
-```
-
-Artefacts visuels regénérés à chaque epoch (écrasés) :
-
-| Artefact MLflow             | Source                   | Contenu                              |
-|:----------------------------|:-------------------------|:-------------------------------------|
-| `confusion_matrix_l1.png`   | `plot_confusion_matrix`  | Matrice normalisée, 157 classes L1   |
-| `confusion_matrix_l2.png`   | `plot_confusion_matrix`  | Top 50 classes L2 les plus fréquentes|
-| `per_class_f1_l1.png`       | `plot_per_class_f1`      | 30 pires + 30 meilleures classes L1  |
-| `training_curves.png`       | `plot_training_curves`   | Loss + F1 L1/L2 + HCR par epoch     |
-
----
-
-## Fichiers à créer ou modifier
-
-### `01_baselines/src/flat_model.py` — nouveau
-
-```python
-class FlatHydra(nn.Module):
-    """Flat classifier fidèle à HYDRA baselines.py officiel.
-
-    Une seule tête unifiée prédit L1 + L2 simultanément.
-    La projection est appliquée sur last_hidden_state AVANT le pooling.
-
-    Retourne : ([], unified_logits) pour compatibilité HYDRALoss.
-    """
-
-    def __init__(
-        self,
-        encoder_name: str,          # 'camembert-base'
-        num_classes_l1: int,        # 157
-        num_classes_l2: int,        # 6100+
-        pooling: str = "cls",
-        project_embedding: bool = True,
-        dropout: float = 0.2,       # 0.2 selon le papier (≠ 0.3 HYDRA)
-        freeze_encoder: bool = False,
-    ): ...
-
-    def forward(self, input_ids, attention_mask):
-        # 1. Encoder → last_hidden_state (B, seq, 768)
-        # 2. Projection AVANT pooling → (B, seq, 1536)
-        # 3. CLS pooling → (B, 1536)
-        # 4. Unified classifier → (B, 6257)
-        # 5. return [], unified_logits
-        ...
-```
-
-### `scripts/run_flat_hydra.py` — nouveau
-
-Miroir de `run_train.py` avec :
-
-- `--variant flat` comme seul choix de variant
-- Import de `FlatHydra` au lieu de `create_hydra_model`
-- Même interface `--data`, `--split-dir`, `--config`, `--resume`
-- Config lue depuis `01_baselines/configs/flat_hydra.yaml`
-
-### `01_baselines/configs/flat_hydra.yaml` — nouveau
-
-```yaml
-# Flat HYDRA — Configuration
-encoder: camembert-base
-max_length: 256
-project_embedding: true
-pooling: cls
-dropout: 0.2          # valeur papier
-
-batch_size: 64
-epochs: 10
-lr: 3.5e-5
-weight_decay: 0.01
-warmup_ratio: 0.1
-max_grad_norm: 1.0
-
-use_focal: false
-level_weight_l1: 0.5
-
-seed: 42
-fp16: true
-save_dir: models/flat_hydra
-experiment_name: flat_hydra
-```
-
-### `scripts/run_flat_3090.slurm` — nouveau
-
-```bash
-#!/bin/bash
-#SBATCH --job-name=flat-hydra
-#SBATCH --partition=3090
-#SBATCH --nodelist=node40
-#SBATCH --gres=gpu:2
-#SBATCH --cpus-per-task=10
-#SBATCH --mem=80G
-#SBATCH --time=1-12:00:00
-#SBATCH --output=slurm-flat-hydra-%j.out
-#SBATCH --error=slurm-flat-hydra-%j.err
-
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
-
-export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
-
-CKPT="models/flat_hydra/checkpoint_latest.pt"
-RESUME_FLAG=""
-if [ -f "$CKPT" ]; then
-    echo "Checkpoint trouvé : $CKPT — reprise du training"
-    RESUME_FLAG="--resume $CKPT"
-fi
-
-python scripts/run_flat_hydra.py \
-    --split-dir /home/infres/tandriam-25/fil_rouge/dataset/ \
-    --config 01_baselines/configs/flat_hydra.yaml \
-    $RESUME_FLAG
+# Prédiction : classe la plus probable
+confs_l1, preds_l1 = probs_l1.max(dim=-1)
+confs_l2, preds_l2 = probs_l2.max(dim=-1)
 ```
 
 ---
 
-## Configuration YAML
+## Paramètres d'apprentissage
 
-La config suit exactement la même structure que `02_hydra/configs/default.yaml`
-pour permettre la comparaison directe.
+Tous les paramètres canoniques sont définis dans
+`01_baselines/configs/flat_hydra.yaml`.
 
-| Paramètre           | Flat HYDRA | HYDRA local | Justification               |
-|:--------------------|:----------:|:-----------:|:----------------------------|
-| `dropout`           | `0.2`      | `0.3`       | Valeur officielle du papier |
-| `level_weight_l1`   | `0.5`      | `0.5`       | Identique                   |
-| `use_focal`         | `false`    | `false`     | CE standard = reproduction  |
-| `project_embedding` | `true`     | `true`      | Identique                   |
-| `pooling`           | `cls`      | `cls`       | Identique                   |
-| `batch_size`        | `64`       | `64`        | Identique                   |
-| `lr`                | `3.5e-5`   | `3.5e-5`    | Identique                   |
+### Encodeur
+
+| Paramètre         | Valeur          | Explication                                           |
+|:------------------|:---------------:|:------------------------------------------------------|
+| `encoder`         | `camembert-base`| RoBERTa entraîné sur du français (CCNet + Oscar)      |
+| `max_length`      | `256`           | Longueur max des séquences tokenisées (truncation)    |
+| `freeze_encoder`  | `false`         | Fine-tuning complet — les poids CamemBERT s'adaptent  |
+
+**Pourquoi `max_length=256` ?** La désignation + description Rakuten dépasse
+rarement 200 tokens. 256 offre une couverture complète sans coût mémoire
+excessif (la complexité attention est O(n²)).
+
+**Pourquoi ne pas geler l'encodeur ?** En mode `freeze_encoder=True`, seule
+la tête de classification apprend — c'est utile pour tester rapidement mais
+donne des performances bien inférieures. Le fine-tuning complet est
+systématiquement meilleur sur des données domaine-spécifiques (e-commerce
+français).
+
+### Architecture
+
+| Paramètre           | Valeur | Explication                                             |
+|:--------------------|:------:|:--------------------------------------------------------|
+| `project_embedding` | `true` | Linear(768→1536) sur `last_hidden_state` avant pooling  |
+| `pooling`           | `cls`  | Token `[CLS]` comme représentation de la séquence       |
+| `dropout`           | `0.2`  | Dropout dans la tête unifiée (valeur papier)            |
+
+**Pourquoi `dropout=0.2` et non `0.3` ?** Les variantes HYDRA
+(local/global/nested) utilisent `dropout=0.3`. Le `Flat` officiel utilise
+`0.2` — probablement car la tête unifiée est plus simple et moins sujette
+à l'overfitting que les têtes multiples.
+
+**Pourquoi CLS pooling ?** Le token `[CLS]` de CamemBERT est entraîné pour
+agréger l'information de toute la séquence. `mean` pooling peut être
+légèrement meilleur sur certaines tâches mais CLS reste le choix par défaut
+du papier.
+
+### Batch et epochs
+
+| Paramètre    | Valeur | Papier officiel | Explication                                    |
+|:-------------|:------:|:---------------:|:-----------------------------------------------|
+| `batch_size` | `64`   | `32`            | Plus grand batch → gradient plus stable        |
+| `epochs`     | `10`   | `50`            | Early stopping compense la différence          |
+
+**Pourquoi `batch_size=64` et non 32 ?** Avec les GPUs du cluster (P100 /
+3090, 16-24 GB), 64 tient en mémoire et double le débit. Le gradient avec
+batch=64 est plus stable qu'avec 32 (moins de bruit stochastique).
+
+**Pourquoi `epochs=10` et non 50 ?** Le papier n'utilise pas d'early
+stopping — il entraîne 50 epochs fixes. Avec early stopping (patience=2),
+la convergence est détectée automatiquement. Sur 8M de produits Rakuten,
+3 à 5 epochs suffisent généralement à saturer le val F1.
 
 ---
 
-## Lancer l'entraînement
+## Optimiseur et scheduling
 
-### Développement local (CPU / 1 GPU)
+### AdamW
 
-```bash
-python scripts/run_flat_hydra.py \
-    --data shared/dataset/products.jsonl \
-    --n-samples 10000
+```
+θ_{t+1} = θ_t - α · m̂_t / (√v̂_t + ε) - α · λ · θ_t
 ```
 
-### Depuis des splits pré-générés (même que HYDRA)
+| Paramètre      | Valeur   | Explication                                              |
+|:---------------|:--------:|:---------------------------------------------------------|
+| `lr`           | `3.5e-5` | Learning rate de base pour le fine-tuning CamemBERT      |
+| `weight_decay` | `0.01`   | Régularisation L2 découplée (le "W" dans AdamW)          |
+| `max_grad_norm`| `1.0`    | Seuil de gradient clipping                              |
 
-```bash
-python scripts/run_flat_hydra.py \
-    --split-dir /chemin/vers/dataset/ \
-    --config 01_baselines/configs/flat_hydra.yaml
+**Pourquoi `lr=3.5e-5` ?** C'est la valeur validée empiriquement pour le
+fine-tuning de modèles CamemBERT/RoBERTa sur des tâches de classification.
+Des valeurs plus élevées (>5e-5) causent de l'instabilité ; plus basses
+(<1e-5) ralentissent inutilement la convergence.
+
+**Pourquoi AdamW et non Adam ?** Adam classique applique le weight decay
+sur le gradient (pas les poids), ce qui est incorrect théoriquement. AdamW
+découple la régularisation L2 de l'adaptation du learning rate — c'est
+le standard pour le fine-tuning de Transformers depuis 2019 (Loshchilov &
+Hutter).
+
+**Gradient clipping (`max_grad_norm=1.0`)** : si la norme L2 des gradients
+dépasse 1.0, tous les gradients sont réduits proportionnellement. Cela
+prévient les explosions de gradient lors des premières étapes, fréquentes
+avec les grands LM.
+
+### Linear Warmup + Linear Decay
+
+Le learning rate suit un schedule en deux phases :
+
+```
+Phase 1 — Warmup linéaire (0 → lr) : steps 0 à warmup_steps
+Phase 2 — Decay linéaire (lr → 0)  : steps warmup_steps à total_steps
 ```
 
-### Sur le cluster — partition 3090
-
-```bash
-sbatch scripts/run_flat_3090.slurm
+```
+lr(t) = lr × t / warmup_steps                  si t < warmup_steps
+lr(t) = lr × (total_steps - t) / (total_steps - warmup_steps)  sinon
 ```
 
-### Sur le cluster — partition P100
+| Paramètre      | Valeur | Explication                                              |
+|:---------------|:------:|:---------------------------------------------------------|
+| `warmup_ratio` | `0.1`  | 10% des steps totaux sont dédiés au warmup               |
 
-```bash
-sbatch scripts/run_flat_p100.slurm
+**Pourquoi un warmup ?** Au début de l'entraînement, les poids de la tête
+de classification sont aléatoires — leurs gradients sont très grands et
+instables. Commencer avec un petit LR puis le monter progressivement laisse
+l'encodeur s'adapter doucement avant d'être soumis à des mises à jour
+agressives.
+
+**Exemple concret** pour 8M produits, batch=64, 10 epochs :
+- Steps totaux : `(8M × 0.7) / 64 × 10 ≈ 875 000 steps`
+- Warmup : `87 500 steps` (~1 epoch)
+
+---
+
+## Mixed precision (AMP)
+
+| Paramètre | Valeur | Explication                                        |
+|:----------|:------:|:---------------------------------------------------|
+| `fp16`    | `true` | Calculs en float16, poids maîtres en float32       |
+
+**Pourquoi FP16 ?** Les opérations en float16 sont 2-8× plus rapides sur
+les GPUs NVIDIA (Tensor Cores). La mémoire consommée est divisée par ~2, ce
+qui permet des batchs plus grands.
+
+**GradScaler** : FP16 a une plage dynamique réduite — les petits gradients
+peuvent underflow à 0. `GradScaler` multiplie la loss par un facteur
+d'échelle S avant le backward, puis divise les gradients par S avant
+`optimizer.step()`. Si un overflow est détecté, le step est sauté et S est
+réduit.
+
+```python
+scaler.scale(loss).backward()      # loss × S, gradients × S
+scaler.unscale_(optimizer)         # gradients / S (pour le clipping)
+clip_grad_norm_(params, 1.0)       # clipping sur les vrais gradients
+scaler.step(optimizer)             # step sauté si overflow
+scaler.update()                    # ajuste S pour le prochain step
 ```
 
-### Reprendre un training interrompu
+---
 
-```bash
-python scripts/run_flat_hydra.py \
-    --split-dir /chemin/vers/dataset/ \
-    --resume models/flat_hydra/checkpoint_latest.pt
+## Early stopping
+
+| Paramètre                    | Valeur  | Explication                                   |
+|:-----------------------------|:-------:|:----------------------------------------------|
+| `early_stopping_patience`    | `2`     | Nombre d'epochs sans amélioration avant arrêt |
+| `early_stopping_min_delta`   | `0.001` | Amélioration minimale du F1 L2 pour compter   |
+
+**Critère** : `val_f1_l2_macro`. Si le F1 L2 n'améliore pas d'au moins
+0.001 pendant 2 epochs consécutives, l'entraînement s'arrête.
+
+**Pourquoi `patience=2` ?** Avec un LR decayant linéairement, l'amélioration
+ralentit progressivement. Une patience de 2 est conservative mais évite
+de continuer à entraîner pour rien après convergence. Sur des datasets
+larges (8M), chaque epoch est coûteuse — on préfère arrêter tôt.
+
+**Pourquoi `min_delta=0.001` ?** Des fluctuations de ±0.001 en F1 macro
+sont du bruit numérique sur 6126 classes. Ce seuil filtre ces faux positifs.
+
+---
+
+## Pipeline d'entraînement
+
+### Flux par batch
+
+```
+batch (input_ids, attention_mask, labels_l1, labels_l2)
+         │
+         ▼
+  FlatHydra.forward()
+         │
+         ▼
+  unified_logits (B, 6283)
+         │
+         ▼
+  one_hot(labels_l1) + one_hot(labels_l2) → unified_labels (B, 6283)
+         │
+         ▼
+  F.binary_cross_entropy_with_logits(unified_logits, unified_labels)
+         │
+         ▼
+       loss
+         │
+  scaler.scale(loss).backward()
+  clip_grad_norm_(params, 1.0)
+  optimizer.step()
+  scheduler.step()
 ```
 
-> **Workflow recommandé** : vérifier les GPUs avec `/gpu-status` avant
-> de soumettre un job SLURM.
+### Flux par epoch
+
+```
+Epoch N
+  ├─► Boucle train (shuffle=True, drop_last=True)
+  │     └─► accumule train_loss
+  │
+  └─► evaluate(val_loader)
+        ├─► sigmoid(unified_logits) → probs
+        ├─► argmax(probs_l1) → preds_l1
+        ├─► argmax(probs_l2) → preds_l2
+        └─► compute_all_metrics() → f1_l1, f1_l2, hcr, constrained_f1
+              │
+              ├─► early stopping sur f1_l2_macro
+              ├─► sauvegarde best_model.pt si amélioration
+              ├─► sauvegarde checkpoint_latest.pt (auto-resume)
+              ├─► metrics.json (fallback local)
+              └─► mlflow.log_metrics()
+```
+
+### Auto-resume (job array SLURM)
+
+Le script SLURM lance jusqu'à 10 slots séquentiels (`--array=0-9%1`).
+Chaque slot vérifie :
+1. Si `training_complete.txt` existe → skip
+2. Si `checkpoint_latest.pt` existe → reprise depuis ce checkpoint
+3. Sinon → démarrage from scratch
+
+```bash
+sbatch --job-name=flat-hydra --array=0-9%1 scripts/run_flat_variant.slurm
+# Smoke test :
+sbatch --job-name=flat-hydra-smoke --array=0-2%1 \
+  scripts/run_flat_variant.slurm 01_baselines/configs/flat_hydra.yaml 5000
+```
+
+---
+
+## Métriques de suivi
+
+| Métrique               | Niveau | Formule                                               | Objectif      |
+|:-----------------------|:------:|:------------------------------------------------------|:-------------:|
+| `f1_l1_macro`          | L1     | Moyenne des F1 par classe L1 (157 classes)            | Référence     |
+| `f1_l2_macro`          | L2     | Moyenne des F1 par classe L2 (6126 classes)           | **Principal** |
+| `constrained_f1_macro` | L2     | F1 L2 mis à 0 si L1 prédit est faux                   | Qualité       |
+| `hcr`                  | Global | % de paires (pred_L1, pred_L2) hiérarchiquement valides | Cible > 95% |
+
+**`f1_macro`** : chaque classe pèse également, indépendamment de sa
+fréquence. C'est la métrique adaptée aux datasets déséquilibrés (certaines
+catégories Rakuten ont 10× plus d'exemples que d'autres).
+
+**`constrained_f1`** : si le modèle prédit la bonne sous-catégorie L2 mais
+la mauvaise catégorie L1 parente, la prédiction L2 est comptée comme fausse.
+Pénalise les incohérences inter-niveaux.
+
+**`hcr` (Hierarchical Consistency Rate)** : mesure si `l2_to_l1_mapping[pred_L2] == pred_L1`.
+C'est une cohérence interne — elle ne regarde pas la vérité terrain.
+Un modèle peut avoir HCR=100% mais de mauvais F1 (s'il est cohérent mais
+systématiquement dans la mauvaise direction).
 
 ---
 
 ## Artefacts produits
 
-À l'issue de l'entraînement, le répertoire `models/flat_hydra/` contient :
-
 ```
 models/flat_hydra/
-    tokenizer/              tokenizer CamemBERT sauvegardé
-    best_model.pt           poids du meilleur checkpoint (best val f1_l2)
-    checkpoint_latest.pt    dernier checkpoint (auto-resume)
-    l1_label_encoder.pkl    LabelEncoder sklearn pour L1
-    l2_label_encoder.pkl    LabelEncoder sklearn pour L2
-    l2_to_l1_mapping.json   hiérarchie L2 → L1 (pour calcul HCR)
-    config.json             config complète + num_classes
-    training_complete.txt   flag de fin (évite re-run accidentel)
+    tokenizer/               tokenizer CamemBERT sérialisé
+    best_model.pt            poids du meilleur checkpoint (best val f1_l2)
+    checkpoint_latest.pt     checkpoint de reprise (epoch, optimizer, scheduler, scaler)
+    l1_label_encoder.pkl     LabelEncoder sklearn → decode int → label L1
+    l2_label_encoder.pkl     LabelEncoder sklearn → decode int → label L2
+    l2_to_l1_mapping.json    hiérarchie L2 → L1 (pour HCR et constrained F1)
+    config.json              FlatHydraConfig complet + num_classes
+    metrics.json             historique par epoch (fallback sans MLflow)
+    training_complete.txt    flag de fin (évite re-run SLURM accidentel)
 ```
 
-### Métriques suivies
+### Contenu de `checkpoint_latest.pt`
 
-| Métrique              | Niveau | Objectif               |
-|:----------------------|:------:|:-----------------------|
-| `f1_l1_macro`         | L1     | Référence              |
-| `f1_l2_macro`         | L2     | **Métrique principale** |
-| `constrained_f1`      | L2     | F1 L2 avec L1 correct  |
-| `hcr`                 | Global | Cible > 95%            |
+```python
+{
+    "model_state_dict":     ...,   # poids FlatHydra
+    "optimizer_state_dict": ...,   # état AdamW (moments m, v)
+    "scheduler_state_dict": ...,   # état du LR scheduler (step courant)
+    "scaler_state_dict":    ...,   # état GradScaler (facteur d'échelle S)
+    "epoch":                N,     # epoch suivante à reprendre
+    "best_val_f1":          0.xx,  # meilleur F1 L2 atteint
+    "epochs_no_improve":    K,     # compteur early stopping
+    "history":              {...}, # courbes complètes
+}
+```
 
 ---
 
-## Prochaines étapes
+## Comparaison avec nos variantes HYDRA
 
-1. Implémenter `01_baselines/src/flat_model.py` (`FlatHydra`)
-1. Créer `scripts/run_flat_hydra.py` (CLI entry point)
-1. Créer `01_baselines/configs/flat_hydra.yaml`
-1. Créer `scripts/run_flat_3090.slurm` et `run_flat_p100.slurm`
-1. Ajouter les tests dans `tests/test_flat_hydra.py`
-1. Lancer `/gpu-status` puis `sbatch scripts/run_flat_3090.slurm`
-1. Comparer avec HYDRA local via MLflow (`compare_runs`)
+| Critère                  | Flat (baseline)                      | HYDRA local/global/nested       |
+|:-------------------------|:-------------------------------------|:--------------------------------|
+| Têtes de classification  | 1 tête unifiée                       | 2 têtes séparées (L1 + L2)      |
+| Loss                     | HYDRALoss — CE L1 + CE L2 (slicing) | HYDRALoss — CE L1 + CE L2       |
+| Labels format            | Entiers séparés (l1, l2)             | Entiers séparés (l1, l2)        |
+| Inférence                | Softmax par niveau + argmax          | Softmax par niveau + argmax     |
+| Hiérarchie explicite     | Non                                  | Oui (masque / conditioning)     |
+| `dropout`                | `0.2`                                | `0.3`                           |
+| `level_weight_l1`        | `0.5`                                | `0.5`                           |
+| Référence papier         | Baseline officielle (à reproduire)   | Variantes à battre              |
