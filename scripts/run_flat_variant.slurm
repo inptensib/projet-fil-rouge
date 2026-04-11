@@ -22,12 +22,13 @@
 #   Smoke test sur 5 000 samples stratifiés :
 #     sbatch --job-name=flat-hydra-smoke --array=0-2%1 scripts/run_flat_variant.slurm 01_baselines/configs/flat_hydra.yaml 5000
 
-#PROJECT_DIR_ROOT="/home/infres/boutrouft-25/projects/IADATA-706"
+PYTHON=/home/infres/tandriam-25/fil_rouge/venv/bin/python
 source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
 cd /home/infres/boutrouft-25/projects/IADATA-706/projet-fil-rouge
 
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=~/.cache/huggingface
+export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
+export PYTHONPATH=""
 
 CONFIG="${1:-01_baselines/configs/flat_hydra.yaml}"
 N_SAMPLES="${2:-}"  # optionnel — si vide, charge le dataset complet
@@ -54,8 +55,6 @@ N_SAMPLES_FLAG=""
 if [ -n "$N_SAMPLES" ]; then
     N_SAMPLES_FLAG="--n-samples $N_SAMPLES"
 fi
-
-PYTHON=/home/infres/tandriam-25/fil_rouge/venv/bin/python
 
 $PYTHON scripts/run_flat_hydra.py \
     --split-dir /home/infres/boutrouft-25/projects/IADATA-706/dataset/ \
