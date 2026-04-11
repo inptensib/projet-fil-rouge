@@ -27,7 +27,7 @@ source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
 cd /home/infres/boutrouft-25/projects/IADATA-706/projet-fil-rouge
 
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
+export HF_HOME=/home/infres/boutrouft-25/.cache/huggingface
 export PYTHONPATH=""
 
 CONFIG="${1:-01_baselines/configs/flat_hydra.yaml}"
