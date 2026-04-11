@@ -32,7 +32,7 @@ export HF_HOME=~/.cache/huggingface
 CONFIG="${1:-01_baselines/configs/flat_hydra.yaml}"
 N_SAMPLES="${2:-}"  # optionnel — si vide, charge le dataset complet
 
-SAVE_DIR=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/flat_hydra'))" 2>/dev/null || echo "models/flat_hydra")
+SAVE_DIR=$($PYTHON -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/flat_hydra'))" 2>/dev/null || echo "models/flat_hydra")
 CKPT="${SAVE_DIR}/checkpoint_latest.pt"
 COMPLETE="${SAVE_DIR}/training_complete.txt"
 
@@ -55,7 +55,9 @@ if [ -n "$N_SAMPLES" ]; then
     N_SAMPLES_FLAG="--n-samples $N_SAMPLES"
 fi
 
-python scripts/run_flat_hydra.py \
+PYTHON=/home/infres/boutrouft-25/projects/IADATA-706/venv/bin/python
+
+$PYTHON scripts/run_flat_hydra.py \
     --split-dir /home/infres/boutrouft-25/projects/IADATA-706/dataset/ \
     --config "$CONFIG" \
     $RESUME_FLAG \
