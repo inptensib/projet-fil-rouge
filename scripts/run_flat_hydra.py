@@ -68,8 +68,9 @@ def main() -> None:
     parser.add_argument(
         "--n-samples",
         type=int,
-        default=10_000,
-        help="Nombre de samples à charger depuis --data",
+        default=None,
+        help="Nombre de samples à charger "
+             "Si omis : dataset complet. Fonctionne avec --data et --split-dir.",
     )
 
     # --- Config ---
@@ -142,11 +143,13 @@ def main() -> None:
             if not (split_dir / fname).exists():
                 print(f"[ERROR] Fichier manquant : {split_dir / fname}")
                 sys.exit(1)
-        print(f"[Data] Chargement depuis les splits : {split_dir}")
+        sample_msg = f"{args.n_samples:,} samples" if args.n_samples else "dataset complet"
+        print(f"[Data] Chargement depuis les splits : {split_dir} — {sample_msg}")
         data = prepare_hierarchical_data_from_splits(
             train_path=str(split_dir / "train_split.jsonl"),
             val_path=str(split_dir / "val_split.jsonl"),
             test_path=str(split_dir / "test_split.jsonl"),
+            n_samples=args.n_samples,
             seed=config.seed,
         )
     else:
@@ -154,10 +157,11 @@ def main() -> None:
         if not data_path.exists():
             print(f"[ERROR] Fichier introuvable : {data_path}")
             sys.exit(1)
-        print(f"[Data] Chargement de {args.n_samples} samples depuis {data_path}")
+        n = args.n_samples or 10_000  # --data requiert une limite (fichier complet = 8M+)
+        print(f"[Data] Chargement de {n:,} samples depuis {data_path}")
         data = prepare_hierarchical_data(
             file_path=str(data_path),
-            n_samples=args.n_samples,
+            n_samples=n,
             seed=config.seed,
         )
 
