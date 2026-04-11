@@ -24,10 +24,12 @@
 
 PYTHON=/home/infres/tandriam-25/fil_rouge/venv/bin/python
 source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/boutrouft-25/projects/IADATA-706/projet-fil-rouge
+#cd /home/infres/boutrouft-25/projects/IADATA-706/projet-fil-rouge
+cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
 
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/home/infres/boutrouft-25/.cache/huggingface
+#export HF_HOME=/home/infres/boutrouft-25/.cache/huggingface
+export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
 export PYTHONPATH=""
 
 CONFIG="${1:-01_baselines/configs/flat_hydra.yaml}"
@@ -57,7 +59,7 @@ if [ -n "$N_SAMPLES" ]; then
 fi
 
 $PYTHON scripts/run_flat_hydra.py \
-    --split-dir /home/infres/boutrouft-25/projects/IADATA-706/dataset/ \
+    --split-dir /home/infres/tandriam-25/fil_rouge/dataset/ \
     --config "$CONFIG" \
     $RESUME_FLAG \
     $N_SAMPLES_FLAG
