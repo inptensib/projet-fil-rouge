@@ -23,7 +23,7 @@
 #     sbatch --job-name=flat-hydra-smoke --array=0-2%1 scripts/run_flat_variant.slurm 01_baselines/configs/flat_hydra.yaml 5000
 
 #PROJECT_DIR_ROOT="/home/infres/boutrouft-25/projects/IADATA-706"
-source /home/infres/boutrouft-25/projects/IADATA-706/venv/bin/activate
+source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
 cd /home/infres/boutrouft-25/projects/IADATA-706/projet-fil-rouge
 
 export TRANSFORMERS_OFFLINE=1
@@ -55,7 +55,7 @@ if [ -n "$N_SAMPLES" ]; then
     N_SAMPLES_FLAG="--n-samples $N_SAMPLES"
 fi
 
-PYTHON=/home/infres/boutrouft-25/projects/IADATA-706/venv/bin/python
+PYTHON=/home/infres/tandriam-25/fil_rouge/venv/bin/python
 
 $PYTHON scripts/run_flat_hydra.py \
     --split-dir /home/infres/boutrouft-25/projects/IADATA-706/dataset/ \

@@ -34,8 +34,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from shared.data_loader import HierarchicalProductDataset  # noqa: E402
 from shared.metrics import compute_all_metrics              # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "02_hydra"))
-from src.losses import HYDRALoss                           # noqa: E402
+import importlib.util as _ilu  # noqa: E402
+_losses_path = Path(__file__).resolve().parents[2] / "02_hydra" / "src" / "losses.py"
+_spec = _ilu.spec_from_file_location("hydra_losses", _losses_path)
+_mod = _ilu.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+HYDRALoss = _mod.HYDRALoss
 
 from .flat_model import FlatHydra                          # noqa: E402
 
