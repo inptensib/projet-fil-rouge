@@ -24,7 +24,7 @@
 
 PROJECT_DIR_ROOT="/home/infres/boutrouft-25/projects/IADATA-706"
 source $PROJECT_DIR_ROOT/venv/bin/activate
-
+echo "Python: $(which python) — torch: $(python -c 'import torch; print(torch.__version__)' 2>&1)"
 cd $PROJECT_DIR_ROOT/projet-fil-rouge
 
 export TRANSFORMERS_OFFLINE=1
