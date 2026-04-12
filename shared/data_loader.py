@@ -15,6 +15,25 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 import torch
+
+def _cpu_has_avx2() -> bool:
+    """Check if CPU supports AVX2 (required by Polars)."""
+    try:
+        with open("/proc/cpuinfo") as f:
+            return "avx2" in f.read()
+    except OSError:
+        return True  # assume modern CPU if can't check
+
+_HAS_POLARS = False
+if _cpu_has_avx2():
+    try:
+        import polars as pl
+        _HAS_POLARS = True
+    except ImportError:
+        pass
+
+if not _HAS_POLARS:
+    print("[Data] Polars indisponible (CPU sans AVX2 ou non installé) → fallback pandas")
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch.utils.data import Dataset
@@ -93,45 +112,61 @@ def extract_level_2(producttype) -> Optional[str]:
     return None
 
 
-def load_jsonl_full(file_path: str) -> pd.DataFrame:
+def load_jsonl_full(file_path: str):
     """Load all records from a JSONL file.
+
+    Uses Polars (Rust/Arrow) if available, falls back to pandas.
+    Polars avoids pymalloc fragmentation on large datasets.
 
     Args:
         file_path: Path to the JSONL file.
 
     Returns:
-        DataFrame with all valid records.
+        Polars or pandas DataFrame with all valid records.
     """
-    data = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            try:
-                data.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-
-    df = pd.DataFrame(data)
-    del data
-    gc.collect()
-
+    if _HAS_POLARS:
+        df = pl.read_ndjson(file_path)
+    else:
+        df = pd.read_json(file_path, lines=True)
     print(f"[Data] Loaded {len(df):,} records from {file_path}.")
     return df
 
 
-def _preprocess_df(df: pd.DataFrame) -> pd.DataFrame:
+def _preprocess_df(df):
     """Extract hierarchical labels and text from a raw JSONL DataFrame.
 
+    Supports both Polars and pandas DataFrames.
     Returns DataFrame with columns: text, level_1, level_2.
-    Drops rows with invalid L2 labels.
     """
-    df["level_1"] = df["typelabel"].fillna("Unknown")
-    df["level_2_raw"] = df["producttype"].apply(extract_level_2)
-    df = df[df["level_2_raw"].notna()].copy()
-    df["level_2"] = df["level_2_raw"]
-    df["designation"] = df["designation"].fillna("")
-    df["description"] = df["description"].fillna("")
-    df["text"] = df["designation"] + ". " + df["description"]
-    return df[["text", "level_1", "level_2"]]
+    if _HAS_POLARS and isinstance(df, pl.DataFrame):
+        invalid_l2 = ["", "none", "nan", "unknown"]
+        return (
+            df.with_columns(
+                pl.col("typelabel").fill_null("Unknown").alias("level_1"),
+                pl.col("designation").fill_null(""),
+                pl.col("description").fill_null(""),
+                pl.col("producttype").list.first().cast(pl.Utf8).alias("level_2_raw"),
+            )
+            .filter(
+                pl.col("level_2_raw").is_not_null()
+                & ~pl.col("level_2_raw").str.to_lowercase().is_in(invalid_l2)
+            )
+            .with_columns(
+                (pl.col("designation") + ". " + pl.col("description")).alias("text"),
+                pl.col("level_2_raw").str.strip_chars().alias("level_2"),
+            )
+            .select("text", "level_1", "level_2")
+        )
+    else:
+        # Pandas fallback
+        df["level_1"] = df["typelabel"].fillna("Unknown")
+        df["level_2_raw"] = df["producttype"].apply(extract_level_2)
+        df = df[df["level_2_raw"].notna()].copy()
+        df["level_2"] = df["level_2_raw"]
+        df["designation"] = df["designation"].fillna("")
+        df["description"] = df["description"].fillna("")
+        df["text"] = df["designation"] + ". " + df["description"]
+        return df[["text", "level_1", "level_2"]]
 
 
 def prepare_hierarchical_data(
@@ -206,27 +241,44 @@ def prepare_hierarchical_data(
     }
 
 
-def _ensure_l2_coverage(
-    df_train: pd.DataFrame,
-    df_val: pd.DataFrame,
-    df_test: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def _ensure_l2_coverage(df_train, df_val, df_test):
     """Garantit que chaque classe L2 a au moins 1 échantillon dans chaque split.
 
-    Pour les classes absentes d'un split, duplique un échantillon depuis un autre split.
-    Cela permet aux modèles d'apprendre et d'évaluer toutes les classes L2.
+    Supporte Polars et pandas. Utilise des sets pour O(1) lookup.
     """
-    all_l2 = set(df_train["level_2"]) | set(df_val["level_2"]) | set(df_test["level_2"])
+    is_polars = _HAS_POLARS and isinstance(df_train, pl.DataFrame)
+
+    def _get_unique(df, col):
+        if is_polars:
+            return set(df[col].unique().to_list())
+        return set(df[col].unique())
+
+    def _filter_first(df, col, value):
+        if is_polars:
+            return df.filter(pl.col(col) == value).head(1)
+        return df[df[col] == value].iloc[[0]]
+
+    def _concat(dfs):
+        if is_polars:
+            return pl.concat(dfs)
+        return pd.concat(dfs, ignore_index=True)
+
+    l2_sets = {
+        "train": _get_unique(df_train, "level_2"),
+        "val": _get_unique(df_val, "level_2"),
+        "test": _get_unique(df_test, "level_2"),
+    }
+    all_l2 = l2_sets["train"] | l2_sets["val"] | l2_sets["test"]
     splits = {"train": df_train, "val": df_val, "test": df_test}
 
     rows_to_add: dict[str, list] = {"train": [], "val": [], "test": []}
     for l2_class in all_l2:
-        present = {name for name, df in splits.items() if l2_class in df["level_2"].values}
+        present = {name for name in splits if l2_class in l2_sets[name]}
         missing = set(splits) - present
         if not missing or not present:
             continue
         source_name = next(iter(present))
-        sample = splits[source_name][splits[source_name]["level_2"] == l2_class].iloc[[0]]
+        sample = _filter_first(splits[source_name], "level_2", l2_class)
         for name in missing:
             rows_to_add[name].append(sample)
 
@@ -234,7 +286,7 @@ def _ensure_l2_coverage(
     if added > 0:
         for name in splits:
             if rows_to_add[name]:
-                splits[name] = pd.concat([splits[name]] + rows_to_add[name], ignore_index=True)
+                splits[name] = _concat([splits[name]] + rows_to_add[name])
         print(f"[Data] {added} échantillons dupliqués pour couvrir toutes les classes L2 dans chaque split")
 
     return splits["train"], splits["val"], splits["test"]
@@ -274,8 +326,11 @@ def prepare_hierarchical_data_from_splits(
         df_test = _preprocess_df(load_random_sample(test_path, n_test, seed))
     else:
         df_train = _preprocess_df(load_jsonl_full(train_path))
+        gc.collect()
         df_val = _preprocess_df(load_jsonl_full(val_path))
+        gc.collect()
         df_test = _preprocess_df(load_jsonl_full(test_path))
+        gc.collect()
 
     print(
         f"[Data] Pre-split loaded: "
@@ -285,9 +340,19 @@ def prepare_hierarchical_data_from_splits(
     # Garantir que chaque classe L2 a au moins 1 échantillon dans chaque split
     df_train, df_val, df_test = _ensure_l2_coverage(df_train, df_val, df_test)
 
+    is_polars = _HAS_POLARS and isinstance(df_train, pl.DataFrame)
+
+    def _to_list(series):
+        return series.to_list() if is_polars else list(series)
+
+    def _concat_series(s1, s2, s3):
+        if is_polars:
+            return pl.concat([s1, s2, s3]).to_list()
+        return pd.concat([s1, s2, s3]).tolist()
+
     # Fit encoders on the union of all labels
-    all_l1 = pd.concat([df_train["level_1"], df_val["level_1"], df_test["level_1"]])
-    all_l2 = pd.concat([df_train["level_2"], df_val["level_2"], df_test["level_2"]])
+    all_l1 = _concat_series(df_train["level_1"], df_val["level_1"], df_test["level_1"])
+    all_l2 = _concat_series(df_train["level_2"], df_val["level_2"], df_test["level_2"])
 
     l1_encoder = LabelEncoder()
     l2_encoder = LabelEncoder()
@@ -297,23 +362,24 @@ def prepare_hierarchical_data_from_splits(
     del all_l1, all_l2
 
     # Encode each split
-    y_l1_train = pd.Series(l1_encoder.transform(df_train["level_1"]), index=df_train.index)
-    y_l2_train = pd.Series(l2_encoder.transform(df_train["level_2"]), index=df_train.index)
-    y_l1_val = pd.Series(l1_encoder.transform(df_val["level_1"]), index=df_val.index)
-    y_l2_val = pd.Series(l2_encoder.transform(df_val["level_2"]), index=df_val.index)
-    y_l1_test = pd.Series(l1_encoder.transform(df_test["level_1"]), index=df_test.index)
-    y_l2_test = pd.Series(l2_encoder.transform(df_test["level_2"]), index=df_test.index)
+    y_l1_train = l1_encoder.transform(_to_list(df_train["level_1"]))
+    y_l2_train = l2_encoder.transform(_to_list(df_train["level_2"]))
+    y_l1_val = l1_encoder.transform(_to_list(df_val["level_1"]))
+    y_l2_val = l2_encoder.transform(_to_list(df_val["level_2"]))
+    y_l1_test = l1_encoder.transform(_to_list(df_test["level_1"]))
+    y_l2_test = l2_encoder.transform(_to_list(df_test["level_2"]))
 
     # Build parent-child mapping from all data
-    all_l1_enc = np.concatenate([y_l1_train.values, y_l1_val.values, y_l1_test.values])
-    all_l2_enc = np.concatenate([y_l2_train.values, y_l2_val.values, y_l2_test.values])
+    all_l1_enc = np.concatenate([y_l1_train, y_l1_val, y_l1_test])
+    all_l2_enc = np.concatenate([y_l2_train, y_l2_val, y_l2_test])
     l2_to_l1 = build_parent_child_mapping(all_l1_enc, all_l2_enc)
 
     del all_l1_enc, all_l2_enc
 
-    X_train = df_train["text"]
-    X_val = df_val["text"]
-    X_test = df_test["text"]
+    # Convert texts to Python lists (single point where Python objects are created)
+    X_train = df_train["text"].to_list()
+    X_val = df_val["text"].to_list()
+    X_test = df_test["text"].to_list()
 
     del df_train, df_val, df_test
     gc.collect()
