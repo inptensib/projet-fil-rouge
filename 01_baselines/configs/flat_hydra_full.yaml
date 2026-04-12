@@ -1,0 +1,46 @@
+# ==============================================================================
+# FlatHydra — Configuration full training (2× P100, dataset complet)
+# ==============================================================================
+# Dérivée de flat_hydra.yaml. Seuls batch_size et num_workers changent.
+# batch_size=256 : GPU 0 utilise ~9 GB/16 GB (DataParallel, 128 samples/GPU).
+# ==============================================================================
+
+# --- Encoder ---
+encoder: camembert-base
+max_length: 256
+freeze_encoder: false
+
+# --- Architecture ---
+project_embedding: true   # Linear(768 → 1536) sur last_hidden_state AVANT pooling
+pooling: cls              # cls | mean | max | last
+dropout: 0.2              # 0.2 selon le papier (≠ 0.3 dans HYDRA local/global/nested)
+
+# --- Training ---
+batch_size: 256           # 4× vs smoke test (128 samples/GPU sur P100 16 GB)
+epochs: 10
+lr: 3.5e-5                # inchangé : dans la plage standard fine-tuning CamemBERT
+weight_decay: 0.01
+warmup_ratio: 0.1
+max_grad_norm: 1.0
+
+# --- Early stopping ---
+early_stopping_patience: 2
+early_stopping_min_delta: 0.001
+
+# --- Loss ---
+use_focal: false          # CrossEntropy standard (fidélité au papier)
+focal_gamma: 2.0          # ignoré si use_focal=false
+level_weight_l1: 0.5      # poids relatif de la loss L1 (L2 = 1.0 implicitement)
+
+# --- Data ---
+num_workers: 6            # limité à 10 CPUs max (qos-student), 6 workers raisonnables
+
+# --- Logging ---
+experiment_name: flat_hydra
+
+# --- Reproducibility ---
+seed: 42
+
+# --- Hardware ---
+fp16: true
+save_dir: models/flat_hydra
