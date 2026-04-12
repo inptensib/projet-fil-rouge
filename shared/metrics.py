@@ -196,7 +196,7 @@ def plot_confusion_matrix(
         counts = np.bincount(np.asarray(y_true), minlength=len(classes))
         top_indices = np.argsort(counts)[-top_n:]
         top_indices = np.sort(top_indices)
-        mask = np.isin(y_true, top_indices) & np.isin(y_pred, top_indices)
+        mask = np.isin(y_true, top_indices)
         y_true = np.asarray(y_true)[mask]
         y_pred = np.asarray(y_pred)[mask]
         labels = top_indices.tolist()
