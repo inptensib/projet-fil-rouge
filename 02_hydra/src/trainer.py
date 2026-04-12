@@ -216,28 +216,29 @@ class HYDRATrainer:
         all_labels_l1, all_labels_l2 = [], []
         all_confs_l1, all_confs_l2 = [], []
 
-        for batch in dataloader:
-            input_ids = batch["input_ids"].to(self.device)
-            attention_mask = batch["attention_mask"].to(self.device)
+        with torch.no_grad():
+            for batch in dataloader:
+                input_ids = batch["input_ids"].to(self.device)
+                attention_mask = batch["attention_mask"].to(self.device)
 
-            with autocast("cuda", enabled=self.fp16):
-                level_outputs, _ = self.model(input_ids, attention_mask)
-            logits_l1, logits_l2 = level_outputs
+                with autocast("cuda", enabled=self.fp16):
+                    level_outputs, _ = self.model(input_ids, attention_mask)
+                logits_l1, logits_l2 = level_outputs
 
-            if self.check_hierarchy:
-                logits_l2 = self._enforce_hierarchy(logits_l1, logits_l2)
+                if self.check_hierarchy:
+                    logits_l2 = self._enforce_hierarchy(logits_l1, logits_l2)
 
-            probs_l1 = torch.softmax(logits_l1, dim=-1)
-            probs_l2 = torch.softmax(logits_l2, dim=-1)
-            confs_l1, preds_l1 = probs_l1.max(dim=-1)
-            confs_l2, preds_l2 = probs_l2.max(dim=-1)
+                probs_l1 = torch.softmax(logits_l1, dim=-1)
+                probs_l2 = torch.softmax(logits_l2, dim=-1)
+                confs_l1, preds_l1 = probs_l1.max(dim=-1)
+                confs_l2, preds_l2 = probs_l2.max(dim=-1)
 
-            all_preds_l1.extend(preds_l1.cpu().numpy())
-            all_preds_l2.extend(preds_l2.cpu().numpy())
-            all_confs_l1.extend(confs_l1.cpu().numpy())
-            all_confs_l2.extend(confs_l2.cpu().numpy())
-            all_labels_l1.extend(batch["label_l1"].numpy())
-            all_labels_l2.extend(batch["label_l2"].numpy())
+                all_preds_l1.extend(preds_l1.cpu().numpy())
+                all_preds_l2.extend(preds_l2.cpu().numpy())
+                all_confs_l1.extend(confs_l1.cpu().numpy())
+                all_confs_l2.extend(confs_l2.cpu().numpy())
+                all_labels_l1.extend(batch["label_l1"].numpy())
+                all_labels_l2.extend(batch["label_l2"].numpy())
 
         metrics = compute_all_metrics(
             all_labels_l1, all_preds_l1,
