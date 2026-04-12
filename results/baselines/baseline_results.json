@@ -5,9 +5,10 @@
     "subtitle": "FastText Supervised — L1: softmax (25 epochs), L2: OVA (10 epochs)",
     "status": "finished",
     "metrics": {
-      "test_f1_l1_macro": 0.8372,
-      "test_f1_l2_macro": 0.0948,
-      "test_hcr": 0.2860
+      "test_f1_l1_macro": 0.8260,
+      "test_f1_l2_macro": 0.1001,
+      "test_hcr": 0.2929,
+      "test_constrained_f1_macro": 0.0979
     },
     "params": {
       "dim": 100,
@@ -26,9 +27,10 @@
     "subtitle": "TF-IDF (50K features, 1-2grams) + LinearSVC / SGDClassifier",
     "status": "finished",
     "metrics": {
-      "test_f1_l1_macro": 0.8250,
-      "test_f1_l2_macro": 0.4223,
-      "test_hcr": 0.5729
+      "test_f1_l1_macro": 0.8326,
+      "test_f1_l2_macro": 0.4275,
+      "test_hcr": 0.6341,
+      "test_constrained_f1_macro": 0.4223
     },
     "params": {
       "max_features": 50000,
