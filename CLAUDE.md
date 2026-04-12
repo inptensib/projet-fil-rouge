@@ -60,6 +60,8 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 - Variante hierarchique : `02_hydra/configs/hierarchy.yaml`
   - `condition_l2_on_l1: true` — teacher forcing (L1 ground truth pendant le training)
   - `check_hierarchy: true` — masque hierarchique a l'inference
+  - `use_focal: true` — Perte asymetrique : L1 → CrossEntropy (stable, calibre pour le masque hierarchique),
+    L2 → FocalLoss `-(1-p_t)^γ·log(p_t)`, `γ=2.0` (concentre le gradient sur les classes L2 rares)
   - `save_dir: models_hierarchy`
 - Tout default dans le code Python DOIT matcher le fichier YAML correspondant
 

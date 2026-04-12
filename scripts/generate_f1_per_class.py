@@ -113,11 +113,15 @@ def main():
     parser.add_argument("--split-dir", required=True, help="Répertoire des splits")
     parser.add_argument("--config", default="02_hydra/configs/default.yaml")
     parser.add_argument("--variant", default=None, choices=VARIANTS)
+    parser.add_argument("--batch-size", type=int, default=None,
+                        help="Batch size pour l'évaluation (défaut: config YAML)")
     args = parser.parse_args()
 
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
     cfg_kwargs = _map_config(cfg)
+    if args.batch_size:
+        cfg_kwargs["batch_size"] = args.batch_size
 
     split_dir = Path(args.split_dir)
     print("Chargement des données...")
