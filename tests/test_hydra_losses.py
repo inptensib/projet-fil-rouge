@@ -112,6 +112,42 @@ class TestHYDRALoss:
         total, _, _ = loss_fn([l1, l2], None, y1, y2)
         assert total.item() >= 0
 
+    def test_use_focal_true(self):
+        """HYDRALoss(use_focal=True) doit produire une loss finie non-NaN."""
+        loss_fn = HYDRALoss(architecture="local", use_focal=True, focal_gamma=2.0)
+        l1, l2, y1, y2 = self._make_inputs()
+        total, _, _ = loss_fn([l1, l2], None, y1, y2)
+        assert total.item() >= 0
+        assert not torch.isnan(total)
+
+    def test_l1_always_uses_crossentropy(self):
+        """L1 doit toujours utiliser CrossEntropy, même si use_focal=True."""
+        torch.manual_seed(42)
+        logits = torch.zeros(4, 10)
+        logits[:, 0] = 10.0          # exemples faciles — p_t ≈ 1
+        labels = torch.zeros(4, dtype=torch.long)
+
+        fn_focal = HYDRALoss(architecture="local", use_focal=True, focal_gamma=2.0)
+        fn_ce    = HYDRALoss(architecture="local", use_focal=False)
+
+        _, loss_l1_focal, _ = fn_focal([logits, logits], None, labels, labels)
+        _, loss_l1_ce,    _ = fn_ce(   [logits, logits], None, labels, labels)
+
+        # L1 toujours CE → valeurs identiques
+        assert torch.allclose(loss_l1_focal, loss_l1_ce, atol=1e-5)
+
+    def test_focal_downweights_easy_examples(self):
+        """FocalLoss doit être < CrossEntropy sur exemples faciles (p_t ≈ 1)."""
+        torch.manual_seed(42)
+        logits = torch.zeros(4, 10)
+        labels = torch.zeros(4, dtype=torch.long)
+        logits[:, 0] = 10.0  # confiance max sur classe 0 → exemple facile
+        focal = HYDRALoss(architecture="local", use_focal=True, focal_gamma=2.0)
+        ce    = HYDRALoss(architecture="local", use_focal=False)
+        focal_loss, _, _ = focal([logits, logits], None, labels, labels)
+        ce_loss,    _, _ = ce(   [logits, logits], None, labels, labels)
+        assert focal_loss.item() < ce_loss.item()
+
     def test_gradient_flows(self):
         l1 = torch.randn(4, 5, requires_grad=True)
         l2 = torch.randn(4, 10, requires_grad=True)

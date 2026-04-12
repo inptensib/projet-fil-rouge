@@ -33,7 +33,8 @@ def _map_config(cfg: dict) -> dict:
     # Direct mappings (same name)
     for key in ("variant", "batch_size", "epochs", "lr", "weight_decay",
                 "max_length", "seed", "condition_l2_on_l1", "check_hierarchy",
-                "save_dir"):
+                "save_dir", "use_focal", "focal_gamma",
+                "gradient_accumulation_steps", "warmup_ratio", "fp16"):
         if key in cfg:
             kwargs[key] = cfg[key]
 
@@ -47,14 +48,12 @@ def _map_config(cfg: dict) -> dict:
         }
         kwargs["encoder_name"] = encoder_map.get(cfg["encoder"], cfg["encoder"])
 
-    if "gradient_clip" in cfg:
-        kwargs["max_grad_norm"] = cfg["gradient_clip"]
+    for src, dst in [("gradient_clip", "max_grad_norm"), ("max_grad_norm", "max_grad_norm")]:
+        if src in cfg:
+            kwargs[dst] = cfg[src]
 
     if "level_weights" in cfg and len(cfg["level_weights"]) >= 1:
         kwargs["level_weight_l1"] = cfg["level_weights"][0]
-
-    if "loss" in cfg:
-        kwargs["use_focal"] = cfg["loss"] == "focal"
 
     # Note: dropout and hidden_dim are model-level params handled internally
     # by HYDRATrainer via create_hydra_model, not constructor kwargs.

@@ -138,6 +138,7 @@ class HYDRATrainerDDP:
         early_stopping_min_delta: float = 0.001,
         level_weight_l1: float = 0.5,
         focal_gamma: float = 2.0,
+        use_focal: bool = False,
         grad_clip_max_norm: float = GRAD_CLIP_MAX_NORM,
         warmup_ratio: float = 0.1,
         condition_l2_on_l1: bool = False,
@@ -159,6 +160,7 @@ class HYDRATrainerDDP:
         self.early_stopping_min_delta = early_stopping_min_delta
         self.level_weight_l1 = level_weight_l1
         self.focal_gamma = focal_gamma
+        self.use_focal = use_focal
         self.grad_clip_max_norm = grad_clip_max_norm
         self.warmup_ratio = warmup_ratio
 
@@ -543,6 +545,7 @@ class HYDRATrainerDDP:
             num_classes_l2=self.num_classes_l2,
             level_weight_l1=self.level_weight_l1,
             focal_gamma=self.focal_gamma,
+            use_focal=self.use_focal,
         )
 
         # Weight decay différencié : pas de decay sur bias et LayerNorm

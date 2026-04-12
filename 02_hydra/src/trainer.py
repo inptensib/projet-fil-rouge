@@ -130,6 +130,8 @@ class HYDRATrainer:
         self.max_length = max_length
         self.weight_decay = weight_decay
         self.level_weight_l1 = level_weight_l1
+        self.use_focal = use_focal
+        self.focal_gamma = focal_gamma
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.max_grad_norm = max_grad_norm
         self.early_stopping_patience = early_stopping_patience
@@ -302,6 +304,8 @@ class HYDRATrainer:
                 "max_length": self.max_length,
                 "max_grad_norm": self.max_grad_norm,
                 "level_weight_l1": self.level_weight_l1,
+                "use_focal": self.use_focal,
+                "focal_gamma": self.focal_gamma,
                 "early_stopping_patience": self.early_stopping_patience,
                 "early_stopping_min_delta": self.early_stopping_min_delta,
                 "gpu_type": gpu_type,
@@ -367,16 +371,25 @@ class HYDRATrainer:
                 with autocast("cuda", enabled=self.fp16):
                     level_outputs, unified_output = self.model(input_ids, mask)
 
-                    # Conditionner L2 sur le vrai L1 (teacher forcing)
-                    if self.condition_l2_on_l1:
-                        logits_l1, logits_l2 = level_outputs
-                        valid_mask = self.parent_child_matrix[l1]
-                        logits_l2 = logits_l2.clone()
-                        logits_l2[valid_mask == 0] = float("-inf")
-                        level_outputs = [logits_l1, logits_l2]
+                # Cast fp32 + clamp : élimine les +inf dus à l'overflow fp16
+                level_outputs_fp32 = [o.float().clamp(-1e4, 1e4) for o in level_outputs]
+                unified_output_fp32 = (
+                    unified_output.float().clamp(-1e4, 1e4)
+                    if unified_output is not None else None
+                )
+                if self.condition_l2_on_l1:
+                    logits_l1, logits_l2 = level_outputs_fp32
+                    valid_mask = self.parent_child_matrix[l1]  # [B, num_l2]
+                    # has_valid : lignes non vides (L1 ayant au moins 1 enfant L2 connu)
+                    has_valid = valid_mask.any(dim=1, keepdim=True)  # [B, 1]
+                    # -1e9 au lieu de -inf : évite -inf - (-inf) = nan sur lignes vides
+                    logits_l2 = logits_l2.masked_fill(
+                        (valid_mask == 0) & has_valid, -1e9
+                    )
+                    level_outputs_fp32 = [logits_l1, logits_l2]
 
-                    loss, _, _ = self.criterion(level_outputs, unified_output, l1, l2)
-                    loss = loss / self.gradient_accumulation_steps
+                loss, _, _ = self.criterion(level_outputs_fp32, unified_output_fp32, l1, l2)
+                loss = loss / self.gradient_accumulation_steps
 
                 self.scaler.scale(loss).backward()
 

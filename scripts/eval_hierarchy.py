@@ -51,9 +51,15 @@ def _map_config(cfg: dict) -> dict:
     return kwargs
 
 
-def evaluate_variant(variant: str, data: dict, cfg_kwargs: dict) -> dict:
+def evaluate_variant(
+    variant: str,
+    data: dict,
+    cfg_kwargs: dict,
+    eval_batch_size: int = 1024,
+    model_dir: str = "models",
+) -> dict:
     """Évalue une variante avec et sans conditioning hiérarchique."""
-    model_path = Path(_ROOT) / f"models/HYDRA_{variant}_CamemBERT/best_model.pt"
+    model_path = Path(_ROOT) / f"{model_dir}/HYDRA_{variant}_CamemBERT/best_model.pt"
     if not model_path.exists():
         print(f"  [SKIP] {model_path} introuvable")
         return {}
@@ -70,6 +76,10 @@ def evaluate_variant(variant: str, data: dict, cfg_kwargs: dict) -> dict:
     state_dict = ckpt.get("model_state_dict", ckpt)
     trainer._base_model.load_state_dict(state_dict)
     print(f"  Modèle chargé: {model_path.name}")
+
+    # Override batch_size pour l'éval : pas de gradient → VRAM disponible bien supérieure
+    trainer.batch_size = eval_batch_size
+    print(f"  Eval batch_size: {eval_batch_size} (DataParallel: {trainer.device})")
 
     test_loader = trainer._create_dataloader(
         data["X_test"], data["y_l1_test"], data["y_l2_test"], shuffle=False,
@@ -155,6 +165,14 @@ def main():
     parser.add_argument("--split-dir", required=True, help="Répertoire des splits train/val/test")
     parser.add_argument("--config", default="02_hydra/configs/default.yaml")
     parser.add_argument("--variant", default=None, choices=VARIANTS, help="Une seule variante (défaut: toutes)")
+    parser.add_argument(
+        "--eval-batch-size", type=int, default=2048,
+        help="Batch size pour l'évaluation (plus grand = plus rapide, pas de gradient).",
+    )
+    parser.add_argument(
+        "--model-dir", default="models",
+        help="Répertoire racine des modèles (ex: 'models' ou 'models_hierarchy').",
+    )
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -178,7 +196,11 @@ def main():
         print(f"\n{'='*60}")
         print(f"  HYDRA {variant.capitalize()}")
         print(f"{'='*60}")
-        result = evaluate_variant(variant, data, cfg_kwargs)
+        result = evaluate_variant(
+            variant, data, cfg_kwargs,
+            eval_batch_size=args.eval_batch_size,
+            model_dir=args.model_dir,
+        )
         if result:
             all_results[variant] = result
 

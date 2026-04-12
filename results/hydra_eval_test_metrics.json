@@ -1,0 +1,19 @@
+{
+  "_source": "SLURM job 772505 — eval_hierarchy.py sur test_split.jsonl (2 P100, batch=2048)",
+  "_date": "2026-04-11",
+  "hydra-local-camembert": {
+    "test_f1_l1_macro": 0.9350,
+    "test_f1_l2_macro": 0.6665,
+    "test_hcr": 0.8582
+  },
+  "hydra-nested-camembert": {
+    "test_f1_l1_macro": 0.9362,
+    "test_f1_l2_macro": 0.6426,
+    "test_hcr": 0.8583
+  },
+  "hydra-global-camembert": {
+    "test_f1_l1_macro": 0.9356,
+    "test_f1_l2_macro": 0.6620,
+    "test_hcr": 0.8587
+  }
+}

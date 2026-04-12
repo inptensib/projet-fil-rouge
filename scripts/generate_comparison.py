@@ -42,6 +42,8 @@ IMAGE_FILES = [
 
 SKIP_PARAMS = {"gpu_type", "num_classes_l1", "num_classes_l2"}
 
+EVAL_TEST_METRICS = RESULTS_DIR / "hydra_eval_test_metrics.json"
+
 
 def encode_image(path: Path) -> str | None:
     if not path.exists():
@@ -52,6 +54,12 @@ def encode_image(path: Path) -> str | None:
 def discover_hydra_models() -> list[dict]:
     conn = sqlite3.connect(str(MLFLOW_DB))
     models = []
+
+    # Overrides de métriques test (eval officielle sur test_split.jsonl)
+    eval_overrides = {}
+    if EVAL_TEST_METRICS.exists():
+        raw = json.loads(EVAL_TEST_METRICS.read_text())
+        eval_overrides = {k: v for k, v in raw.items() if not k.startswith("_")}
 
     for exp_id, info in HYDRA_EXPERIMENTS.items():
         variant = info["variant"]
@@ -80,6 +88,9 @@ def discover_hydra_models() -> list[dict]:
                     (run_id,),
                 ).fetchall()
                 m = dict(metrics_rows)
+                model_id = f"hydra-{variant}-camembert"
+                if model_id in eval_overrides:
+                    m.update(eval_overrides[model_id])
                 models.append({
                     "id": f"hydra-{variant}-camembert",
                     "name": info["name"],
@@ -112,6 +123,9 @@ def discover_hydra_models() -> list[dict]:
             "SELECT key, value FROM latest_metrics WHERE run_uuid=?", (run_id,),
         ).fetchall()
         m = dict(metrics_rows)
+        model_id = f"hydra-{variant}-camembert"
+        if model_id in eval_overrides:
+            m.update(eval_overrides[model_id])
 
         # Paramètres
         params_rows = conn.execute(
@@ -180,6 +194,14 @@ def discover_hydra_models() -> list[dict]:
     return models
 
 
+def _load_baseline_per_class(embedding: str, level: str) -> dict | None:
+    """Load per-class F1 JSON for a baseline (e.g. per_class_f1_l1_tfidf.json)."""
+    path = RESULTS_DIR / "baselines" / f"per_class_f1_{level}_{embedding}.json"
+    if path.exists():
+        return json.loads(path.read_text())
+    return None
+
+
 def discover_baseline_models() -> list[dict]:
     json_path = RESULTS_DIR / "baselines" / "baseline_results.json"
     if not json_path.exists():
@@ -203,8 +225,8 @@ def discover_baseline_models() -> list[dict]:
                 "params": entry.get("params", {}),
             },
             "history": None,
-            "f1_per_class_l1": entry.get("f1_per_class_l1"),
-            "f1_per_class_l2": entry.get("f1_per_class_l2"),
+            "f1_per_class_l1": _load_baseline_per_class(emb, "l1") or entry.get("f1_per_class_l1"),
+            "f1_per_class_l2": _load_baseline_per_class(emb, "l2") or entry.get("f1_per_class_l2"),
             "images": {},
         })
     return models
