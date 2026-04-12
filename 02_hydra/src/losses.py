@@ -60,7 +60,7 @@ class HYDRALoss(nn.Module):
         num_classes_l2: Number of L2 classes (needed for global/nested).
         level_weight_l1: Weight for L1 loss relative to L2.
         focal_gamma: Gamma parameter for Focal Loss.
-        use_focal: If True, use Focal Loss; if False, use CrossEntropy.
+        use_focal: If True, use Focal Loss for L2 head only; L1 always uses CrossEntropy.
     """
 
     def __init__(
@@ -86,10 +86,10 @@ class HYDRALoss(nn.Module):
         self.num_classes_l2 = num_classes_l2
         self.level_weight_l1 = level_weight_l1
 
-        if use_focal:
-            self.loss_fn = FocalLoss(gamma=focal_gamma)
-        else:
-            self.loss_fn = nn.CrossEntropyLoss()
+        # L1 : toujours CrossEntropy (157 classes, F1~92%, calibré pour le masque hiérarchique)
+        self.loss_fn_l1 = nn.CrossEntropyLoss()
+        # L2 : FocalLoss si use_focal (6 126 classes déséquilibrées), CE sinon
+        self.loss_fn_l2 = FocalLoss(gamma=focal_gamma) if use_focal else nn.CrossEntropyLoss()
 
     def forward(
         self,
@@ -109,17 +109,27 @@ class HYDRALoss(nn.Module):
         Returns:
             Tuple of (total_loss, loss_l1, loss_l2).
         """
+        # FlatHydra path: level_outputs est vide, toute la loss vient de unified_output
+        if len(level_outputs) == 0:
+            assert unified_output is not None and self.num_classes_l1 is not None
+            unified_l1_logits = unified_output[:, :self.num_classes_l1]
+            unified_l2_logits = unified_output[:, self.num_classes_l1:]
+            loss_l1 = self.loss_fn_l1(unified_l1_logits, labels_l1)
+            loss_l2 = self.loss_fn_l2(unified_l2_logits, labels_l2)
+            total_loss = self.alpha * (self.level_weight_l1 * loss_l1 + loss_l2)
+            return total_loss, loss_l1, loss_l2
+
         logits_l1, logits_l2 = level_outputs
-        loss_l1 = self.loss_fn(logits_l1, labels_l1)
-        loss_l2 = self.loss_fn(logits_l2, labels_l2)
+        loss_l1 = self.loss_fn_l1(logits_l1, labels_l1)
+        loss_l2 = self.loss_fn_l2(logits_l2, labels_l2)
         level_loss = self.level_weight_l1 * loss_l1 + loss_l2
         total_loss = level_loss
 
         if self.architecture in ("global", "nested") and unified_output is not None:
             unified_l1_logits = unified_output[:, :self.num_classes_l1]
             unified_l2_logits = unified_output[:, self.num_classes_l1:]
-            unified_loss_l1 = self.loss_fn(unified_l1_logits, labels_l1)
-            unified_loss_l2 = self.loss_fn(unified_l2_logits, labels_l2)
+            unified_loss_l1 = self.loss_fn_l1(unified_l1_logits, labels_l1)
+            unified_loss_l2 = self.loss_fn_l2(unified_l2_logits, labels_l2)
             unified_loss = self.level_weight_l1 * unified_loss_l1 + unified_loss_l2
             total_loss = level_loss + self.alpha * unified_loss
 

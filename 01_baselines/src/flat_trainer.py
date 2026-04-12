@@ -308,6 +308,7 @@ class FlatHydraTrainer:
             "val_f1_l1_macro": [],
             "val_f1_l2_macro": [],
             "val_hcr": [],
+            "val_constrained_f1_macro": [],
         }
         best_val_f1 = 0.0
         epochs_no_improve = 0
@@ -402,6 +403,9 @@ class FlatHydraTrainer:
             history["val_f1_l1_macro"].append(val_metrics["f1_l1_macro"])
             history["val_f1_l2_macro"].append(val_f1_l2)
             history["val_hcr"].append(val_metrics.get("hcr", 0.0))
+            history["val_constrained_f1_macro"].append(
+                val_metrics.get("constrained_f1_macro", 0.0)
+            )
 
             elapsed = time.time() - start_time
             print(
@@ -432,6 +436,7 @@ class FlatHydraTrainer:
                         "val_f1_l1_macro": val_metrics["f1_l1_macro"],
                         "val_f1_l2_macro": val_f1_l2,
                         "val_hcr": val_metrics.get("hcr", 0.0),
+                        "val_constrained_f1_macro": val_metrics.get("constrained_f1_macro", 0.0),
                     }, step=epoch + 1)
 
                     v_labels_l1 = val_metrics["_labels_l1"]
