@@ -43,6 +43,13 @@ IMAGE_FILES = [
 SKIP_PARAMS = {"gpu_type", "num_classes_l1", "num_classes_l2"}
 
 EVAL_TEST_METRICS = RESULTS_DIR / "hydra_eval_test_metrics.json"
+HYDRA_HIERARCHY_METRICS = RESULTS_DIR / "hydra_eval_hierarchy_metrics.json"
+
+HYDRA_HIERARCHY_VARIANTS = {
+    "local":  {"name": "HYDRA Local + Hierarchy",  "color": "#1a5276"},
+    "nested": {"name": "HYDRA Nested + Hierarchy", "color": "#1d8348"},
+    "global": {"name": "HYDRA Global + Hierarchy", "color": "#6c3483"},
+}
 
 
 def encode_image(path: Path) -> str | None:
@@ -191,6 +198,66 @@ def discover_hydra_models() -> list[dict]:
         })
 
     conn.close()
+    return models
+
+
+def discover_hydra_hierarchy_models() -> list[dict]:
+    """Découvre les modèles HYDRA hierarchy depuis un JSON statique + per-class JSONs."""
+    if not HYDRA_HIERARCHY_METRICS.exists():
+        return []
+
+    raw = json.loads(HYDRA_HIERARCHY_METRICS.read_text())
+    overrides = {k: v for k, v in raw.items() if not k.startswith("_")}
+
+    models = []
+    for variant, info in HYDRA_HIERARCHY_VARIANTS.items():
+        model_id = f"hydra-{variant}-hierarchy-camembert"
+        results_dir = RESULTS_DIR / f"hydra-{variant}-hierarchy-camembert"
+        m = overrides.get(model_id, {})
+
+        f1_per_class_l1, f1_per_class_l2 = None, None
+        if results_dir.exists():
+            p1 = results_dir / "f1_per_class_l1.json"
+            p2 = results_dir / "f1_per_class_l2.json"
+            if p1.exists():
+                f1_per_class_l1 = json.loads(p1.read_text())
+            if p2.exists():
+                f1_per_class_l2 = json.loads(p2.read_text())
+
+        images = {}
+        if results_dir.exists():
+            for fname in IMAGE_FILES:
+                key = fname.replace(".png", "")
+                encoded = encode_image(results_dir / fname)
+                if encoded:
+                    images[key] = encoded
+
+        models.append({
+            "id": model_id,
+            "name": info["name"],
+            "family": "hydra",
+            "subtitle": f"CamemBERT — variante {variant} + masque hiérarchique",
+            "status": "finished",
+            "color": info["color"],
+            "metrics": {
+                "test_f1_l1_macro": m.get("test_f1_l1_macro"),
+                "test_f1_l2_macro": m.get("test_f1_l2_macro"),
+                "test_hcr": m.get("test_hcr"),
+            },
+            "val_metrics": {},
+            "training": {"params": {
+                "check_hierarchy": "true",
+                "condition_l2_on_l1": "true",
+                "encoder": "camembert-base",
+                "lr": "5.0e-5",
+                "batch_size": "128",
+                "epochs": "10",
+            }},
+            "history": None,
+            "f1_per_class_l1": f1_per_class_l1,
+            "f1_per_class_l2": f1_per_class_l2,
+            "images": images,
+        })
     return models
 
 
@@ -714,7 +781,11 @@ renderConfigTable();
 def main():
     print("Découverte des modèles HYDRA...")
     hydra_models = discover_hydra_models()
-    print(f"  → {len(hydra_models)} variante(s) HYDRA")
+    print(f"  → {len(hydra_models)} variante(s) HYDRA standard")
+
+    print("Découverte des modèles HYDRA hierarchy...")
+    hydra_hier_models = discover_hydra_hierarchy_models()
+    print(f"  → {len(hydra_hier_models)} variante(s) HYDRA hierarchy")
 
     print("Découverte des baselines...")
     baseline_models = discover_baseline_models()
@@ -727,7 +798,7 @@ def main():
             "num_classes_l1": 157,
             "num_classes_l2": 6126,
         },
-        "models": hydra_models + baseline_models,
+        "models": hydra_models + hydra_hier_models + baseline_models,
     }
 
     print("Génération du HTML...")

@@ -55,16 +55,23 @@ def _map_config(cfg: dict) -> dict:
     return kwargs
 
 
-def evaluate_and_save(variant: str, data: dict, cfg_kwargs: dict):
+def evaluate_and_save(
+    variant: str,
+    data: dict,
+    cfg_kwargs: dict,
+    model_dir: str = "models",
+    results_tag: str = "",
+    check_hierarchy: bool = False,
+):
     """Évalue un modèle et sauvegarde les F1 per-class en JSON."""
-    model_path = Path(_ROOT) / f"models/HYDRA_{variant}_CamemBERT/best_model.pt"
+    model_path = Path(_ROOT) / f"{model_dir}/HYDRA_{variant}_CamemBERT/best_model.pt"
     if not model_path.exists():
         print(f"  [SKIP] {model_path} introuvable")
         return
 
     cfg_kwargs.pop("epochs", None)
     trainer = HYDRATrainer(
-        data=data, variant=variant, check_hierarchy=False,
+        data=data, variant=variant, check_hierarchy=check_hierarchy,
         epochs=1, **cfg_kwargs,
     )
 
@@ -95,7 +102,8 @@ def evaluate_and_save(variant: str, data: dict, cfg_kwargs: dict):
     f1_l2_pc = compute_per_class_f1(labels_l2, preds_l2, trainer.l2_encoder)
 
     # Sauvegarde
-    out_dir = RESULTS_DIR / f"hydra-{variant}-camembert"
+    suffix = f"-{results_tag}" if results_tag else ""
+    out_dir = RESULTS_DIR / f"hydra-{variant}{suffix}-camembert"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     l1_path = out_dir / "f1_per_class_l1.json"
@@ -115,6 +123,12 @@ def main():
     parser.add_argument("--variant", default=None, choices=VARIANTS)
     parser.add_argument("--batch-size", type=int, default=None,
                         help="Batch size pour l'évaluation (défaut: config YAML)")
+    parser.add_argument("--model-dir", default="models",
+                        help="Répertoire racine des modèles (ex: 'models_hierarchy')")
+    parser.add_argument("--results-tag", default="",
+                        help="Suffixe dossier résultats (ex: 'hierarchy' → hydra-local-hierarchy-camembert/)")
+    parser.add_argument("--check-hierarchy", action="store_true",
+                        help="Activer le masque hiérarchique à l'inférence")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -139,7 +153,10 @@ def main():
         print(f"\n{'='*60}")
         print(f"  HYDRA {variant.capitalize()}")
         print(f"{'='*60}")
-        evaluate_and_save(variant, data, dict(cfg_kwargs))
+        evaluate_and_save(variant, data, dict(cfg_kwargs),
+                          model_dir=args.model_dir,
+                          results_tag=args.results_tag,
+                          check_hierarchy=args.check_hierarchy)
 
 
 if __name__ == "__main__":

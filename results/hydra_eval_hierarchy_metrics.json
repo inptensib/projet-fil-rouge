@@ -1,0 +1,7 @@
+{
+  "_source": "SLURM jobs 772228/229/230 — node40, 2026-04-13",
+  "_date": "2026-04-13",
+  "hydra-local-hierarchy-camembert":  {"test_f1_l1_macro": 0.9133, "test_f1_l2_macro": 0.6118, "test_hcr": 0.9974},
+  "hydra-nested-hierarchy-camembert": {"test_f1_l1_macro": 0.9206, "test_f1_l2_macro": 0.6114, "test_hcr": 0.9974},
+  "hydra-global-hierarchy-camembert": {"test_f1_l1_macro": 0.9259, "test_f1_l2_macro": 0.6270, "test_hcr": 0.9974}
+}
