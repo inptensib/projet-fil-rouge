@@ -523,9 +523,9 @@ details[open] summary { border-radius: 8px 8px 0 0; }
         <div class="chart-container full-width"><canvas id="chart-metrics"></canvas></div>
     </div>
     <div class="chart-row">
-        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence"></canvas></div>
-        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence-l1"></canvas></div>
-        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence-loss"></canvas></div>
+        <div class="chart-container" style="min-width:320px;min-height:380px"><canvas id="chart-convergence"></canvas></div>
+        <div class="chart-container" style="min-width:320px;min-height:380px"><canvas id="chart-convergence-l1"></canvas></div>
+        <div class="chart-container" style="min-width:320px;min-height:380px"><canvas id="chart-convergence-loss"></canvas></div>
     </div>
 </section>
 <section id="per-class">
@@ -662,6 +662,7 @@ function renderCharts() {
             data: {datasets},
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: pluginsOpts,
                 scales: {
                     x: {type: 'linear', min: 1, max: 10, title: {display: true, text: 'Epoch'}, ticks: {stepSize: 1}},
@@ -671,13 +672,13 @@ function renderCharts() {
         });
     }
 
-    const pctF2 = v => (v * 100).toFixed(2) + '%';
+    const pctF2 = v => (v * 100).toFixed(1) + '%';
     makeConvergenceChart('chart-convergence', 'val_f1_l2_macro',
         'Convergence — Val F1 L2 macro (epoch 1→10)',
-        {title: {display: true, text: 'F1 L2 macro'}, ticks: {callback: pctF2}});
+        {min: 0.3, title: {display: true, text: 'F1 L2 macro'}, ticks: {callback: pctF2}});
     makeConvergenceChart('chart-convergence-l1', 'val_f1_l1_macro',
         'Convergence — Val F1 L1 macro (epoch 1→10)',
-        {title: {display: true, text: 'F1 L1 macro'}, ticks: {callback: pctF2}});
+        {min: 0.84, title: {display: true, text: 'F1 L1 macro'}, ticks: {callback: pctF2}});
     const standardHydra = hydraWithHistory.filter(m => !m.id.includes('hierarchy'));
     makeConvergenceChart('chart-convergence-loss', 'train_loss',
         'Train Loss — HYDRA standard (epoch 1→10)',
