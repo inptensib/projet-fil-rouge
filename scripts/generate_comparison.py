@@ -523,9 +523,13 @@ details[open] summary { border-radius: 8px 8px 0 0; }
         <div class="chart-container full-width"><canvas id="chart-metrics"></canvas></div>
     </div>
     <div class="chart-row">
-        <div class="chart-container" style="min-width:320px;min-height:380px"><canvas id="chart-convergence"></canvas></div>
-        <div class="chart-container" style="min-width:320px;min-height:380px"><canvas id="chart-convergence-l1"></canvas></div>
-        <div class="chart-container" style="min-width:320px;min-height:380px"><canvas id="chart-convergence-loss"></canvas></div>
+        <div class="chart-container full-width" style="min-height:420px"><canvas id="chart-convergence"></canvas></div>
+    </div>
+    <div class="chart-row">
+        <div class="chart-container full-width" style="min-height:420px"><canvas id="chart-convergence-l1"></canvas></div>
+    </div>
+    <div class="chart-row">
+        <div class="chart-container full-width" style="min-height:420px"><canvas id="chart-convergence-loss"></canvas></div>
     </div>
 </section>
 <section id="per-class">
