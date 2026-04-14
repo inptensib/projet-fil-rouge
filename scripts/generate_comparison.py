@@ -635,15 +635,19 @@ function renderCharts() {
         options: {
             responsive: true,
             plugins: {title: {display: true, text: 'Métriques de test (F1 macro + HCR)'}},
-            scales: {y: {beginAtZero: true, min: 0, max: 1.0, ticks: {callback: v => (v*100).toFixed(0)+'%'}}},
+            scales: {
+                x: {ticks: {maxRotation: 45, minRotation: 30}},
+                y: {beginAtZero: true, min: 0, max: 1.0, ticks: {callback: v => (v*100).toFixed(0)+'%'}},
+            },
         },
     });
 
     // Courbes de convergence (HYDRA uniquement — modèles avec historique MLflow)
     const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history);
 
-    function makeConvergenceChart(canvasId, metricKey, title, yScaleOpts) {
-        const withMetric = hydraWithHistory.filter(m => m.history[metricKey]);
+    function makeConvergenceChart(canvasId, metricKey, title, yScaleOpts, modelsPool, subtitleText) {
+        const pool = modelsPool ?? hydraWithHistory;
+        const withMetric = pool.filter(m => m.history[metricKey]);
         if (withMetric.length === 0) return;
         const datasets = withMetric.map(m => ({
             label: m.name,
@@ -651,12 +655,14 @@ function renderCharts() {
             borderColor: m.color, backgroundColor: m.color + '33',
             fill: false, tension: 0.3, pointRadius: 4,
         }));
+        const pluginsOpts = {title: {display: true, text: title}};
+        if (subtitleText) pluginsOpts.subtitle = {display: true, text: subtitleText, color: '#888', font: {size: 11}};
         new Chart(document.getElementById(canvasId), {
             type: 'line',
             data: {datasets},
             options: {
                 responsive: true,
-                plugins: {title: {display: true, text: title}},
+                plugins: pluginsOpts,
                 scales: {
                     x: {type: 'linear', min: 1, max: 10, title: {display: true, text: 'Epoch'}, ticks: {stepSize: 1}},
                     y: yScaleOpts,
@@ -672,10 +678,13 @@ function renderCharts() {
     makeConvergenceChart('chart-convergence-l1', 'val_f1_l1_macro',
         'Convergence — Val F1 L1 macro (epoch 1→10)',
         {title: {display: true, text: 'F1 L1 macro'}, ticks: {callback: pctF2}});
+    const standardHydra = hydraWithHistory.filter(m => !m.id.includes('hierarchy'));
     makeConvergenceChart('chart-convergence-loss', 'train_loss',
-        'Convergence — Train Loss (échelle log, epoch 1→10)',
+        'Train Loss — HYDRA standard (epoch 1→10)',
         {type: 'logarithmic', title: {display: true, text: 'Train Loss (log)'},
-         ticks: {callback: v => v >= 1 ? v.toExponential(1) : v.toFixed(3)}});
+         ticks: {callback: v => v >= 1 ? v.toExponential(1) : v.toFixed(3)}},
+        standardHydra,
+        'Modèles hierarchy exclus — loss non normalisée (somme brute ≈ 126M)');
 }
 
 // --- 3. Per-class comparison (generic for L1 and L2) ---
