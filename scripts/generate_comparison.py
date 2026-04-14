@@ -51,6 +51,73 @@ HYDRA_HIERARCHY_VARIANTS = {
     "global": {"name": "HYDRA Global + Hierarchy", "color": "#6c3483"},
 }
 
+# Timestamp de séparation : runs standard (avant) vs runs hierarchy (après)
+# April 11, 2026 00:00:00 UTC = 1775865600 s = 1775865600000 ms
+HIERARCHY_START_MS = 1775865600000
+
+VARIANT_TO_EXP_ID = {info["variant"]: eid for eid, info in HYDRA_EXPERIMENTS.items()}
+
+
+def _get_merged_history(
+    conn: sqlite3.Connection,
+    exp_id: str,
+    *,
+    before_ms: int | None = None,
+    since_ms: int | None = None,
+) -> dict:
+    """Fusionne l'historique de plusieurs runs en un dict epochs/values par clé de métrique.
+
+    Priorité par step : FINISHED non-nul > RUNNING non-nul > toute valeur (earliest start_time).
+    Permet de reconstruire epoch 1-10 depuis plusieurs jobs SLURM fragmentés, en ignorant
+    les runs de redémarrage qui ont loggé des zéros avant d'être tués.
+    """
+    query = "SELECT run_uuid, start_time, status FROM runs WHERE experiment_id=?"
+    params: list = [exp_id]
+    if before_ms is not None:
+        query += " AND start_time < ?"
+        params.append(before_ms)
+    if since_ms is not None:
+        query += " AND start_time >= ?"
+        params.append(since_ms)
+    query += " ORDER BY start_time ASC"
+
+    runs = conn.execute(query, params).fetchall()
+    if not runs:
+        return {}
+
+    # step → liste de (value, start_time, status)
+    candidates: dict[str, dict[int, list]] = {key: {} for key in HISTORY_KEYS}
+    for run_uuid, start_time, status in runs:
+        for key in HISTORY_KEYS:
+            rows = conn.execute(
+                "SELECT step, value FROM metrics WHERE run_uuid=? AND key=? ORDER BY step",
+                (run_uuid, key),
+            ).fetchall()
+            for step, value in rows:
+                candidates[key].setdefault(step, []).append((value, start_time, status))
+
+    def _pick_best(items: list) -> float:
+        """FINISHED non-nul > RUNNING non-nul > tout, à start_time égal préfère le plus ancien."""
+        for status_filter in ("FINISHED", "RUNNING", None):
+            subset = [
+                (v, t) for v, t, s in items
+                if (status_filter is None or s == status_filter) and v != 0.0
+            ]
+            if subset:
+                return min(subset, key=lambda x: x[1])[0]
+        # fallback : valeur du run le plus ancien
+        return min(items, key=lambda x: x[1])[0]
+
+    history = {}
+    for key, step_data in candidates.items():
+        if step_data:
+            sorted_steps = sorted(step_data)
+            history[key] = {
+                "epochs": sorted_steps,
+                "values": [_pick_best(step_data[s]) for s in sorted_steps],
+            }
+    return history
+
 
 def encode_image(path: Path) -> str | None:
     if not path.exists():
@@ -75,18 +142,18 @@ def discover_hydra_models() -> list[dict]:
         # Meilleur run FINISHED
         row = conn.execute(
             "SELECT run_uuid FROM runs "
-            "WHERE experiment_id=? AND status='FINISHED' "
+            "WHERE experiment_id=? AND status='FINISHED' AND start_time < ? "
             "ORDER BY end_time DESC LIMIT 1",
-            (exp_id,),
+            (exp_id, HIERARCHY_START_MS),
         ).fetchone()
 
         if row is None:
             # Vérifier si en cours
             running = conn.execute(
                 "SELECT run_uuid FROM runs "
-                "WHERE experiment_id=? AND status='RUNNING' "
+                "WHERE experiment_id=? AND status='RUNNING' AND start_time < ? "
                 "ORDER BY start_time DESC LIMIT 1",
-                (exp_id,),
+                (exp_id, HIERARCHY_START_MS),
             ).fetchone()
             if running:
                 run_id = running[0]
@@ -140,15 +207,8 @@ def discover_hydra_models() -> list[dict]:
         ).fetchall()
         p = dict(params_rows)
 
-        # Historique par epoch
-        history = {}
-        for key in HISTORY_KEYS:
-            rows = conn.execute(
-                "SELECT step, value FROM metrics WHERE run_uuid=? AND key=? ORDER BY step",
-                (run_id, key),
-            ).fetchall()
-            if rows:
-                history[key] = {"epochs": [r[0] for r in rows], "values": [r[1] for r in rows]}
+        # Historique par epoch (fusion de tous les runs standard pour reconstruire epoch 1-10)
+        history = _get_merged_history(conn, exp_id, before_ms=HIERARCHY_START_MS)
 
         # F1 par classe (results/ puis fallback MLflow artifacts)
         artifacts_dir = PROJECT_ROOT / "mlruns" / exp_id / run_id / "artifacts"
@@ -202,18 +262,33 @@ def discover_hydra_models() -> list[dict]:
 
 
 def discover_hydra_hierarchy_models() -> list[dict]:
-    """Découvre les modèles HYDRA hierarchy depuis un JSON statique + per-class JSONs."""
+    """Découvre les modèles HYDRA hierarchy depuis un JSON statique + per-class JSONs + MLflow."""
     if not HYDRA_HIERARCHY_METRICS.exists():
         return []
 
     raw = json.loads(HYDRA_HIERARCHY_METRICS.read_text())
     overrides = {k: v for k, v in raw.items() if not k.startswith("_")}
 
+    conn = sqlite3.connect(str(MLFLOW_DB)) if MLFLOW_DB.exists() else None
+
     models = []
     for variant, info in HYDRA_HIERARCHY_VARIANTS.items():
         model_id = f"hydra-{variant}-hierarchy-camembert"
         results_dir = RESULTS_DIR / f"hydra-{variant}-hierarchy-camembert"
         m = overrides.get(model_id, {})
+
+        # Historique MLflow (runs hierarchy = après HIERARCHY_START_MS)
+        history = None
+        val_metrics: dict = {}
+        if conn is not None:
+            exp_id = VARIANT_TO_EXP_ID.get(variant)
+            if exp_id:
+                history_raw = _get_merged_history(conn, exp_id, since_ms=HIERARCHY_START_MS)
+                if history_raw:
+                    history = history_raw
+                    for mk in ("val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
+                        if mk in history_raw and history_raw[mk]["values"]:
+                            val_metrics[mk] = history_raw[mk]["values"][-1]
 
         f1_per_class_l1, f1_per_class_l2 = None, None
         if results_dir.exists():
@@ -244,7 +319,7 @@ def discover_hydra_hierarchy_models() -> list[dict]:
                 "test_f1_l2_macro": m.get("test_f1_l2_macro"),
                 "test_hcr": m.get("test_hcr"),
             },
-            "val_metrics": {},
+            "val_metrics": val_metrics,
             "training": {"params": {
                 "check_hierarchy": "true",
                 "condition_l2_on_l1": "true",
@@ -253,11 +328,14 @@ def discover_hydra_hierarchy_models() -> list[dict]:
                 "batch_size": "128",
                 "epochs": "10",
             }},
-            "history": None,
+            "history": history,
             "f1_per_class_l1": f1_per_class_l1,
             "f1_per_class_l2": f1_per_class_l2,
             "images": images,
         })
+
+    if conn is not None:
+        conn.close()
     return models
 
 
@@ -442,8 +520,12 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <section id="charts">
     <h2>Graphiques comparatifs</h2>
     <div class="chart-row">
-        <div class="chart-container"><canvas id="chart-metrics"></canvas></div>
-        <div class="chart-container"><canvas id="chart-convergence"></canvas></div>
+        <div class="chart-container full-width"><canvas id="chart-metrics"></canvas></div>
+    </div>
+    <div class="chart-row">
+        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence"></canvas></div>
+        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence-l1"></canvas></div>
+        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence-loss"></canvas></div>
     </div>
 </section>
 <section id="per-class">
@@ -557,31 +639,43 @@ function renderCharts() {
         },
     });
 
-    // Convergence curves (HYDRA only)
-    const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history?.val_f1_l2_macro);
-    if (hydraWithHistory.length > 0) {
-        const datasets = hydraWithHistory.map(m => ({
+    // Courbes de convergence (HYDRA uniquement — modèles avec historique MLflow)
+    const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history);
+
+    function makeConvergenceChart(canvasId, metricKey, title, yScaleOpts) {
+        const withMetric = hydraWithHistory.filter(m => m.history[metricKey]);
+        if (withMetric.length === 0) return;
+        const datasets = withMetric.map(m => ({
             label: m.name,
-            data: m.history.val_f1_l2_macro.values.map((v, i) => ({x: m.history.val_f1_l2_macro.epochs[i], y: v})),
-            borderColor: m.color,
-            backgroundColor: m.color + '33',
-            fill: false,
-            tension: 0.3,
-            pointRadius: 4,
+            data: m.history[metricKey].values.map((v, i) => ({x: m.history[metricKey].epochs[i], y: v})),
+            borderColor: m.color, backgroundColor: m.color + '33',
+            fill: false, tension: 0.3, pointRadius: 4,
         }));
-        new Chart(document.getElementById('chart-convergence'), {
+        new Chart(document.getElementById(canvasId), {
             type: 'line',
             data: {datasets},
             options: {
                 responsive: true,
-                plugins: {title: {display: true, text: 'Convergence — Val F1 L2 macro par epoch'}},
+                plugins: {title: {display: true, text: title}},
                 scales: {
-                    x: {type: 'linear', title: {display: true, text: 'Epoch'}},
-                    y: {title: {display: true, text: 'F1 L2 macro'}, ticks: {callback: v => (v*100).toFixed(1)+'%'}},
+                    x: {type: 'linear', min: 1, max: 10, title: {display: true, text: 'Epoch'}, ticks: {stepSize: 1}},
+                    y: yScaleOpts,
                 },
             },
         });
     }
+
+    const pctF2 = v => (v * 100).toFixed(2) + '%';
+    makeConvergenceChart('chart-convergence', 'val_f1_l2_macro',
+        'Convergence — Val F1 L2 macro (epoch 1→10)',
+        {title: {display: true, text: 'F1 L2 macro'}, ticks: {callback: pctF2}});
+    makeConvergenceChart('chart-convergence-l1', 'val_f1_l1_macro',
+        'Convergence — Val F1 L1 macro (epoch 1→10)',
+        {title: {display: true, text: 'F1 L1 macro'}, ticks: {callback: pctF2}});
+    makeConvergenceChart('chart-convergence-loss', 'train_loss',
+        'Convergence — Train Loss (échelle log, epoch 1→10)',
+        {type: 'logarithmic', title: {display: true, text: 'Train Loss (log)'},
+         ticks: {callback: v => v >= 1 ? v.toExponential(1) : v.toFixed(3)}});
 }
 
 // --- 3. Per-class comparison (generic for L1 and L2) ---

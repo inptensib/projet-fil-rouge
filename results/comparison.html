@@ -136,8 +136,12 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <section id="charts">
     <h2>Graphiques comparatifs</h2>
     <div class="chart-row">
-        <div class="chart-container"><canvas id="chart-metrics"></canvas></div>
-        <div class="chart-container"><canvas id="chart-convergence"></canvas></div>
+        <div class="chart-container full-width"><canvas id="chart-metrics"></canvas></div>
+    </div>
+    <div class="chart-row">
+        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence"></canvas></div>
+        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence-l1"></canvas></div>
+        <div class="chart-container" style="min-width:320px"><canvas id="chart-convergence-loss"></canvas></div>
     </div>
 </section>
 <section id="per-class">
@@ -173,7 +177,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-14 07:12",
+    "generated": "2026-04-14 08:24",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -192,17 +196,17 @@ const MODELS_DATA = {
         "test_hcr": 0.8582
       },
       "val_metrics": {
-        "val_f1_l1_macro": 0.9068923249454763,
-        "val_f1_l2_macro": 0.6100372580521751,
-        "val_hcr": 0.9973835990327854
+        "val_f1_l1_macro": 0.9338141663341171,
+        "val_f1_l2_macro": 0.7167539662355832,
+        "val_hcr": 0.8589288779299287
       },
       "training": {
         "params": {
           "variant": "local",
           "encoder": "CamemBERT",
-          "batch_size": "128",
+          "batch_size": "64",
           "epochs": "10",
-          "lr": "5e-05",
+          "lr": "3.5e-05",
           "warmup_ratio": "0.1",
           "fp16": "True",
           "gradient_accumulation_steps": "1",
@@ -210,8 +214,6 @@ const MODELS_DATA = {
           "max_length": "256",
           "max_grad_norm": "1.0",
           "level_weight_l1": "0.5",
-          "use_focal": "True",
-          "focal_gamma": "2.0",
           "early_stopping_patience": "2",
           "early_stopping_min_delta": "0.001"
         }
@@ -219,58 +221,106 @@ const MODELS_DATA = {
       "history": {
         "train_loss": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            126374097.88689132,
-            126399396.0523149,
-            126399194.30208525,
-            126399541.99931104
+            3.8106,
+            1.0447470021093503,
+            0.6692932877760334,
+            0.6928079058800317,
+            0.5432291320783355,
+            0.5099211895000437,
+            0.4419995975269271,
+            0.3796225997987035,
+            0.3251890565362204,
+            0.282245409228862
           ]
         },
         "val_f1_l1_macro": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.9000699873265458,
-            0.903419067537337,
-            0.9055402045349402,
-            0.9068923249454763
+            0.8807,
+            0.9055457706243588,
+            0.9153169379306838,
+            0.920055368746475,
+            0.9234044940732438,
+            0.9264192630918483,
+            0.9302675264603423,
+            0.9323468784438205,
+            0.9333214133473245,
+            0.9338141663341171
           ]
         },
         "val_f1_l2_macro": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.581631799468373,
-            0.5959519277586872,
-            0.6052804720544478,
-            0.6100372580521751
+            0.4627,
+            0.5782019551372812,
+            0.6222848648555025,
+            0.6473278869020227,
+            0.6687427635580324,
+            0.6824636614613191,
+            0.6952841454637659,
+            0.7059808335678632,
+            0.7132062308887975,
+            0.7167539662355832
           ]
         },
         "val_hcr": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.997367696403746,
-            0.997371044325649,
-            0.997364348481843,
-            0.9973835990327854
+            0.8333,
+            0.844131769867418,
+            0.8494383998057529,
+            0.8529633149273038,
+            0.8543088110318959,
+            0.8554600600324024,
+            0.8574000192572561,
+            0.8579618287695032,
+            0.8585236382817504,
+            0.8589288779299287
           ]
         }
       },
@@ -6582,17 +6632,17 @@ const MODELS_DATA = {
         "test_hcr": 0.8583
       },
       "val_metrics": {
-        "val_f1_l1_macro": 0.9157100139183756,
-        "val_f1_l2_macro": 0.6125663851626018,
-        "val_hcr": 0.9974087084470581
+        "val_f1_l1_macro": 0.9372786939311015,
+        "val_f1_l2_macro": 0.6906713531317032,
+        "val_hcr": 0.8589606942659427
       },
       "training": {
         "params": {
           "variant": "nested",
           "encoder": "CamemBERT",
-          "batch_size": "128",
+          "batch_size": "64",
           "epochs": "10",
-          "lr": "5e-05",
+          "lr": "3.5e-05",
           "warmup_ratio": "0.1",
           "fp16": "True",
           "gradient_accumulation_steps": "1",
@@ -6600,8 +6650,6 @@ const MODELS_DATA = {
           "max_length": "256",
           "max_grad_norm": "1.0",
           "level_weight_l1": "0.5",
-          "use_focal": "True",
-          "focal_gamma": "2.0",
           "early_stopping_patience": "2",
           "early_stopping_min_delta": "0.001"
         }
@@ -6609,58 +6657,106 @@ const MODELS_DATA = {
       "history": {
         "train_loss": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            126486522.64221218,
-            126399212.97230388,
-            126399726.42159654,
-            126399175.55580562
+            9.2567,
+            2.537512729130846,
+            1.6999653588976624,
+            1.6157419609931514,
+            1.373507546965898,
+            1.0475112022737432,
+            1.0324043967444043,
+            0.8998986245179181,
+            0.7746757045413888,
+            0.6763544519036295
           ]
         },
         "val_f1_l1_macro": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.9173670646550887,
-            0.9200061272762569,
-            0.9203351794848953,
-            0.9157100139183756
+            0.8767,
+            0.8982054582107998,
+            0.9080627373165877,
+            0.9220623893441816,
+            0.9277541487349089,
+            0.9281231835877348,
+            0.9305878105785653,
+            0.9346203362011286,
+            0.9358191242041185,
+            0.9372786939311015
           ]
         },
         "val_f1_l2_macro": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.5856977887232446,
-            0.5967020479622319,
-            0.6070916086525651,
-            0.6125663851626018
+            0.3794,
+            0.5230954852637251,
+            0.5805556262270064,
+            0.6110561629703711,
+            0.6339135702629414,
+            0.6513172313478863,
+            0.6655837131569045,
+            0.6778164984499604,
+            0.6860670705037611,
+            0.6906713531317032
           ]
         },
         "val_hcr": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.9973442609504248,
-            0.9974011756227762,
-            0.9974313069199034,
-            0.9974087084470581
+            0.8296,
+            0.8454990350440196,
+            0.8506650032862926,
+            0.8527992096152317,
+            0.8552155766082948,
+            0.8566581962649296,
+            0.8574603028412825,
+            0.8578755897534652,
+            0.8584147929217025,
+            0.8589606942659427
           ]
         }
       },
@@ -12972,17 +13068,17 @@ const MODELS_DATA = {
         "test_hcr": 0.8587
       },
       "val_metrics": {
-        "val_f1_l1_macro": 0.9197894934211985,
-        "val_f1_l2_macro": 0.6247948526454264,
-        "val_hcr": 0.9974145673103884
+        "val_f1_l1_macro": 0.9351952634608425,
+        "val_f1_l2_macro": 0.7112467040363171,
+        "val_hcr": 0.8594161702341431
       },
       "training": {
         "params": {
           "variant": "global",
           "encoder": "CamemBERT",
-          "batch_size": "128",
+          "batch_size": "64",
           "epochs": "10",
-          "lr": "5e-05",
+          "lr": "3.5e-05",
           "warmup_ratio": "0.1",
           "fp16": "True",
           "gradient_accumulation_steps": "1",
@@ -12990,8 +13086,6 @@ const MODELS_DATA = {
           "max_length": "256",
           "max_grad_norm": "1.0",
           "level_weight_l1": "0.5",
-          "use_focal": "True",
-          "focal_gamma": "2.0",
           "early_stopping_patience": "2",
           "early_stopping_min_delta": "0.001"
         }
@@ -12999,58 +13093,106 @@ const MODELS_DATA = {
       "history": {
         "train_loss": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            126366653.24867846,
-            126399914.1707698,
-            126398813.03614734,
-            126399159.3017178
+            2.9790292523299042,
+            2.250986905505355,
+            1.5992455962961687,
+            1.1585478858775422,
+            1.1735465414791302,
+            0.9470724464408927,
+            0.6673568925415021,
+            0.7531652246589603,
+            0.6545537130530064,
+            0.5676091141303997
           ]
         },
         "val_f1_l1_macro": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.9149859748880155,
-            0.9171234635624776,
-            0.9194408540432903,
-            0.9197894934211985
+            0.8784376798195602,
+            0.9052171992696166,
+            0.9146893699968629,
+            0.9204355221205391,
+            0.9240830773691271,
+            0.9278475472968167,
+            0.9302399329463926,
+            0.9321507099230574,
+            0.9350074473335847,
+            0.9351952634608425
           ]
         },
         "val_f1_l2_macro": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.5982429418569213,
-            0.6105457773378624,
-            0.6196455929932005,
-            0.6247948526454264
+            0.45037344902596954,
+            0.5687498458811645,
+            0.616970383276456,
+            0.6440319453129827,
+            0.661993200484377,
+            0.6780307745039142,
+            0.6891263199771945,
+            0.6997251858544431,
+            0.7075544871182726,
+            0.7112467040363171
           ]
         },
         "val_hcr": {
           "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
             7,
             8,
             9,
             10
           ],
           "values": [
-            0.9974221001346701,
-            0.9974179152322914,
-            0.9974254480565732,
-            0.9974145673103884
+            0.8327607788304148,
+            0.846368123380402,
+            0.8510735920224723,
+            0.8537746314956608,
+            0.8546629770880517,
+            0.8565610727128868,
+            0.8573673656492417,
+            0.8582406403456259,
+            0.8587396544578455,
+            0.8594161702341431
           ]
         }
       },
@@ -19361,7 +19503,11 @@ const MODELS_DATA = {
         "test_f1_l2_macro": 0.6118,
         "test_hcr": 0.9974
       },
-      "val_metrics": {},
+      "val_metrics": {
+        "val_f1_l1_macro": 0.9068923249454763,
+        "val_f1_l2_macro": 0.6100372580521751,
+        "val_hcr": 0.9973835990327854
+      },
       "training": {
         "params": {
           "check_hierarchy": "true",
@@ -19372,7 +19518,112 @@ const MODELS_DATA = {
           "epochs": "10"
         }
       },
-      "history": null,
+      "history": {
+        "train_loss": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            126399625.13600037,
+            126399609.86413743,
+            126399399.9368455,
+            126399721.82776043,
+            126399502.75358258,
+            126399104.2015892,
+            126374097.88689132,
+            126399396.0523149,
+            126399194.30208525,
+            126399541.99931104
+          ]
+        },
+        "val_f1_l1_macro": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.8595747830101479,
+            0.8791138281827221,
+            0.8836932996326462,
+            0.8880739072137235,
+            0.8940484345902885,
+            0.8985337977519973,
+            0.9000699873265458,
+            0.903419067537337,
+            0.9055402045349402,
+            0.9068923249454763
+          ]
+        },
+        "val_f1_l2_macro": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.4247220899138989,
+            0.494789666616214,
+            0.5189618800886877,
+            0.5405191954185663,
+            0.55671379755395,
+            0.5690872523705494,
+            0.581631799468373,
+            0.5959519277586872,
+            0.6052804720544478,
+            0.6100372580521751
+          ]
+        },
+        "val_hcr": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.9974128933494368,
+            0.9975526690888882,
+            0.997402012603252,
+            0.997402012603252,
+            0.9974723189632155,
+            0.9974070344861066,
+            0.997367696403746,
+            0.997371044325649,
+            0.997364348481843,
+            0.9973835990327854
+          ]
+        }
+      },
       "f1_per_class_l1": {
         "Cartes son": 0.0,
         "Livres": 0.0,
@@ -25674,7 +25925,11 @@ const MODELS_DATA = {
         "test_f1_l2_macro": 0.6114,
         "test_hcr": 0.9974
       },
-      "val_metrics": {},
+      "val_metrics": {
+        "val_f1_l1_macro": 0.9157100139183756,
+        "val_f1_l2_macro": 0.6125663851626018,
+        "val_hcr": 0.9974087084470581
+      },
       "training": {
         "params": {
           "check_hierarchy": "true",
@@ -25685,7 +25940,112 @@ const MODELS_DATA = {
           "epochs": "10"
         }
       },
-      "history": null,
+      "history": {
+        "train_loss": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            126399628.36960316,
+            126399437.15689877,
+            126399947.49853022,
+            126399372.35224141,
+            126399330.38407129,
+            126399107.8045655,
+            126486522.64221218,
+            126399212.97230388,
+            126399726.42159654,
+            126399175.55580562
+          ]
+        },
+        "val_f1_l1_macro": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.8684560594950341,
+            0.8859094657910449,
+            0.8991849905389412,
+            0.8996486976632984,
+            0.9053842547095625,
+            0.9095477239657591,
+            0.9173670646550887,
+            0.9200061272762569,
+            0.9203351794848953,
+            0.9157100139183756
+          ]
+        },
+        "val_f1_l2_macro": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.3589908073264607,
+            0.48039223905204603,
+            0.5180906354430538,
+            0.5400849475821708,
+            0.5560731221703867,
+            0.5695571591446336,
+            0.5856977887232446,
+            0.5967020479622319,
+            0.6070916086525651,
+            0.6125663851626018
+          ]
+        },
+        "val_hcr": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.997491569514158,
+            0.9974890585727306,
+            0.9975551800303154,
+            0.997439676724661,
+            0.9973969907203974,
+            0.9974371657832338,
+            0.9973442609504248,
+            0.9974011756227762,
+            0.9974313069199034,
+            0.9974087084470581
+          ]
+        }
+      },
       "f1_per_class_l1": {
         "Livres": 0.0,
         "Lots de Vidéos": 0.0,
@@ -31987,7 +32347,11 @@ const MODELS_DATA = {
         "test_f1_l2_macro": 0.627,
         "test_hcr": 0.9974
       },
-      "val_metrics": {},
+      "val_metrics": {
+        "val_f1_l1_macro": 0.9197894934211985,
+        "val_f1_l2_macro": 0.6247948526454264,
+        "val_hcr": 0.9974145673103884
+      },
       "training": {
         "params": {
           "check_hierarchy": "true",
@@ -31998,7 +32362,112 @@ const MODELS_DATA = {
           "epochs": "10"
         }
       },
-      "history": null,
+      "history": {
+        "train_loss": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            126399089.59594892,
+            126400147.68133382,
+            126399038.88466838,
+            126399357.95388572,
+            126398955.68082859,
+            126400526.76309021,
+            126366653.24867846,
+            126399914.1707698,
+            126398813.03614734,
+            126399159.3017178
+          ]
+        },
+        "val_f1_l1_macro": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.8695667953539677,
+            0.8931197620380726,
+            0.9011943601791035,
+            0.9061267912873766,
+            0.9096682842075785,
+            0.9125225821136324,
+            0.9149859748880155,
+            0.9171234635624776,
+            0.9194408540432903,
+            0.9197894934211985
+          ]
+        },
+        "val_f1_l2_macro": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.41343716118838103,
+            0.5047325032438063,
+            0.5360073709455422,
+            0.5534020527879704,
+            0.5698686688626299,
+            0.5859642893379746,
+            0.5982429418569213,
+            0.6105457773378624,
+            0.6196455929932005,
+            0.6247948526454264
+          ]
+        },
+        "val_hcr": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.9974698080217883,
+            0.9973199885166278,
+            0.9973877839351641,
+            0.997402012603252,
+            0.997460601236555,
+            0.9973953167594459,
+            0.9974221001346701,
+            0.9974179152322914,
+            0.9974254480565732,
+            0.9974145673103884
+          ]
+        }
+      },
       "f1_per_class_l1": {
         "Cartes son": 0.0,
         "Livres": 0.0,
@@ -57313,31 +57782,43 @@ function renderCharts() {
         },
     });
 
-    // Convergence curves (HYDRA only)
-    const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history?.val_f1_l2_macro);
-    if (hydraWithHistory.length > 0) {
-        const datasets = hydraWithHistory.map(m => ({
+    // Courbes de convergence (HYDRA uniquement — modèles avec historique MLflow)
+    const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history);
+
+    function makeConvergenceChart(canvasId, metricKey, title, yScaleOpts) {
+        const withMetric = hydraWithHistory.filter(m => m.history[metricKey]);
+        if (withMetric.length === 0) return;
+        const datasets = withMetric.map(m => ({
             label: m.name,
-            data: m.history.val_f1_l2_macro.values.map((v, i) => ({x: m.history.val_f1_l2_macro.epochs[i], y: v})),
-            borderColor: m.color,
-            backgroundColor: m.color + '33',
-            fill: false,
-            tension: 0.3,
-            pointRadius: 4,
+            data: m.history[metricKey].values.map((v, i) => ({x: m.history[metricKey].epochs[i], y: v})),
+            borderColor: m.color, backgroundColor: m.color + '33',
+            fill: false, tension: 0.3, pointRadius: 4,
         }));
-        new Chart(document.getElementById('chart-convergence'), {
+        new Chart(document.getElementById(canvasId), {
             type: 'line',
             data: {datasets},
             options: {
                 responsive: true,
-                plugins: {title: {display: true, text: 'Convergence — Val F1 L2 macro par epoch'}},
+                plugins: {title: {display: true, text: title}},
                 scales: {
-                    x: {type: 'linear', title: {display: true, text: 'Epoch'}},
-                    y: {title: {display: true, text: 'F1 L2 macro'}, ticks: {callback: v => (v*100).toFixed(1)+'%'}},
+                    x: {type: 'linear', min: 1, max: 10, title: {display: true, text: 'Epoch'}, ticks: {stepSize: 1}},
+                    y: yScaleOpts,
                 },
             },
         });
     }
+
+    const pctF2 = v => (v * 100).toFixed(2) + '%';
+    makeConvergenceChart('chart-convergence', 'val_f1_l2_macro',
+        'Convergence — Val F1 L2 macro (epoch 1→10)',
+        {title: {display: true, text: 'F1 L2 macro'}, ticks: {callback: pctF2}});
+    makeConvergenceChart('chart-convergence-l1', 'val_f1_l1_macro',
+        'Convergence — Val F1 L1 macro (epoch 1→10)',
+        {title: {display: true, text: 'F1 L1 macro'}, ticks: {callback: pctF2}});
+    makeConvergenceChart('chart-convergence-loss', 'train_loss',
+        'Convergence — Train Loss (échelle log, epoch 1→10)',
+        {type: 'logarithmic', title: {display: true, text: 'Train Loss (log)'},
+         ticks: {callback: v => v >= 1 ? v.toExponential(1) : v.toFixed(3)}});
 }
 
 // --- 3. Per-class comparison (generic for L1 and L2) ---
