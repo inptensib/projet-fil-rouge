@@ -15,8 +15,10 @@
 # results/hydra-{variant}-hierarchy-camembert/.
 #
 # Usage :
-#   sbatch scripts/run_f1_perclass_hierarchy.slurm
-#   sbatch scripts/run_f1_perclass_hierarchy.slurm --variant local
+#   sbatch scripts/run_f1_perclass_hierarchy.slurm             # toutes les variantes (séquentiel)
+#   sbatch --job-name=f1-hier-local  scripts/run_f1_perclass_hierarchy.slurm local
+#   sbatch --job-name=f1-hier-nested scripts/run_f1_perclass_hierarchy.slurm nested
+#   sbatch --job-name=f1-hier-global scripts/run_f1_perclass_hierarchy.slurm global
 
 source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
 cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
@@ -25,7 +27,12 @@ export TRANSFORMERS_OFFLINE=1
 export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
 export PYTHONPATH=""
 
-echo "=== F1 per-class HYDRA hierarchy | $(hostname) | $(date) ==="
+VARIANT_ARG=""
+if [ -n "$1" ]; then
+    VARIANT_ARG="--variant $1"
+fi
+
+echo "=== F1 per-class HYDRA hierarchy ${1:-toutes variantes} | $(hostname) | $(date) ==="
 echo "GPUs : $(python -c 'import torch; print(torch.cuda.device_count())')"
 
 python scripts/generate_f1_per_class.py \
@@ -34,6 +41,7 @@ python scripts/generate_f1_per_class.py \
     --model-dir models_hierarchy \
     --results-tag hierarchy \
     --check-hierarchy \
-    --batch-size 512
+    --batch-size 512 \
+    $VARIANT_ARG
 
 echo "=== Terminé : $(date) ==="
