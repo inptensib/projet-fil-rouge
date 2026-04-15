@@ -1,0 +1,53 @@
+# ==============================================================================
+# HLPD — Configuration pour 2× RTX 3090 (partition 3090, node40)
+# ==============================================================================
+# 10 epochs sur le dataset complet (5.57M train / 1.19M val / 1.19M test).
+# bfloat16 : stable pour ZLPR (-1e12 représentable), pas de GradScaler.
+# gradient_checkpointing : recompute les activations du décodeur → -5 GB VRAM.
+#
+# VRAM estimée (à vérifier via smoke test V3) :
+#   Attention scores (B/2=16, nhead=4, L=6283) ≈ 5 GB/layer
+#   Modèle total (CamemBERT bf16 + décodeur) ≈ 400 MB
+#   Cible : < 22 GB/GPU avec batch_size=32
+
+# --- Encoder ---
+encoder: camembert-base
+max_length: 128            # Paper HLPD utilise 128 (256 dépasse le budget VRAM)
+freeze_encoder: false
+
+# --- Decoder ---
+num_decoder_layers: 2
+nhead: 4
+ffn_dim: 2048
+decoder_dropout: 0.1
+gradient_checkpointing: true
+
+# --- Training ---
+batch_size: 8              # 4/GPU — réduit après OOM (16/GPU → 10 GB d'attn scores).
+epochs: 10
+lr: 1.0e-4
+weight_decay: 0.01
+warmup_ratio: 0.05
+max_grad_norm: 1.0
+gradient_accumulation_steps: 8    # effective_bs = 64 (inchangé)
+
+# --- Early stopping ---
+early_stopping_patience: 3
+early_stopping_min_delta: 0.001
+
+# --- Intra-epoch checkpointing ---
+checkpoint_every_n_steps: 5000    # Sauvegarde mid-epoch pour SLURM resume
+
+# --- Data ---
+num_workers: 4
+pin_memory: true
+
+# --- Save ---
+save_dir: models/hlpd
+experiment_name: HLPD_CamemBERT
+
+# --- Reproducibility ---
+seed: 42
+
+# --- Hardware ---
+precision: bfloat16        # Stable pour ZLPR, natif RTX 3090 (Ampere)

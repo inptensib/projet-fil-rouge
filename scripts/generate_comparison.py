@@ -377,6 +377,71 @@ def discover_baseline_models() -> list[dict]:
     return models
 
 
+FLAT_HYDRA_RESULTS_DIR = RESULTS_DIR / "flat_hydra"
+FLAT_HYDRA_MODELS_DIR = PROJECT_ROOT / "models" / "flat_hydra"
+
+
+def discover_flat_hydra_model() -> list[dict]:
+    """Découvre le modèle FlatHydra depuis results/flat_hydra/ et models/flat_hydra/."""
+    test_metrics_path = FLAT_HYDRA_RESULTS_DIR / "test_metrics.json"
+    if not test_metrics_path.exists():
+        return []
+
+    test_m = json.loads(test_metrics_path.read_text())
+
+    # Historique d'entraînement (models/flat_hydra/metrics.json)
+    history: dict | None = None
+    val_metrics: dict = {}
+    history_path = FLAT_HYDRA_MODELS_DIR / "metrics.json"
+    if history_path.exists():
+        h = json.loads(history_path.read_text())
+        epochs = h.get("epoch", [])
+        history = {}
+        for key in ("train_loss", "val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
+            if key in h:
+                history[key] = {"epochs": epochs, "values": h[key]}
+        for mk in ("val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
+            if mk in h and h[mk]:
+                val_metrics[mk] = h[mk][-1]
+
+    # Paramètres de config
+    params: dict = {}
+    config_path = FLAT_HYDRA_MODELS_DIR / "config.json"
+    if config_path.exists():
+        cfg = json.loads(config_path.read_text())
+        skip = {"save_dir", "experiment_name", "num_workers", "seed", "num_classes_l1", "num_classes_l2"}
+        params = {k: str(v) for k, v in cfg.items() if k not in skip}
+
+    # Images
+    images = {}
+    for fname in IMAGE_FILES:
+        key = fname.replace(".png", "")
+        encoded = encode_image(FLAT_HYDRA_RESULTS_DIR / fname)
+        if encoded:
+            images[key] = encoded
+
+    return [{
+        "id": "flat-hydra-camembert",
+        "name": "FlatHydra",
+        "family": "baseline",
+        "subtitle": "CamemBERT — classification plate (1 tête, CrossEntropy)",
+        "status": "finished",
+        "color": "#f39c12",
+        "metrics": {
+            "test_f1_l1_macro": test_m.get("f1_l1_macro"),
+            "test_f1_l2_macro": test_m.get("f1_l2_macro"),
+            "test_hcr": test_m.get("hcr"),
+            "test_constrained_f1_macro": test_m.get("constrained_f1_macro"),
+        },
+        "val_metrics": val_metrics,
+        "training": {"params": params},
+        "history": history,
+        "f1_per_class_l1": None,
+        "f1_per_class_l2": None,
+        "images": images,
+    }]
+
+
 def render_html(models_data: dict) -> str:
     data_json = json.dumps(models_data, ensure_ascii=False, indent=2)
     return HTML_TEMPLATE.replace("/* __MODELS_DATA__ */", data_json)
@@ -935,6 +1000,10 @@ def main():
     baseline_models = discover_baseline_models()
     print(f"  → {len(baseline_models)} baseline(s)")
 
+    print("Découverte de FlatHydra...")
+    flat_hydra_models = discover_flat_hydra_model()
+    print(f"  → {len(flat_hydra_models)} modèle(s) FlatHydra")
+
     models_data = {
         "meta": {
             "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -942,7 +1011,7 @@ def main():
             "num_classes_l1": 157,
             "num_classes_l2": 6126,
         },
-        "models": hydra_models + hydra_hier_models + baseline_models,
+        "models": hydra_models + hydra_hier_models + flat_hydra_models + baseline_models,
     }
 
     print("Génération du HTML...")

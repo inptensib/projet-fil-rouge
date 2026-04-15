@@ -181,7 +181,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-14 09:14",
+    "generated": "2026-04-15 15:45",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -38759,6 +38759,156 @@ const MODELS_DATA = {
         "Élément de charpente": 1.0,
         "Éteignoirs pour bougies": 1.0
       },
+      "images": {}
+    },
+    {
+      "id": "flat-hydra-camembert",
+      "name": "FlatHydra",
+      "family": "baseline",
+      "subtitle": "CamemBERT — classification plate (1 tête, CrossEntropy)",
+      "status": "finished",
+      "color": "#f39c12",
+      "metrics": {
+        "test_f1_l1_macro": 0.9324052487594717,
+        "test_f1_l2_macro": 0.7169766402942921,
+        "test_hcr": 0.854868948339298,
+        "test_constrained_f1_macro": 0.7219343545542359
+      },
+      "val_metrics": {
+        "val_f1_l1_macro": 0.9297973829983089,
+        "val_f1_l2_macro": 0.7136724102342299,
+        "val_hcr": 0.8554467759930564
+      },
+      "training": {
+        "params": {
+          "encoder": "camembert-base",
+          "max_length": "256",
+          "project_embedding": "True",
+          "pooling": "cls",
+          "dropout": "0.2",
+          "batch_size": "256",
+          "epochs": "10",
+          "lr": "3.5e-05",
+          "weight_decay": "0.01",
+          "warmup_ratio": "0.1",
+          "max_grad_norm": "1.0",
+          "use_focal": "False",
+          "focal_gamma": "2.0",
+          "level_weight_l1": "0.5",
+          "early_stopping_patience": "2",
+          "early_stopping_min_delta": "0.001",
+          "fp16": "True",
+          "freeze_encoder": "False"
+        }
+      },
+      "history": {
+        "train_loss": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            3.521370129650532,
+            0.9711393278085986,
+            0.7287044804444016,
+            0.6022554198261155,
+            0.5145823213742505,
+            0.44592519822846477,
+            0.3902002009873703,
+            0.34406034033673666,
+            0.3069793739293305,
+            0.27878122809667283
+          ]
+        },
+        "val_f1_l1_macro": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.86909909318024,
+            0.9008588306934382,
+            0.9133708661719879,
+            0.9193233432332139,
+            0.9224868829918466,
+            0.9251391431886264,
+            0.9272483200350086,
+            0.9277983232185119,
+            0.929477049186119,
+            0.9297973829983089
+          ]
+        },
+        "val_f1_l2_macro": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.4753116967639696,
+            0.5977097666112935,
+            0.6390882488674693,
+            0.6656422283856211,
+            0.6812212220152503,
+            0.6937575195470397,
+            0.7029740505183876,
+            0.7076864649601763,
+            0.7122937617318381,
+            0.7136724102342299
+          ]
+        },
+        "val_hcr": {
+          "epochs": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10
+          ],
+          "values": [
+            0.8321603051965607,
+            0.8428058598677068,
+            0.8480888806306816,
+            0.8492439136872254,
+            0.8515330552884193,
+            0.8529165840148447,
+            0.8538121531239041,
+            0.8545093578602092,
+            0.8550517212084994,
+            0.8554467759930564
+          ]
+        }
+      },
+      "f1_per_class_l1": null,
+      "f1_per_class_l2": null,
       "images": {}
     },
     {
