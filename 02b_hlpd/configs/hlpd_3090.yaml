@@ -3,33 +3,37 @@
 # ==============================================================================
 # 10 epochs sur le dataset complet (5.57M train / 1.19M val / 1.19M test).
 # bfloat16 : stable pour ZLPR (-1e12 représentable), pas de GradScaler.
-# gradient_checkpointing : recompute les activations du décodeur → -5 GB VRAM.
 #
-# VRAM estimée (à vérifier via smoke test V3) :
-#   Attention scores (B/2=16, nhead=4, L=6283) ≈ 5 GB/layer
-#   Modèle total (CamemBERT bf16 + décodeur) ≈ 400 MB
-#   Cible : < 22 GB/GPU avec batch_size=32
+# Architecture allégée (v2) après benchmark de vitesse :
+#   v1 (layers=2, nhead=4, grad_ckpt=True, bs=8) : 213h/epoch → infaisable
+#   v2 (layers=1, nhead=2, grad_ckpt=False, bs=16) : ~13h/epoch → 130h pour 10 epochs
+#
+# VRAM estimée v2 (8/GPU, nhead=2, 1 layer, bf16) :
+#   Attention scores (8, 2, 6283²) ≈ 1.3 GB/layer
+#   Modèle total (CamemBERT bf16 + décodeur) ≈ 450 MB
+#   Gradients + optimizer ≈ 1.3 GB
+#   Cible : < 5 GB/GPU — large marge sur 24 GB
 
 # --- Encoder ---
 encoder: camembert-base
-max_length: 128            # Paper HLPD utilise 128 (256 dépasse le budget VRAM)
+max_length: 128            # Paper HLPD utilise 128
 freeze_encoder: false
 
 # --- Decoder ---
-num_decoder_layers: 2
-nhead: 4
+num_decoder_layers: 1      # Réduit de 2→1 pour vitesse (×2 sur le décodeur)
+nhead: 2                   # Réduit de 4→2 (×2 sur l'attention O(L²))
 ffn_dim: 2048
 decoder_dropout: 0.1
-gradient_checkpointing: true
+gradient_checkpointing: false   # Désactivé : VRAM large, grad_ckpt = +40% lenteur
 
 # --- Training ---
-batch_size: 8              # 4/GPU — réduit après OOM (16/GPU → 10 GB d'attn scores).
+batch_size: 16             # 8/GPU — budget VRAM confortable avec arch allégée
 epochs: 10
 lr: 1.0e-4
 weight_decay: 0.01
 warmup_ratio: 0.05
 max_grad_norm: 1.0
-gradient_accumulation_steps: 8    # effective_bs = 64 (inchangé)
+gradient_accumulation_steps: 4    # effective_bs = 64 (inchangé)
 
 # --- Early stopping ---
 early_stopping_patience: 3
