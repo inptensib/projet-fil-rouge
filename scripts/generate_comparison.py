@@ -707,7 +707,15 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     </div>
 </div>
 
-<section id="recap"><h2>Tableau récapitulatif</h2><div class="table-container"><table id="recap-table"></table></div></section>
+<section id="recap">
+    <h2>Tableau récapitulatif</h2>
+    <h3 style="color:#5dade2;border-left:4px solid #5dade2;padding-left:10px">Title-only (<code>designation</code> seule)</h3>
+    <p style="color:#6c757d;font-size:0.9em">Modèles entraînés sur le titre du produit uniquement (benchmark sans description).</p>
+    <div class="table-container"><table id="recap-table-title-only"></table></div>
+    <h3 style="color:#3498db;border-left:4px solid #3498db;padding-left:10px;margin-top:30px">Title + Description (<code>designation + description</code>)</h3>
+    <p style="color:#6c757d;font-size:0.9em">Modèles entraînés sur la concaténation titre + description (régime principal).</p>
+    <div class="table-container"><table id="recap-table-full-text"></table></div>
+</section>
 <section id="charts">
     <h2>Graphiques comparatifs</h2>
     <div class="chart-row">
@@ -751,7 +759,13 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     <div class="table-container"><table id="per-class-l2-table"></table></div>
 </section>
 <section id="details"><h2>Détail par modèle</h2><div id="accordions"></div></section>
-<section id="config"><h2>Hyperparamètres</h2><div class="table-container"><table id="config-table"></table></div></section>
+<section id="config">
+    <h2>Hyperparamètres</h2>
+    <h3 style="color:#5dade2;border-left:4px solid #5dade2;padding-left:10px">Title-only</h3>
+    <div class="table-container"><table id="config-table-title-only"></table></div>
+    <h3 style="color:#3498db;border-left:4px solid #3498db;padding-left:10px;margin-top:30px">Title + Description</h3>
+    <div class="table-container"><table id="config-table-full-text"></table></div>
+</section>
 
 <script>
 const MODELS_DATA = /* __MODELS_DATA__ */;
@@ -767,8 +781,13 @@ const badgeHtml = (status) => {
 const finished = MODELS_DATA.models.filter(m => m.status !== 'planned');
 
 // --- 1. Recap Table ---
-function renderRecapTable() {
-    const t = document.getElementById('recap-table');
+function renderRecapTable(modelList, tableId) {
+    const t = document.getElementById(tableId);
+    if (!t) return;
+    if (modelList.length === 0) {
+        t.innerHTML = '<tbody><tr><td style="text-align:center;padding:20px;color:#6c757d">Aucun modèle dans cette catégorie.</td></tr></tbody>';
+        return;
+    }
     const metrics = [
         {key: 'test_f1_l1_macro', label: 'Test F1 L1 macro', main: false},
         {key: 'test_f1_l2_macro', label: 'Test F1 L2 macro', main: true},
@@ -776,20 +795,17 @@ function renderRecapTable() {
         {key: 'val_f1_l1_macro', label: 'Val F1 L1 macro', main: false, src: 'val_metrics'},
         {key: 'val_f1_l2_macro', label: 'Val F1 L2 macro', main: false, src: 'val_metrics'},
     ];
-    // Header
     let html = '<thead><tr><th></th>';
-    for (const m of finished) {
+    for (const m of modelList) {
         html += `<th style="text-align:center;min-width:120px">
             <span style="color:${m.color}">●</span> ${m.name}<br>${badgeHtml(m.status)}</th>`;
     }
     html += '</tr></thead><tbody>';
-    // Famille
     html += '<tr><td style="font-weight:600">Famille</td>';
-    for (const m of finished) html += `<td style="text-align:center">${m.family.startsWith('hydra') ? 'HYDRA' : 'Baseline'}</td>`;
+    for (const m of modelList) html += `<td style="text-align:center">${m.family.startsWith('hydra') ? 'HYDRA' : 'Baseline'}</td>`;
     html += '</tr>';
-    // Metrics rows
     for (const mdef of metrics) {
-        const vals = finished.map(m => {
+        const vals = modelList.map(m => {
             const src = mdef.src === 'val_metrics' ? m.val_metrics : m.metrics;
             return src ? src[mdef.key] : null;
         });
@@ -798,7 +814,7 @@ function renderRecapTable() {
         const worst = validVals.length > 1 ? Math.min(...validVals) : null;
 
         html += `<tr><td style="font-weight:600">${mdef.label}</td>`;
-        for (let i = 0; i < finished.length; i++) {
+        for (let i = 0; i < modelList.length; i++) {
             const v = vals[i];
             let cls = mdef.main ? 'metric-main' : '';
             if (v != null && v === best && validVals.length > 1) cls += ' best-cell';
@@ -999,10 +1015,9 @@ function renderPerClassL2Comparison() {
 }
 
 // --- 4. Accordions ---
-function renderAccordions() {
-    const container = document.getElementById('accordions');
+function renderAccordionBlock(modelList) {
     let html = '';
-    for (const m of finished) {
+    for (const m of modelList) {
         const metricsLine = [
             m.metrics?.test_f1_l1_macro != null ? `F1 L1: ${fmt(m.metrics.test_f1_l1_macro)}` : null,
             m.metrics?.test_f1_l2_macro != null ? `F1 L2: ${fmt(m.metrics.test_f1_l2_macro)}` : null,
@@ -1032,7 +1047,6 @@ function renderAccordions() {
                 </div>`;
             }
             html += '</div>';
-            // Link to individual report
             const reportPath = `hydra-${m.id.replace('hydra-','').replace('-camembert','')}-camembert/${m.id}.html`;
             html += `<p style="margin-top:12px"><a href="${reportPath}">Voir le rapport individuel →</a></p>`;
         } else {
@@ -1044,29 +1058,49 @@ function renderAccordions() {
         }
         html += '</div></details>';
     }
+    return html;
+}
+
+function renderAccordions() {
+    const container = document.getElementById('accordions');
+    const titleOnly = finished.filter(m => m.family.endsWith('-title'));
+    const fullText  = finished.filter(m => !m.family.endsWith('-title'));
+    let html = '';
+    if (titleOnly.length > 0) {
+        html += '<h3 style="color:#5dade2;border-left:4px solid #5dade2;padding-left:10px">Title-only</h3>';
+        html += renderAccordionBlock(titleOnly);
+    }
+    if (fullText.length > 0) {
+        html += '<h3 style="color:#3498db;border-left:4px solid #3498db;padding-left:10px;margin-top:24px">Title + Description</h3>';
+        html += renderAccordionBlock(fullText);
+    }
     container.innerHTML = html;
 }
 
 // --- 5. Config Table ---
-function renderConfigTable() {
-    if (finished.length === 0) return;
-    const allKeys = [...new Set(finished.flatMap(m => Object.keys(m.training.params || {})))];
+function renderConfigTable(modelList, tableId, allKeysGlobal) {
+    const tbl = document.getElementById(tableId);
+    if (!tbl) return;
+    if (modelList.length === 0) {
+        tbl.innerHTML = '<tbody><tr><td style="text-align:center;padding:20px;color:#6c757d">Aucun modèle dans cette catégorie.</td></tr></tbody>';
+        return;
+    }
     const important = ['variant','encoder','epochs','lr','batch_size','max_length','dropout','hidden_dim','level_weight_l1','warmup_ratio','weight_decay','fp16'];
-    const sorted = important.filter(k => allKeys.includes(k)).concat(allKeys.filter(k => !important.includes(k)));
+    const sorted = important.filter(k => allKeysGlobal.includes(k)).concat(allKeysGlobal.filter(k => !important.includes(k)));
 
     let html = '<thead><tr><th>Paramètre</th>';
-    for (const m of finished) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
+    for (const m of modelList) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
     html += '</tr></thead><tbody>';
     html += '<tr><td style="font-weight:600">Famille</td>';
-    for (const m of finished) html += `<td style="text-align:center">${m.family.startsWith('hydra') ? 'HYDRA' : 'Baseline'}</td>`;
+    for (const m of modelList) html += `<td style="text-align:center">${m.family.startsWith('hydra') ? 'HYDRA' : 'Baseline'}</td>`;
     html += '</tr>';
     for (const key of sorted) {
         html += `<tr><td style="font-weight:600">${key}</td>`;
-        for (const m of finished) html += `<td style="text-align:center">${m.training.params?.[key] ?? '--'}</td>`;
+        for (const m of modelList) html += `<td style="text-align:center">${m.training.params?.[key] ?? '--'}</td>`;
         html += '</tr>';
     }
     html += '</tbody>';
-    document.getElementById('config-table').innerHTML = html;
+    tbl.innerHTML = html;
 }
 
 // --- Overlay Zoom (verbatim from individual reports) ---
@@ -1102,12 +1136,17 @@ overlay.addEventListener('click', e => { if (e.target === overlay) closeOverlay(
 
 // --- Init ---
 document.getElementById('gen-date').textContent = MODELS_DATA.meta.generated;
-renderRecapTable();
+const titleOnlyModels = finished.filter(m => m.family.endsWith('-title'));
+const fullTextModels  = finished.filter(m => !m.family.endsWith('-title'));
+renderRecapTable(titleOnlyModels, 'recap-table-title-only');
+renderRecapTable(fullTextModels,  'recap-table-full-text');
 renderCharts();
 renderPerClassComparison();
 renderPerClassL2Comparison();
 renderAccordions();
-renderConfigTable();
+const allConfigKeys = [...new Set(finished.flatMap(m => Object.keys(m.training.params || {})))];
+renderConfigTable(titleOnlyModels, 'config-table-title-only', allConfigKeys);
+renderConfigTable(fullTextModels,  'config-table-full-text',  allConfigKeys);
 </script>
 </body>
 </html>"""
