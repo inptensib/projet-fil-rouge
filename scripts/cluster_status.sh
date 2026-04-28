@@ -2,7 +2,7 @@
 # Affiche l'état des ressources du cluster : GPUs, CPUs, RAM par nœud.
 # Trié du plus disponible au moins disponible (GPU libres desc, puis CPU libres desc).
 
-PARTS=$(sinfo -a -h -o "%P" | tr -d '*' | sort -u | tr '\n' ',' | sed 's/,$//')
+PARTS=$(sinfo -h -o "%P" | tr -d '*' | sort -u | tr '\n' ',' | sed 's/,$//')
 
 sinfo -N -h -p "$PARTS" --Format="NodeList:15,Partition:12,StateLong:12,Gres:30,GresUsed:30,CPUsState:16,Memory:10,FreeMem:10" | python3 -c "
 import sys, re
