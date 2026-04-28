@@ -2,7 +2,7 @@
   {
     "embedding": "fasttext",
     "classifier": "Supervised",
-    "subtitle": "FastText Supervised — L1: softmax (25 epochs), L2: OVA (10 epochs)",
+    "subtitle": "FastText Supervised — L1: softmax (25 epochs), L2: OVA (10 epochs) — designation + description",
     "status": "finished",
     "metrics": {
       "test_f1_l1_macro": 0.8260,
@@ -24,7 +24,7 @@
   {
     "embedding": "fasttext-softmax",
     "classifier": "Softmax",
-    "subtitle": "FastText — L1: softmax (25 epochs), L2: softmax (10 epochs)",
+    "subtitle": "FastText — L1: softmax (25 epochs), L2: softmax (10 epochs) — designation + description",
     "status": "finished",
     "metrics": {
       "test_f1_l1_macro": 0.8261,
