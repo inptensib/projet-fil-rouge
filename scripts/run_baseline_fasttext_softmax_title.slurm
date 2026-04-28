@@ -56,6 +56,8 @@ data = prepare_hierarchical_data_from_splits(
 )
 print(f"[Data] Chargé en {time.time()-t0:.0f}s — train: {len(data['X_train']):,}, test: {len(data['X_test']):,}")
 
+import unicodedata
+
 def write_fasttext_file(texts, labels, encoder, filepath):
     label_names = encoder.inverse_transform(labels)
     with open(filepath, "w", encoding="utf-8") as f:
@@ -64,17 +66,39 @@ def write_fasttext_file(texts, labels, encoder, filepath):
             clean_text  = str(text).replace("\n", " ").strip()
             f.write(f"__label__{clean_label} {clean_text}\n")
 
+def fasttext_predict_batch(model, texts, encoder, label=""):
+    """Prédit en batch et retourne des indices encodés.
+    Gère les espaces→underscores et la normalisation Unicode NFC.
+    """
+    class_to_idx_nfc = {
+        unicodedata.normalize("NFC", c): i
+        for i, c in enumerate(encoder.classes_)
+    }
+    ft_to_idx = {}
+    unmapped = []
+    for ft_label in model.labels:
+        name = unicodedata.normalize("NFC",
+                   ft_label.replace("__label__", "").replace("_", " "))
+        if name in class_to_idx_nfc:
+            ft_to_idx[ft_label] = class_to_idx_nfc[name]
+        else:
+            unmapped.append(ft_label)
+            ft_to_idx[ft_label] = 0
+    if unmapped:
+        print(f"  ⚠ [{label}] {len(unmapped)} labels non mappés (fallback 0) : {unmapped[:3]}")
+    else:
+        print(f"  ✓ [{label}] Tous les {len(ft_to_idx)} labels mappés")
+    cleaned = [str(t).replace("\n", " ").strip() for t in texts]
+    labels_batch, _ = model.predict(cleaned)
+    return np.array([ft_to_idx.get(lbs[0], 0) for lbs in labels_batch])
+
 tmpdir = tempfile.mkdtemp()
 train_l1_path = os.path.join(tmpdir, "train_l1.txt")
-test_l1_path  = os.path.join(tmpdir, "test_l1.txt")
 train_l2_path = os.path.join(tmpdir, "train_l2.txt")
-test_l2_path  = os.path.join(tmpdir, "test_l2.txt")
 
 print("[FastText] Écriture des fichiers d'entraînement...")
 write_fasttext_file(data["X_train"], data["y_l1_train"], data["l1_encoder"], train_l1_path)
-write_fasttext_file(data["X_test"],  data["y_l1_test"],  data["l1_encoder"], test_l1_path)
 write_fasttext_file(data["X_train"], data["y_l2_train"], data["l2_encoder"], train_l2_path)
-write_fasttext_file(data["X_test"],  data["y_l2_test"],  data["l2_encoder"], test_l2_path)
 
 # --- L1 ---
 _l1_path = SAVE_DIR / "model_l1.bin"
@@ -94,8 +118,8 @@ else:
     model_l1.save_model(str(_l1_path))
     print(f"[L1] Entraîné en {train_time_l1:.0f}s")
 
-preds_l1_test = [model_l1.predict(t)[0][0].replace("__label__", "") for t in data["X_test"]]
-preds_l1_test = data["l1_encoder"].transform(preds_l1_test)
+print("[L1] Prédiction sur le test set...")
+preds_l1_test = fasttext_predict_batch(model_l1, data["X_test"], data["l1_encoder"], label="L1")
 
 # --- L2 ---
 _l2_path = SAVE_DIR / "model_l2.bin"
@@ -116,8 +140,8 @@ else:
     model_l2.save_model(str(_l2_path))
     print(f"[L2] Entraîné en {train_time_l2:.0f}s")
 
-preds_l2_test = [model_l2.predict(t)[0][0].replace("__label__", "") for t in data["X_test"]]
-preds_l2_test = data["l2_encoder"].transform(preds_l2_test)
+print("[L2] Prédiction sur le test set...")
+preds_l2_test = fasttext_predict_batch(model_l2, data["X_test"], data["l2_encoder"], label="L2")
 
 # --- Métriques ---
 all_metrics = compute_all_metrics(
