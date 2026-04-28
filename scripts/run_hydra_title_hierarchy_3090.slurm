@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=hydra-title-hier
-#SBATCH --partition=3090,P100
+#SBATCH --partition=3090
 #SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=10
 #SBATCH --mem=35G
@@ -9,7 +9,7 @@
 #SBATCH --error=slurm-hydra-title-hier-%x-%A_%a.err
 
 # HYDRA Title-only + Hierarchy — 10 tâches chaînées, resume auto.
-# Partition 3090 par défaut, fallback P100.
+# Partition 3090 uniquement (batch_size=640 → OOM sur P100 16GB).
 #
 # Usage (une soumission par variante) :
 #   sbatch --job-name=hydra-title-hier-local  --array=0-9%1 scripts/run_hydra_title_hierarchy_3090.slurm local
