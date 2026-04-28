@@ -361,34 +361,54 @@ def _load_baseline_per_class(embedding: str, level: str) -> dict | None:
     return None
 
 
-def discover_baseline_models() -> list[dict]:
-    json_path = RESULTS_DIR / "baselines" / "baseline_results.json"
+def _discover_baseline_models_from_file(json_path: Path, family: str) -> list[dict]:
     if not json_path.exists():
         return []
     data = json.loads(json_path.read_text())
     models = []
-    colors = {"tfidf": "#e67e22", "word2vec": "#e74c3c", "fasttext": "#1abc9c", "fasttext-softmax": "#148f77"}
+    colors = {
+        "tfidf": "#e67e22", "word2vec": "#e74c3c",
+        "fasttext": "#1abc9c", "fasttext-softmax": "#148f77",
+        "tfidf-title": "#d4820a", "word2vec-title": "#c0392b",
+        "fasttext-softmax-title": "#0e6655",
+    }
+    name_map = {
+        "tfidf": "TF-IDF", "word2vec": "Word2Vec",
+        "fasttext": "FastText", "fasttext-softmax": "FastText Softmax",
+        "tfidf-title": "TF-IDF (Title-only)", "word2vec-title": "Word2Vec (Title-only)",
+        "fasttext-softmax-title": "FastText Softmax (Title-only)",
+    }
     for entry in data:
         emb = entry["embedding"]
         clf = entry["classifier"]
         models.append({
             "id": f"{emb}-{clf.lower().replace('/', '-').replace(' ', '')}",
-            "name": f"{emb.upper()} + {clf}" if emb != "fasttext" else "FastText",
-            "family": "baseline",
+            "name": name_map.get(emb, f"{emb.upper()} + {clf}"),
+            "family": family,
             "subtitle": entry.get("subtitle", f"{emb} + {clf}"),
             "status": entry.get("status", "finished"),
             "color": colors.get(emb, "#95a5a6"),
             "metrics": entry.get("metrics", {}),
             "val_metrics": entry.get("val_metrics", {}),
-            "training": {
-                "params": entry.get("params", {}),
-            },
+            "training": {"params": entry.get("params", {})},
             "history": None,
             "f1_per_class_l1": _load_baseline_per_class(emb, "l1") or entry.get("f1_per_class_l1"),
             "f1_per_class_l2": _load_baseline_per_class(emb, "l2") or entry.get("f1_per_class_l2"),
             "images": {},
         })
     return models
+
+
+def discover_baseline_models() -> list[dict]:
+    return _discover_baseline_models_from_file(
+        RESULTS_DIR / "baselines" / "baseline_results.json", "baseline"
+    )
+
+
+def discover_baseline_title_models() -> list[dict]:
+    return _discover_baseline_models_from_file(
+        RESULTS_DIR / "baselines" / "baseline_results_title.json", "baseline-title"
+    )
 
 
 FLAT_HYDRA_RESULTS_DIR = RESULTS_DIR / "flat_hydra"
@@ -1177,6 +1197,10 @@ def main():
     flat_hydra_title_models = discover_flat_hydra_title_model()
     print(f"  → {len(flat_hydra_title_models)} modèle(s) FlatHydra Title-only")
 
+    print("Découverte des baselines Title-only...")
+    baseline_title_models = discover_baseline_title_models()
+    print(f"  → {len(baseline_title_models)} baseline(s) Title-only")
+
     models_data = {
         "meta": {
             "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -1190,6 +1214,7 @@ def main():
             + flat_hydra_models
             + hydra_title_models
             + flat_hydra_title_models
+            + baseline_title_models
             + baseline_models
         ),
     }
