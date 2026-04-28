@@ -34,7 +34,8 @@ def _map_config(cfg: dict) -> dict:
     for key in ("variant", "batch_size", "epochs", "lr", "weight_decay",
                 "max_length", "seed", "condition_l2_on_l1", "check_hierarchy",
                 "save_dir", "use_focal", "focal_gamma",
-                "gradient_accumulation_steps", "warmup_ratio", "fp16"):
+                "gradient_accumulation_steps", "warmup_ratio", "fp16",
+                "experiment_suffix"):
         if key in cfg:
             kwargs[key] = cfg[key]
 
@@ -126,6 +127,7 @@ def main():
             test_path=str(test_path),
             n_samples=args.n_samples if args.n_samples != 10_000 else None,
             seed=seed,
+            use_description=cfg.get("use_description", True),
         )
     else:
         data_path = Path(args.data)
@@ -137,6 +139,7 @@ def main():
             file_path=str(data_path),
             n_samples=args.n_samples,
             seed=seed,
+            use_description=cfg.get("use_description", True),
         )
 
     trainer_kwargs = _map_config(cfg)

@@ -22,6 +22,28 @@
     }
   },
   {
+    "embedding": "fasttext-softmax",
+    "classifier": "Softmax",
+    "subtitle": "FastText — L1: softmax (25 epochs), L2: softmax (10 epochs)",
+    "status": "finished",
+    "metrics": {
+      "test_f1_l1_macro": 0.8261,
+      "test_f1_l2_macro": 0.4287,
+      "test_hcr": 0.6741,
+      "test_constrained_f1_macro": 0.4259
+    },
+    "params": {
+      "dim": 100,
+      "wordNgrams": 2,
+      "lr": 0.5,
+      "loss_l1": "softmax",
+      "epochs_l1": 25,
+      "loss_l2": "softmax",
+      "epochs_l2": 10,
+      "thread": 80
+    }
+  },
+  {
     "embedding": "tfidf",
     "classifier": "LinearSVC",
     "subtitle": "TF-IDF (50K features, 1-2grams) + LinearSVC / SGDClassifier",

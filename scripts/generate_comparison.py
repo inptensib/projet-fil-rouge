@@ -57,6 +57,20 @@ HIERARCHY_START_MS = 1775865600000
 
 VARIANT_TO_EXP_ID = {info["variant"]: eid for eid, info in HYDRA_EXPERIMENTS.items()}
 
+HYDRA_TITLE_VARIANTS = {
+    "local":  {"name": "HYDRA Local (Title-only)",  "color": "#5dade2"},
+    "nested": {"name": "HYDRA Nested (Title-only)", "color": "#58d68d"},
+    "global": {"name": "HYDRA Global (Title-only)", "color": "#bb8fce"},
+}
+
+HYDRA_TITLE_EXPERIMENT_NAMES = {
+    variant: f"HYDRA_{variant}_CamemBERT_title"
+    for variant in HYDRA_TITLE_VARIANTS
+}
+
+FLAT_HYDRA_TITLE_RESULTS_DIR = RESULTS_DIR / "flat_hydra_title"
+FLAT_HYDRA_TITLE_MODELS_DIR = PROJECT_ROOT / "models" / "flat_hydra_title"
+
 
 def _get_merged_history(
     conn: sqlite3.Connection,
@@ -353,7 +367,7 @@ def discover_baseline_models() -> list[dict]:
         return []
     data = json.loads(json_path.read_text())
     models = []
-    colors = {"tfidf": "#e67e22", "word2vec": "#e74c3c", "fasttext": "#1abc9c"}
+    colors = {"tfidf": "#e67e22", "word2vec": "#e74c3c", "fasttext": "#1abc9c", "fasttext-softmax": "#148f77"}
     for entry in data:
         emb = entry["embedding"]
         clf = entry["classifier"]
@@ -436,6 +450,118 @@ def discover_flat_hydra_model() -> list[dict]:
         "val_metrics": val_metrics,
         "training": {"params": params},
         "history": history,
+        "f1_per_class_l1": None,
+        "f1_per_class_l2": None,
+        "images": images,
+    }]
+
+
+def discover_hydra_title_models() -> list[dict]:
+    """Découvre les modèles HYDRA Title-only (designation seule) depuis MLflow."""
+    if not MLFLOW_DB.exists():
+        return []
+    conn = sqlite3.connect(str(MLFLOW_DB))
+    models = []
+
+    for variant, info in HYDRA_TITLE_VARIANTS.items():
+        exp_name = HYDRA_TITLE_EXPERIMENT_NAMES[variant]
+        row = conn.execute(
+            "SELECT experiment_id FROM experiments WHERE name=?", (exp_name,)
+        ).fetchone()
+        if row is None:
+            continue
+        exp_id = str(row[0])
+
+        best = conn.execute(
+            "SELECT run_uuid FROM runs "
+            "WHERE experiment_id=? AND status='FINISHED' "
+            "ORDER BY end_time DESC LIMIT 1",
+            (exp_id,),
+        ).fetchone()
+        if best is None:
+            continue
+        run_id = best[0]
+
+        m = dict(conn.execute(
+            "SELECT key, value FROM latest_metrics WHERE run_uuid=?", (run_id,),
+        ).fetchall())
+        p = dict(conn.execute(
+            "SELECT key, value FROM params WHERE run_uuid=?", (run_id,),
+        ).fetchall())
+        params_clean = {k: v for k, v in p.items() if k not in SKIP_PARAMS}
+
+        history = _get_merged_history(conn, exp_id)
+
+        models.append({
+            "id": f"hydra-{variant}-title-camembert",
+            "name": info["name"],
+            "family": "hydra-title",
+            "subtitle": f"CamemBERT — variante {variant} — Title-only (designation seule)",
+            "status": "finished",
+            "color": info["color"],
+            "metrics": {
+                "test_f1_l1_macro": m.get("test_f1_l1_macro"),
+                "test_f1_l2_macro": m.get("test_f1_l2_macro"),
+                "test_hcr": m.get("test_hcr"),
+            },
+            "val_metrics": {
+                "val_f1_l1_macro": m.get("val_f1_l1_macro"),
+                "val_f1_l2_macro": m.get("val_f1_l2_macro"),
+                "val_hcr": m.get("val_hcr"),
+            },
+            "training": {"params": params_clean},
+            "history": history if history else None,
+            "f1_per_class_l1": None,
+            "f1_per_class_l2": None,
+            "images": {},
+        })
+
+    conn.close()
+    return models
+
+
+def discover_flat_hydra_title_model() -> list[dict]:
+    """Découvre le modèle FlatHydra Title-only depuis models/flat_hydra_title/."""
+    history_path = FLAT_HYDRA_TITLE_MODELS_DIR / "metrics.json"
+    if not history_path.exists():
+        return []
+
+    h = json.loads(history_path.read_text())
+    epochs = h.get("epoch", [])
+    history: dict = {}
+    val_metrics: dict = {}
+    for key in ("train_loss", "val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
+        if key in h:
+            history[key] = {"epochs": epochs, "values": h[key]}
+    for mk in ("val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
+        if mk in h and h[mk]:
+            val_metrics[mk] = h[mk][-1]
+
+    params: dict = {}
+    config_path = FLAT_HYDRA_TITLE_MODELS_DIR / "config.json"
+    if config_path.exists():
+        cfg = json.loads(config_path.read_text())
+        skip = {"save_dir", "experiment_name", "num_workers", "seed", "num_classes_l1", "num_classes_l2"}
+        params = {k: str(v) for k, v in cfg.items() if k not in skip}
+
+    images = {}
+    for fname in IMAGE_FILES:
+        key = fname.replace(".png", "")
+        encoded = encode_image(FLAT_HYDRA_TITLE_RESULTS_DIR / fname)
+        if encoded:
+            images[key] = encoded
+
+    return [{
+        "id": "flat-hydra-title-camembert",
+        "name": "FlatHydra (Title-only)",
+        "family": "baseline-title",
+        "subtitle": "CamemBERT — classification plate (1 tête) — Title-only (designation seule)",
+        "status": "finished",
+        "color": "#f5b041",
+        "metrics": {},
+        "val_metrics": val_metrics,
+        "training": {"params": params},
+        "history": history if history else None,
         "f1_per_class_l1": None,
         "f1_per_class_l2": None,
         "images": images,
@@ -659,7 +785,7 @@ function renderRecapTable() {
     html += '</tr></thead><tbody>';
     // Famille
     html += '<tr><td style="font-weight:600">Famille</td>';
-    for (const m of finished) html += `<td style="text-align:center">${m.family === 'hydra' ? 'HYDRA' : 'Baseline'}</td>`;
+    for (const m of finished) html += `<td style="text-align:center">${m.family.startsWith('hydra') ? 'HYDRA' : 'Baseline'}</td>`;
     html += '</tr>';
     // Metrics rows
     for (const mdef of metrics) {
@@ -932,7 +1058,7 @@ function renderConfigTable() {
     for (const m of finished) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
     html += '</tr></thead><tbody>';
     html += '<tr><td style="font-weight:600">Famille</td>';
-    for (const m of finished) html += `<td style="text-align:center">${m.family === 'hydra' ? 'HYDRA' : 'Baseline'}</td>`;
+    for (const m of finished) html += `<td style="text-align:center">${m.family.startsWith('hydra') ? 'HYDRA' : 'Baseline'}</td>`;
     html += '</tr>';
     for (const key of sorted) {
         html += `<tr><td style="font-weight:600">${key}</td>`;
@@ -1004,6 +1130,14 @@ def main():
     flat_hydra_models = discover_flat_hydra_model()
     print(f"  → {len(flat_hydra_models)} modèle(s) FlatHydra")
 
+    print("Découverte des modèles HYDRA Title-only...")
+    hydra_title_models = discover_hydra_title_models()
+    print(f"  → {len(hydra_title_models)} variante(s) HYDRA Title-only")
+
+    print("Découverte de FlatHydra Title-only...")
+    flat_hydra_title_models = discover_flat_hydra_title_model()
+    print(f"  → {len(flat_hydra_title_models)} modèle(s) FlatHydra Title-only")
+
     models_data = {
         "meta": {
             "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -1011,7 +1145,14 @@ def main():
             "num_classes_l1": 157,
             "num_classes_l2": 6126,
         },
-        "models": hydra_models + hydra_hier_models + flat_hydra_models + baseline_models,
+        "models": (
+            hydra_models
+            + hydra_hier_models
+            + flat_hydra_models
+            + hydra_title_models
+            + flat_hydra_title_models
+            + baseline_models
+        ),
     }
 
     print("Génération du HTML...")

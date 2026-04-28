@@ -1,0 +1,65 @@
+# ==============================================================================
+# HYDRA -- Configuration Title-only (designation seule, sans description)
+# ==============================================================================
+# Identique à default.yaml sauf :
+#   - use_description: false  (désactive la concat description)
+#   - max_length: 128         (les designations tiennent en < 80 tokens)
+#   - save_dir: models_title  (dossier dédié, n'écrase pas models/)
+#   - experiment_suffix: _title (MLflow experiment isolé)
+
+# --- Encoder ---
+encoder: camembert-base
+max_length: 128
+freeze_encoder: false
+
+# --- Architecture ---
+variant: local            # local | global | nested
+num_levels: 2
+hidden_dim: 256
+dropout: 0.3
+pooling: cls              # cls | mean | max | last
+project_embedding: true
+
+# --- Training ---
+batch_size: 320
+epochs: 10
+lr: 7.8e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+scheduler: linear
+max_grad_norm: 1.0
+gradient_accumulation_steps: 1
+
+# --- Early stopping ---
+early_stopping_patience: 2
+early_stopping_min_delta: 0.001
+
+# --- Multi-task loss ---
+use_focal: false
+focal_gamma: 2.0
+level_weights:
+  - 0.5                  # L1 weight (L2 is implicitly 1.0)
+
+# --- Hierarchy ---
+check_hierarchy: false
+condition_l2_on_l1: false
+
+# --- Data ---
+use_description: false
+num_workers: 4
+pin_memory: true
+
+# --- Logging ---
+mlflow_tracking_uri: ../mlruns
+experiment_suffix: "_title"
+
+# --- Save ---
+save_dir: models_title
+
+# --- Reproducibility ---
+seed: 42
+deterministic: true
+
+# --- Hardware ---
+device: auto
+fp16: true

@@ -117,11 +117,13 @@ class HYDRATrainer:
         resume_from: str | None = None,
         checkpoint_every_n_steps: int = 10_000,
         condition_l2_on_l1: bool = False,
+        experiment_suffix: str = "",
     ):
         set_seed(seed)
         self.resume_from = resume_from
         self.checkpoint_every_n_steps = checkpoint_every_n_steps
         self.condition_l2_on_l1 = condition_l2_on_l1
+        self.experiment_suffix = experiment_suffix
         self.device = get_device()
         self.variant = variant
         self.encoder_name = encoder_name
@@ -255,7 +257,7 @@ class HYDRATrainer:
 
     def train(self) -> dict:
         """Run the full training loop."""
-        model_key = f"HYDRA_{self.variant}_{self.encoder_name}"
+        model_key = f"HYDRA_{self.variant}_{self.encoder_name}{self.experiment_suffix}"
         print(f"\n{'='*60}")
         print(f"Training {model_key}")
         print(f"{'='*60}")

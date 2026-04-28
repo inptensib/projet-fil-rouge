@@ -151,6 +151,7 @@ def main() -> None:
             test_path=str(split_dir / "test_split.jsonl"),
             n_samples=args.n_samples,
             seed=config.seed,
+            use_description=config.use_description,
         )
     else:
         data_path = Path(args.data)
@@ -163,6 +164,7 @@ def main() -> None:
             file_path=str(data_path),
             n_samples=n,
             seed=config.seed,
+            use_description=config.use_description,
         )
 
     print(

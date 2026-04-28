@@ -104,6 +104,7 @@ class FlatHydraConfig:
     save_dir: str = "models/flat_hydra"
     experiment_name: str = "flat_hydra"
     freeze_encoder: bool = False
+    use_description: bool = True
 
     def __post_init__(self) -> None:
         if self.lr <= 0:

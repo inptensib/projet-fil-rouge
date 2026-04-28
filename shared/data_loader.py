@@ -132,7 +132,7 @@ def load_jsonl_full(file_path: str):
     return df
 
 
-def _preprocess_df(df):
+def _preprocess_df(df, use_description: bool = True):
     """Extract hierarchical labels and text from a raw JSONL DataFrame.
 
     Supports both Polars and pandas DataFrames.
@@ -152,7 +152,11 @@ def _preprocess_df(df):
                 & ~pl.col("level_2_raw").str.to_lowercase().is_in(invalid_l2)
             )
             .with_columns(
-                (pl.col("designation") + ". " + pl.col("description")).alias("text"),
+                (
+                    (pl.col("designation") + ". " + pl.col("description"))
+                    if use_description
+                    else pl.col("designation")
+                ).alias("text"),
                 pl.col("level_2_raw").str.strip_chars().alias("level_2"),
             )
             .select("text", "level_1", "level_2")
@@ -165,7 +169,10 @@ def _preprocess_df(df):
         df["level_2"] = df["level_2_raw"]
         df["designation"] = df["designation"].fillna("")
         df["description"] = df["description"].fillna("")
-        df["text"] = df["designation"] + ". " + df["description"]
+        if use_description:
+            df["text"] = df["designation"] + ". " + df["description"]
+        else:
+            df["text"] = df["designation"]
         return df[["text", "level_1", "level_2"]]
 
 
@@ -175,6 +182,7 @@ def prepare_hierarchical_data(
     test_size: float = 0.2,
     val_ratio: float = 0.125,
     seed: int = 42,
+    use_description: bool = True,
 ) -> dict:
     """Load JSONL data and prepare hierarchical labels with train/val/test splits.
 
@@ -191,7 +199,7 @@ def prepare_hierarchical_data(
         l2_to_l1_mapping, num_classes_l1, num_classes_l2.
     """
     df = load_random_sample(file_path, n_samples=n_samples, seed=seed)
-    df = _preprocess_df(df)
+    df = _preprocess_df(df, use_description=use_description)
 
     print(f"[Data] Valid hierarchical samples: {len(df):,}")
 
@@ -298,6 +306,7 @@ def prepare_hierarchical_data_from_splits(
     test_path: str,
     n_samples: Optional[int] = None,
     seed: int = 42,
+    use_description: bool = True,
 ) -> dict:
     """Load pre-split JSONL files and prepare hierarchical labels.
 
@@ -321,15 +330,15 @@ def prepare_hierarchical_data_from_splits(
         n_train = int(n_samples * 0.70)
         n_val = int(n_samples * 0.15)
         n_test = n_samples - n_train - n_val
-        df_train = _preprocess_df(load_random_sample(train_path, n_train, seed))
-        df_val = _preprocess_df(load_random_sample(val_path, n_val, seed))
-        df_test = _preprocess_df(load_random_sample(test_path, n_test, seed))
+        df_train = _preprocess_df(load_random_sample(train_path, n_train, seed), use_description=use_description)
+        df_val = _preprocess_df(load_random_sample(val_path, n_val, seed), use_description=use_description)
+        df_test = _preprocess_df(load_random_sample(test_path, n_test, seed), use_description=use_description)
     else:
-        df_train = _preprocess_df(load_jsonl_full(train_path))
+        df_train = _preprocess_df(load_jsonl_full(train_path), use_description=use_description)
         gc.collect()
-        df_val = _preprocess_df(load_jsonl_full(val_path))
+        df_val = _preprocess_df(load_jsonl_full(val_path), use_description=use_description)
         gc.collect()
-        df_test = _preprocess_df(load_jsonl_full(test_path))
+        df_test = _preprocess_df(load_jsonl_full(test_path), use_description=use_description)
         gc.collect()
 
     print(
@@ -339,6 +348,7 @@ def prepare_hierarchical_data_from_splits(
 
     # Garantir que chaque classe L2 a au moins 1 échantillon dans chaque split
     df_train, df_val, df_test = _ensure_l2_coverage(df_train, df_val, df_test)
+    print(f"[Data] use_description={use_description}")
 
     is_polars = _HAS_POLARS and isinstance(df_train, pl.DataFrame)
 
