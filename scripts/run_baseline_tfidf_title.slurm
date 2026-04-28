@@ -1,9 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=tfidf-title
 #SBATCH --partition=CPU
-#SBATCH --cpus-per-task=26
+#SBATCH --cpus-per-task=10
 #SBATCH --mem=64G
-#SBATCH --time=0-06:00:00
+#SBATCH --time=1-12:00:00
 #SBATCH --output=slurm-tfidf-title-%j.out
 #SBATCH --error=slurm-tfidf-title-%j.err
 
@@ -15,7 +15,7 @@
 source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
 cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
 
-export N_JOBS=26
+export N_JOBS=10
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export MKL_NUM_THREADS=1
@@ -41,7 +41,7 @@ from sklearn.linear_model import SGDClassifier
 from shared.data_loader import prepare_hierarchical_data_from_splits
 from shared.metrics import compute_all_metrics, compute_per_class_f1
 
-N_JOBS      = int(os.environ.get("N_JOBS", 26))
+N_JOBS      = int(os.environ.get("N_JOBS", 10))
 SEED        = 42
 DATASET_DIR = Path("/home/infres/tandriam-25/fil_rouge/dataset")
 SAVE_DIR    = Path("models/baselines/tfidf-title")
