@@ -17,8 +17,11 @@ for line in sys.stdin:
     gpu_used = int(m.group(1)) if m else 0
     gpu_free = gpu_tot - gpu_used
     c = cpus.split('/')
-    cpu_idle, cpu_tot = int(c[1]), int(c[3])
-    entry = (gpu_free, cpu_idle, node, part, state, gpu_tot, cpu_tot, int(mem), int(freemem))
+    cpu_idle = int(c[1]) if c[1].isdigit() else 0
+    cpu_tot  = int(c[3]) if len(c) > 3 and c[3].isdigit() else 0
+    mem_i     = int(mem)     if mem.isdigit()     else 0
+    freemem_i = int(freemem) if freemem.isdigit() else 0
+    entry = (gpu_free, cpu_idle, node, part, state, gpu_tot, cpu_tot, mem_i, freemem_i)
     if node not in nodes or gpu_tot > nodes[node][5]:
         nodes[node] = entry
 
@@ -29,7 +32,7 @@ print('─' * 90)
 for gpu_free, cpu_idle, node, part, state, gpu_tot, cpu_tot, mem, freemem in rows:
     gpu_str = f'{gpu_free} lib / {gpu_tot} tot' if gpu_tot > 0 else '—'
     cpu_str = f'{cpu_idle} lib / {cpu_tot} tot'
-    ram  = f'{mem/1024:.1f} GB'
-    free = f'{freemem/1024:.1f} GB'
+    ram  = f'{mem/1024:.1f} GB'  if mem     else 'N/A'
+    free = f'{freemem/1024:.1f} GB' if freemem else 'N/A'
     print(f'{node:<15} {part:<12} {state:<12} {gpu_str:<16} {cpu_str:<16} {ram:<10} {free}')
 "
