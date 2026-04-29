@@ -57,9 +57,10 @@ def evaluate_variant(
     cfg_kwargs: dict,
     eval_batch_size: int = 1024,
     model_dir: str = "models",
+    model_suffix: str = "",
 ) -> dict:
     """Évalue une variante avec et sans conditioning hiérarchique."""
-    model_path = Path(_ROOT) / f"{model_dir}/HYDRA_{variant}_CamemBERT/best_model.pt"
+    model_path = Path(_ROOT) / f"{model_dir}/HYDRA_{variant}_CamemBERT{model_suffix}/best_model.pt"
     if not model_path.exists():
         print(f"  [SKIP] {model_path} introuvable")
         return {}
@@ -173,6 +174,18 @@ def main():
         "--model-dir", default="models",
         help="Répertoire racine des modèles (ex: 'models' ou 'models_hierarchy').",
     )
+    parser.add_argument(
+        "--model-suffix", default="",
+        help="Suffixe ajouté au nom du dossier modèle : HYDRA_{variant}_CamemBERT{suffix}",
+    )
+    parser.add_argument(
+        "--no-description", action="store_true",
+        help="Évaluer en mode title-only (use_description=False).",
+    )
+    parser.add_argument(
+        "--output-json", default=None,
+        help="Si fourni, sérialise les métriques (mode hier) dans ce fichier JSON.",
+    )
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -186,6 +199,7 @@ def main():
         val_path=str(split_dir / "val_split.jsonl"),
         test_path=str(split_dir / "test_split.jsonl"),
         seed=cfg.get("seed", 42),
+        use_description=not args.no_description,
     )
     print(f"  Test: {len(data['X_test']):,} samples, L1: {data['num_classes_l1']}, L2: {data['num_classes_l2']}")
 
@@ -200,11 +214,28 @@ def main():
             variant, data, cfg_kwargs,
             eval_batch_size=args.eval_batch_size,
             model_dir=args.model_dir,
+            model_suffix=args.model_suffix,
         )
         if result:
             all_results[variant] = result
 
     print_results(all_results)
+
+    if args.output_json and all_results:
+        import json
+        output = {}
+        for variant, r in all_results.items():
+            m = r.get("hier", {})
+            output[variant] = {
+                "f1_l1_macro": m.get("f1_l1_macro"),
+                "f1_l2_macro": m.get("f1_l2_macro"),
+                "hcr": m.get("hcr"),
+                "constrained_f1_macro": m.get("constrained_f1_macro"),
+                "eval_time_s": round(r.get("time_hier", 0), 1),
+            }
+        Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.output_json).write_text(json.dumps(output, indent=2, ensure_ascii=False))
+        print(f"\n[Saved] {args.output_json}")
 
 
 if __name__ == "__main__":

@@ -195,7 +195,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-28 19:09",
+    "generated": "2026-04-29 13:15",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -39367,13 +39367,181 @@ const MODELS_DATA = {
       "images": {}
     },
     {
+      "id": "hydra-local-title-hier-camembert",
+      "name": "HYDRA Local Hier. (Title)",
+      "family": "hydra-title",
+      "subtitle": "CamemBERT — variante local — Hierarchy + Title-only",
+      "status": "finished",
+      "color": "#1f618d",
+      "metrics": {
+        "test_f1_l1_macro": 0.8972122496347289,
+        "test_f1_l2_macro": 0.5894426911498162,
+        "test_hcr": 0.9974941328896314,
+        "test_constrained_f1_macro": 0.6079047012780139
+      },
+      "val_metrics": {
+        "val_f1_l2_macro": 0.5875
+      },
+      "training": {
+        "params": {
+          "encoder": "camembert-base",
+          "max_length": "128",
+          "freeze_encoder": "False",
+          "variant": "local",
+          "num_levels": "2",
+          "hidden_dim": "256",
+          "dropout": "0.3",
+          "pooling": "cls",
+          "project_embedding": "True",
+          "batch_size": "640",
+          "epochs": "10",
+          "lr": "0.000112",
+          "weight_decay": "0.01",
+          "warmup_ratio": "0.1",
+          "scheduler": "linear",
+          "max_grad_norm": "1.0",
+          "gradient_accumulation_steps": "1",
+          "early_stopping_patience": "2",
+          "early_stopping_min_delta": "0.001",
+          "use_focal": "True",
+          "focal_gamma": "2.0",
+          "level_weights": "[0.5]",
+          "check_hierarchy": "True",
+          "condition_l2_on_l1": "True",
+          "use_description": "False",
+          "pin_memory": "True",
+          "mlflow_tracking_uri": "../mlruns",
+          "deterministic": "True",
+          "device": "auto",
+          "fp16": "True"
+        }
+      },
+      "history": null,
+      "f1_per_class_l1": null,
+      "f1_per_class_l2": null,
+      "images": {}
+    },
+    {
+      "id": "hydra-nested-title-hier-camembert",
+      "name": "HYDRA Nested Hier. (Title)",
+      "family": "hydra-title",
+      "subtitle": "CamemBERT — variante nested — Hierarchy + Title-only",
+      "status": "planned",
+      "color": "#239b56",
+      "metrics": {
+        "test_f1_l1_macro": 0.8534287312864728,
+        "test_f1_l2_macro": 0.32864751903025047,
+        "test_hcr": 0.9976908191858694,
+        "test_constrained_f1_macro": 0.3435567047716265
+      },
+      "val_metrics": {},
+      "training": {
+        "params": {
+          "encoder": "camembert-base",
+          "max_length": "128",
+          "freeze_encoder": "False",
+          "variant": "nested",
+          "num_levels": "2",
+          "hidden_dim": "256",
+          "dropout": "0.3",
+          "pooling": "cls",
+          "project_embedding": "True",
+          "batch_size": "640",
+          "epochs": "10",
+          "lr": "0.000112",
+          "weight_decay": "0.01",
+          "warmup_ratio": "0.1",
+          "scheduler": "linear",
+          "max_grad_norm": "1.0",
+          "gradient_accumulation_steps": "1",
+          "early_stopping_patience": "2",
+          "early_stopping_min_delta": "0.001",
+          "use_focal": "True",
+          "focal_gamma": "2.0",
+          "level_weights": "[0.5]",
+          "check_hierarchy": "True",
+          "condition_l2_on_l1": "True",
+          "use_description": "False",
+          "pin_memory": "True",
+          "mlflow_tracking_uri": "../mlruns",
+          "deterministic": "True",
+          "device": "auto",
+          "fp16": "True"
+        }
+      },
+      "history": null,
+      "f1_per_class_l1": null,
+      "f1_per_class_l2": null,
+      "images": {}
+    },
+    {
+      "id": "hydra-global-title-hier-camembert",
+      "name": "HYDRA Global Hier. (Title)",
+      "family": "hydra-title",
+      "subtitle": "CamemBERT — variante global — Hierarchy + Title-only",
+      "status": "finished",
+      "color": "#7d3c98",
+      "metrics": {
+        "test_f1_l1_macro": 0.9163348560528437,
+        "test_f1_l2_macro": 0.604942655168722,
+        "test_hcr": 0.9974414042229803,
+        "test_constrained_f1_macro": 0.6215674579957968
+      },
+      "val_metrics": {
+        "val_f1_l2_macro": 0.6052
+      },
+      "training": {
+        "params": {
+          "encoder": "camembert-base",
+          "max_length": "128",
+          "freeze_encoder": "False",
+          "variant": "global",
+          "num_levels": "2",
+          "hidden_dim": "256",
+          "dropout": "0.3",
+          "pooling": "cls",
+          "project_embedding": "True",
+          "batch_size": "640",
+          "epochs": "10",
+          "lr": "0.000112",
+          "weight_decay": "0.01",
+          "warmup_ratio": "0.1",
+          "scheduler": "linear",
+          "max_grad_norm": "1.0",
+          "gradient_accumulation_steps": "1",
+          "early_stopping_patience": "2",
+          "early_stopping_min_delta": "0.001",
+          "use_focal": "True",
+          "focal_gamma": "2.0",
+          "level_weights": "[0.5]",
+          "check_hierarchy": "True",
+          "condition_l2_on_l1": "True",
+          "use_description": "False",
+          "pin_memory": "True",
+          "mlflow_tracking_uri": "../mlruns",
+          "deterministic": "True",
+          "device": "auto",
+          "fp16": "True"
+        }
+      },
+      "history": null,
+      "f1_per_class_l1": null,
+      "f1_per_class_l2": null,
+      "images": {}
+    },
+    {
       "id": "flat-hydra-title-camembert",
       "name": "FlatHydra (Title-only)",
       "family": "baseline-title",
       "subtitle": "CamemBERT — classification plate (1 tête) — Title-only (designation seule)",
       "status": "finished",
       "color": "#f5b041",
-      "metrics": {},
+      "metrics": {
+        "test_f1_l1_macro": 0.9212617754824167,
+        "test_f1_l2_macro": 0.695300607880913,
+        "test_hcr": 0.8500329763407309,
+        "test_constrained_f1_macro": 0.6999836737387805
+      },
       "val_metrics": {
         "val_f1_l1_macro": 0.9165484791962385,
         "val_f1_l2_macro": 0.6967039437762639,

@@ -68,6 +68,12 @@ HYDRA_TITLE_EXPERIMENT_NAMES = {
     for variant in HYDRA_TITLE_VARIANTS
 }
 
+HYDRA_TITLE_HIERARCHY_VARIANTS = {
+    "local":  {"name": "HYDRA Local Hier. (Title)",  "color": "#1f618d"},
+    "nested": {"name": "HYDRA Nested Hier. (Title)", "color": "#239b56"},
+    "global": {"name": "HYDRA Global Hier. (Title)", "color": "#7d3c98"},
+}
+
 FLAT_HYDRA_TITLE_RESULTS_DIR = RESULTS_DIR / "flat_hydra_title"
 FLAT_HYDRA_TITLE_MODELS_DIR = PROJECT_ROOT / "models" / "flat_hydra_title"
 
@@ -540,6 +546,79 @@ def discover_hydra_title_models() -> list[dict]:
     return models
 
 
+def discover_hydra_title_hierarchy_models() -> list[dict]:
+    """Découvre les modèles HYDRA Hierarchy Title-only depuis models_title_hierarchy/ et results/."""
+    import re
+    metrics_path = RESULTS_DIR / "hydra_eval_title_hierarchy_metrics.json"
+    test_metrics: dict = {}
+    if metrics_path.exists():
+        test_metrics = json.loads(metrics_path.read_text())
+
+    models_root = PROJECT_ROOT / "models_title_hierarchy"
+    models = []
+
+    for variant, info in HYDRA_TITLE_HIERARCHY_VARIANTS.items():
+        model_dir = models_root / f"HYDRA_{variant}_CamemBERT_title_hierarchy"
+        complete_txt = model_dir / "training_complete.txt"
+        ckpt_latest = model_dir / "checkpoint_latest.pt"
+
+        if not model_dir.exists():
+            continue
+
+        if complete_txt.exists():
+            status = "finished"
+        elif ckpt_latest.exists():
+            status = "running"
+        else:
+            status = "planned"
+
+        val_f1_l2: float | None = None
+        if complete_txt.exists():
+            m = re.search(r"Best F1 L2:\s*([\d.]+)", complete_txt.read_text())
+            if m:
+                val_f1_l2 = float(m.group(1))
+
+        tm = test_metrics.get(variant, {})
+        metrics = {
+            "test_f1_l1_macro": tm.get("f1_l1_macro"),
+            "test_f1_l2_macro": tm.get("f1_l2_macro"),
+            "test_hcr": tm.get("hcr"),
+            "test_constrained_f1_macro": tm.get("constrained_f1_macro"),
+        } if tm else {}
+
+        val_metrics = {
+            "val_f1_l2_macro": val_f1_l2,
+        } if val_f1_l2 is not None else {}
+
+        params: dict = {}
+        cfg_path = PROJECT_ROOT / "02_hydra" / "configs" / "title_only_hierarchy.yaml"
+        if cfg_path.exists():
+            import yaml as _yaml
+            cfg = _yaml.safe_load(cfg_path.read_text())
+            skip = {"save_dir", "experiment_suffix", "seed", "num_workers"}
+            params = {k: str(v) for k, v in cfg.items() if k not in skip}
+        params["variant"] = variant
+        params["use_description"] = "False"
+
+        models.append({
+            "id": f"hydra-{variant}-title-hier-camembert",
+            "name": info["name"],
+            "family": "hydra-title",
+            "subtitle": f"CamemBERT — variante {variant} — Hierarchy + Title-only",
+            "status": status,
+            "color": info["color"],
+            "metrics": metrics,
+            "val_metrics": val_metrics,
+            "training": {"params": params},
+            "history": None,
+            "f1_per_class_l1": None,
+            "f1_per_class_l2": None,
+            "images": {},
+        })
+
+    return models
+
+
 def discover_flat_hydra_title_model() -> list[dict]:
     """Découvre le modèle FlatHydra Title-only depuis models/flat_hydra_title/."""
     history_path = FLAT_HYDRA_TITLE_MODELS_DIR / "metrics.json"
@@ -571,6 +650,17 @@ def discover_flat_hydra_title_model() -> list[dict]:
         if encoded:
             images[key] = encoded
 
+    test_m: dict = {}
+    test_metrics_path = FLAT_HYDRA_TITLE_RESULTS_DIR / "test_metrics.json"
+    if test_metrics_path.exists():
+        tm = json.loads(test_metrics_path.read_text())
+        test_m = {
+            "test_f1_l1_macro": tm.get("f1_l1_macro"),
+            "test_f1_l2_macro": tm.get("f1_l2_macro"),
+            "test_hcr": tm.get("hcr"),
+            "test_constrained_f1_macro": tm.get("constrained_f1_macro"),
+        }
+
     return [{
         "id": "flat-hydra-title-camembert",
         "name": "FlatHydra (Title-only)",
@@ -578,7 +668,7 @@ def discover_flat_hydra_title_model() -> list[dict]:
         "subtitle": "CamemBERT — classification plate (1 tête) — Title-only (designation seule)",
         "status": "finished",
         "color": "#f5b041",
-        "metrics": {},
+        "metrics": test_m,
         "val_metrics": val_metrics,
         "training": {"params": params},
         "history": history if history else None,
@@ -1193,6 +1283,10 @@ def main():
     hydra_title_models = discover_hydra_title_models()
     print(f"  → {len(hydra_title_models)} variante(s) HYDRA Title-only")
 
+    print("Découverte des modèles HYDRA Hierarchy Title-only...")
+    hydra_title_hier_models = discover_hydra_title_hierarchy_models()
+    print(f"  → {len(hydra_title_hier_models)} variante(s) HYDRA Hierarchy Title-only")
+
     print("Découverte de FlatHydra Title-only...")
     flat_hydra_title_models = discover_flat_hydra_title_model()
     print(f"  → {len(flat_hydra_title_models)} modèle(s) FlatHydra Title-only")
@@ -1213,6 +1307,7 @@ def main():
             + hydra_hier_models
             + flat_hydra_models
             + hydra_title_models
+            + hydra_title_hier_models
             + flat_hydra_title_models
             + baseline_title_models
             + baseline_models
