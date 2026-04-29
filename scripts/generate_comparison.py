@@ -462,7 +462,7 @@ def discover_flat_hydra_model() -> list[dict]:
 
     return [{
         "id": "flat-hydra-camembert",
-        "name": "FlatHydra",
+        "name": "CamemBERT Flat",
         "family": "baseline",
         "subtitle": "CamemBERT — classification plate (1 tête, CrossEntropy)",
         "status": "finished",
@@ -663,7 +663,7 @@ def discover_flat_hydra_title_model() -> list[dict]:
 
     return [{
         "id": "flat-hydra-title-camembert",
-        "name": "FlatHydra (Title-only)",
+        "name": "CamemBERT Flat (Title-only)",
         "family": "baseline-title",
         "subtitle": "CamemBERT — classification plate (1 tête) — Title-only (designation seule)",
         "status": "finished",
