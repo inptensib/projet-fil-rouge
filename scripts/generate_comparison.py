@@ -69,9 +69,9 @@ HYDRA_TITLE_EXPERIMENT_NAMES = {
 }
 
 HYDRA_TITLE_HIERARCHY_VARIANTS = {
-    "local":  {"name": "HYDRA Local Hier. (Title)",  "color": "#1f618d"},
-    "nested": {"name": "HYDRA Nested Hier. (Title)", "color": "#239b56"},
-    "global": {"name": "HYDRA Global Hier. (Title)", "color": "#7d3c98"},
+    "local":  {"name": "HYDRA Local + Hierarchy (Title-only)",  "color": "#1f618d"},
+    "nested": {"name": "HYDRA Nested + Hierarchy (Title-only)", "color": "#239b56"},
+    "global": {"name": "HYDRA Global + Hierarchy (Title-only)", "color": "#7d3c98"},
 }
 
 FLAT_HYDRA_TITLE_RESULTS_DIR = RESULTS_DIR / "flat_hydra_title"
@@ -374,13 +374,13 @@ def _discover_baseline_models_from_file(json_path: Path, family: str) -> list[di
     models = []
     colors = {
         "tfidf": "#e67e22", "word2vec": "#e74c3c",
-        "fasttext": "#1abc9c", "fasttext-softmax": "#148f77",
+        "fasttext": "#1abc9c", "fasttext-ova": "#1abc9c", "fasttext-softmax": "#148f77",
         "tfidf-title": "#d4820a", "word2vec-title": "#c0392b",
         "fasttext-softmax-title": "#0e6655",
     }
     name_map = {
         "tfidf": "TF-IDF", "word2vec": "Word2Vec",
-        "fasttext": "FastText", "fasttext-softmax": "FastText Softmax",
+        "fasttext": "FastText OVA", "fasttext-softmax": "FastText Softmax",
         "tfidf-title": "TF-IDF (Title-only)", "word2vec-title": "Word2Vec (Title-only)",
         "fasttext-softmax-title": "FastText Softmax (Title-only)",
     }
