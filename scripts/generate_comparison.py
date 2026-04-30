@@ -461,6 +461,11 @@ def discover_flat_hydra_model() -> list[dict]:
         if encoded:
             images[key] = encoded
 
+    flat_f1_l1 = json.loads((FLAT_HYDRA_RESULTS_DIR / "f1_per_class_l1.json").read_text()) \
+        if (FLAT_HYDRA_RESULTS_DIR / "f1_per_class_l1.json").exists() else None
+    flat_f1_l2 = json.loads((FLAT_HYDRA_RESULTS_DIR / "f1_per_class_l2.json").read_text()) \
+        if (FLAT_HYDRA_RESULTS_DIR / "f1_per_class_l2.json").exists() else None
+
     return [{
         "id": "flat-hydra-camembert",
         "name": "CamemBERT Flat",
@@ -477,8 +482,8 @@ def discover_flat_hydra_model() -> list[dict]:
         "val_metrics": val_metrics,
         "training": {"params": params},
         "history": history,
-        "f1_per_class_l1": None,
-        "f1_per_class_l2": None,
+        "f1_per_class_l1": flat_f1_l1,
+        "f1_per_class_l2": flat_f1_l2,
         "images": images,
     }]
 
@@ -519,6 +524,24 @@ def discover_hydra_title_models() -> list[dict]:
 
         history = _get_merged_history(conn, exp_id)
 
+        title_results_dir = RESULTS_DIR / f"hydra-{variant}-title-camembert"
+        f1_pc_l1, f1_pc_l2 = None, None
+        if title_results_dir.exists():
+            p1 = title_results_dir / "f1_per_class_l1.json"
+            p2 = title_results_dir / "f1_per_class_l2.json"
+            if p1.exists():
+                f1_pc_l1 = json.loads(p1.read_text())
+            if p2.exists():
+                f1_pc_l2 = json.loads(p2.read_text())
+
+        images = {}
+        if title_results_dir.exists():
+            for fname in IMAGE_FILES:
+                key = fname.replace(".png", "")
+                encoded = encode_image(title_results_dir / fname)
+                if encoded:
+                    images[key] = encoded
+
         models.append({
             "id": f"hydra-{variant}-title-camembert",
             "name": info["name"],
@@ -538,9 +561,9 @@ def discover_hydra_title_models() -> list[dict]:
             },
             "training": {"params": params_clean},
             "history": history if history else None,
-            "f1_per_class_l1": None,
-            "f1_per_class_l2": None,
-            "images": {},
+            "f1_per_class_l1": f1_pc_l1,
+            "f1_per_class_l2": f1_pc_l2,
+            "images": images,
         })
 
     conn.close()
@@ -601,6 +624,24 @@ def discover_hydra_title_hierarchy_models() -> list[dict]:
         params["variant"] = variant
         params["use_description"] = "False"
 
+        hier_results_dir = RESULTS_DIR / f"hydra-{variant}-title-hier-camembert"
+        f1_pc_l1, f1_pc_l2 = None, None
+        if hier_results_dir.exists():
+            p1 = hier_results_dir / "f1_per_class_l1.json"
+            p2 = hier_results_dir / "f1_per_class_l2.json"
+            if p1.exists():
+                f1_pc_l1 = json.loads(p1.read_text())
+            if p2.exists():
+                f1_pc_l2 = json.loads(p2.read_text())
+
+        hier_images = {}
+        if hier_results_dir.exists():
+            for fname in IMAGE_FILES:
+                key = fname.replace(".png", "")
+                encoded = encode_image(hier_results_dir / fname)
+                if encoded:
+                    hier_images[key] = encoded
+
         models.append({
             "id": f"hydra-{variant}-title-hier-camembert",
             "name": info["name"],
@@ -612,9 +653,9 @@ def discover_hydra_title_hierarchy_models() -> list[dict]:
             "val_metrics": val_metrics,
             "training": {"params": params},
             "history": None,
-            "f1_per_class_l1": None,
-            "f1_per_class_l2": None,
-            "images": {},
+            "f1_per_class_l1": f1_pc_l1,
+            "f1_per_class_l2": f1_pc_l2,
+            "images": hier_images,
         })
 
     return models
@@ -662,6 +703,11 @@ def discover_flat_hydra_title_model() -> list[dict]:
             "test_constrained_f1_macro": tm.get("constrained_f1_macro"),
         }
 
+    title_f1_l1 = json.loads((FLAT_HYDRA_TITLE_RESULTS_DIR / "f1_per_class_l1.json").read_text()) \
+        if (FLAT_HYDRA_TITLE_RESULTS_DIR / "f1_per_class_l1.json").exists() else None
+    title_f1_l2 = json.loads((FLAT_HYDRA_TITLE_RESULTS_DIR / "f1_per_class_l2.json").read_text()) \
+        if (FLAT_HYDRA_TITLE_RESULTS_DIR / "f1_per_class_l2.json").exists() else None
+
     return [{
         "id": "flat-hydra-title-camembert",
         "name": "CamemBERT Flat (Title-only)",
@@ -673,8 +719,8 @@ def discover_flat_hydra_title_model() -> list[dict]:
         "val_metrics": val_metrics,
         "training": {"params": params},
         "history": history if history else None,
-        "f1_per_class_l1": None,
-        "f1_per_class_l2": None,
+        "f1_per_class_l1": title_f1_l1,
+        "f1_per_class_l2": title_f1_l2,
         "images": images,
     }]
 
@@ -729,9 +775,20 @@ def discover_hydra_mbert_models() -> list[dict]:
     }]
 
 
+CLASS_METADATA_PATH = RESULTS_DIR / "class_metadata.json"
+
+
 def render_html(models_data: dict) -> str:
     data_json = json.dumps(models_data, ensure_ascii=False, indent=2)
-    return HTML_TEMPLATE.replace("/* __MODELS_DATA__ */", data_json)
+    class_meta = {}
+    if CLASS_METADATA_PATH.exists():
+        class_meta = json.loads(CLASS_METADATA_PATH.read_text(encoding="utf-8"))
+    class_meta_json = json.dumps(class_meta, ensure_ascii=False)
+    return (
+        HTML_TEMPLATE
+        .replace("/* __MODELS_DATA__ */", data_json)
+        .replace("/* __CLASS_META__ */", class_meta_json)
+    )
 
 
 HTML_TEMPLATE = r"""<!DOCTYPE html>
@@ -739,7 +796,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <title>Comparaison des modèles — Rakuten Classification Hiérarchique</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
 * { box-sizing: border-box; }
 body {
@@ -767,12 +823,6 @@ td { padding: 8px 12px; border-bottom: 1px solid #f1f3f5; }
 .badge-finished { background: #d4edda; color: #155724; }
 .badge-running { background: #fff3cd; color: #856404; }
 .badge-planned { background: #e2e3e5; color: #383d41; }
-
-/* Charts */
-.chart-row { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
-.chart-container { flex: 1; min-width: 400px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 16px; }
-.chart-container.full-width { flex-basis: 100%; }
-.chart-container canvas { max-height: 400px; }
 
 /* Per-class controls */
 .controls-bar { display: flex; gap: 12px; margin: 12px 0; align-items: center; flex-wrap: wrap; }
@@ -848,7 +898,6 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 
 <nav>
     <a href="#recap">Récapitulatif</a>
-    <a href="#charts">Graphiques</a>
     <a href="#per-class">F1 par classe L1</a>
     <a href="#per-class-l2">F1 par classe L2</a>
     <a href="#details">Détail par modèle</a>
@@ -877,30 +926,16 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     <p style="color:#6c757d;font-size:0.9em">Modèles entraînés sur la concaténation titre + description (régime principal).</p>
     <div class="table-container"><table id="recap-table-full-text"></table></div>
 </section>
-<section id="charts">
-    <h2>Graphiques comparatifs</h2>
-    <div class="chart-row">
-        <div class="chart-container full-width"><canvas id="chart-metrics"></canvas></div>
-    </div>
-    <div class="chart-row">
-        <div class="chart-container full-width" style="min-height:420px"><canvas id="chart-convergence"></canvas></div>
-    </div>
-    <div class="chart-row">
-        <div class="chart-container full-width" style="min-height:420px"><canvas id="chart-convergence-l1"></canvas></div>
-    </div>
-    <div class="chart-row">
-        <div class="chart-container full-width" style="min-height:420px"><canvas id="chart-convergence-loss"></canvas></div>
-    </div>
-</section>
 <section id="per-class">
     <h2>Comparaison par classe L1 (157 classes)</h2>
     <div class="controls-bar">
         <input type="text" id="class-search" placeholder="Filtrer par nom de classe...">
         <select id="class-sort">
+            <option value="worst-first">Pire F1 d'abord (défaut)</option>
             <option value="best-first">Meilleur F1 d'abord</option>
-            <option value="worst-first">Pire F1 d'abord</option>
             <option value="alpha">Alphabétique</option>
             <option value="diff">Plus grand écart</option>
+            <option value="support">Support décroissant</option>
         </select>
     </div>
     <div class="table-container"><table id="per-class-table"></table></div>
@@ -908,12 +943,13 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <section id="per-class-l2">
     <h2>Comparaison par classe L2 (6 126 classes)</h2>
     <div class="controls-bar">
-        <input type="text" id="class-l2-search" placeholder="Filtrer par nom de classe L2...">
+        <input type="text" id="class-l2-search" placeholder="Filtrer par nom ou catégorie L1...">
         <select id="class-l2-sort">
+            <option value="worst-first">Pire F1 d'abord (défaut)</option>
             <option value="best-first">Meilleur F1 d'abord</option>
-            <option value="worst-first">Pire F1 d'abord</option>
             <option value="alpha">Alphabétique</option>
             <option value="diff">Plus grand écart</option>
+            <option value="support">Support décroissant</option>
         </select>
         <span id="class-l2-count" style="color:#6c757d;font-size:0.85em"></span>
     </div>
@@ -930,6 +966,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 
 <script>
 const MODELS_DATA = /* __MODELS_DATA__ */;
+const CLASS_META = /* __CLASS_META__ */;
 
 // --- Utils ---
 const fmt = (v, pct=true) => v != null ? (pct ? (v*100).toFixed(2)+'%' : v.toFixed(4)) : '--';
@@ -989,121 +1026,16 @@ function renderRecapTable(modelList, tableId) {
     t.innerHTML = html;
 }
 
-// --- 2. Charts ---
-function renderCharts() {
-    // Grouped bar: F1 L1, F1 L2, HCR
-    const labels = finished.map(m => m.name);
-    const colors = finished.map(m => m.color);
-    new Chart(document.getElementById('chart-metrics'), {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [
-                {label: 'F1 L1 macro', data: finished.map(m => m.metrics?.test_f1_l1_macro), backgroundColor: 'rgba(39,174,96,0.7)', borderColor: '#27ae60', borderWidth: 1},
-                {label: 'F1 L2 macro', data: finished.map(m => m.metrics?.test_f1_l2_macro), backgroundColor: 'rgba(41,128,185,0.7)', borderColor: '#2980b9', borderWidth: 1},
-                {label: 'HCR', data: finished.map(m => m.metrics?.test_hcr), backgroundColor: 'rgba(230,126,34,0.7)', borderColor: '#e67e22', borderWidth: 1},
-            ],
-        },
-        options: {
-            responsive: true,
-            plugins: {title: {display: true, text: 'Métriques de test (F1 macro + HCR)'}},
-            scales: {
-                x: {ticks: {maxRotation: 45, minRotation: 30}},
-                y: {beginAtZero: true, min: 0, max: 1.0, ticks: {callback: v => (v*100).toFixed(0)+'%'}},
-            },
-        },
-    });
-
-    // Courbes de convergence (HYDRA uniquement — modèles avec historique MLflow)
-    const hydraWithHistory = finished.filter(m => m.family === 'hydra' && m.history);
-
-    function makeConvergenceChart(canvasId, metricKey, title, yScaleOpts, modelsPool, subtitleText) {
-        const pool = modelsPool ?? hydraWithHistory;
-        const withMetric = pool.filter(m => m.history[metricKey]);
-        if (withMetric.length === 0) return;
-        const datasets = withMetric.map(m => ({
-            label: m.name,
-            data: m.history[metricKey].values.map((v, i) => ({x: m.history[metricKey].epochs[i], y: v})),
-            borderColor: m.color, backgroundColor: m.color + '33',
-            fill: false, tension: 0.3, pointRadius: 4,
-        }));
-        const pluginsOpts = {title: {display: true, text: title}};
-        if (subtitleText) pluginsOpts.subtitle = {display: true, text: subtitleText, color: '#888', font: {size: 11}};
-        new Chart(document.getElementById(canvasId), {
-            type: 'line',
-            data: {datasets},
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: pluginsOpts,
-                scales: {
-                    x: {type: 'linear', min: 1, max: 10, title: {display: true, text: 'Epoch'}, ticks: {stepSize: 1}},
-                    y: yScaleOpts,
-                },
-            },
-        });
-    }
-
-    const pctF2 = v => (v * 100).toFixed(1) + '%';
-    makeConvergenceChart('chart-convergence', 'val_f1_l2_macro',
-        'Convergence — Val F1 L2 macro (epoch 1→10)',
-        {min: 0.3, title: {display: true, text: 'F1 L2 macro'}, ticks: {callback: pctF2}});
-    makeConvergenceChart('chart-convergence-l1', 'val_f1_l1_macro',
-        'Convergence — Val F1 L1 macro (epoch 1→10)',
-        {min: 0.84, title: {display: true, text: 'F1 L1 macro'}, ticks: {callback: pctF2}});
-    // Train Loss : double axe Y — standard (gauche, log) vs hierarchy (droite, log, somme brute)
-    const lossStd  = hydraWithHistory.filter(m => !m.id.includes('hierarchy') && m.history?.train_loss);
-    const lossHier = hydraWithHistory.filter(m =>  m.id.includes('hierarchy') && m.history?.train_loss);
-    if (lossStd.length > 0 || lossHier.length > 0) {
-        const lossDatasets = [
-            ...lossStd.map(m => ({
-                label: m.name,
-                data: m.history.train_loss.values.map((v, i) => ({x: m.history.train_loss.epochs[i], y: v})),
-                borderColor: m.color, backgroundColor: m.color + '33',
-                fill: false, tension: 0.3, pointRadius: 4, yAxisID: 'y',
-            })),
-            ...lossHier.map(m => ({
-                label: m.name + ' ▶',
-                data: m.history.train_loss.values.map((v, i) => ({x: m.history.train_loss.epochs[i], y: v})),
-                borderColor: m.color, backgroundColor: m.color + '33',
-                borderDash: [6, 3], fill: false, tension: 0.3, pointRadius: 4, yAxisID: 'y2',
-            })),
-        ];
-        new Chart(document.getElementById('chart-convergence-loss'), {
-            type: 'line',
-            data: {datasets: lossDatasets},
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    title: {display: true, text: 'Train Loss (epoch 1→10)'},
-                    subtitle: {display: true,
-                        text: 'Trait plein = standard (axe gauche) · Pointillé ▶ = hierarchy (axe droit, somme brute)',
-                        color: '#888', font: {size: 11}},
-                },
-                scales: {
-                    x: {type: 'linear', min: 1, max: 10, title: {display: true, text: 'Epoch'}, ticks: {stepSize: 1}},
-                    y:  {type: 'logarithmic', position: 'left',
-                         title: {display: true, text: 'Standard (log)'},
-                         ticks: {callback: v => v >= 1 ? v.toExponential(1) : v.toFixed(3)}},
-                    y2: {type: 'logarithmic', position: 'right',
-                         title: {display: true, text: 'Hierarchy (log)'},
-                         ticks: {callback: v => v.toExponential(2)},
-                         grid: {drawOnChartArea: false}},
-                },
-            },
-        });
-    }
-}
-
-// --- 3. Per-class comparison (generic for L1 and L2) ---
+// --- 2. Per-class comparison (generic for L1 and L2) ---
 function renderPerClassGeneric(opts) {
-    const {dataKey, tableId, searchId, sortId, countId, maxRows} = opts;
+    const {dataKey, tableId, searchId, sortId, countId, pageSize, metaLevel, showParent} = opts;
     const modelsWithData = finished.filter(m => m[dataKey]);
     if (modelsWithData.length === 0) {
         if (countId) document.getElementById(countId).textContent = 'Aucune donnée disponible';
         return;
     }
+
+    const metaMap = (CLASS_META && metaLevel) ? (CLASS_META[metaLevel] || {}) : {};
 
     const allClasses = [...new Set(modelsWithData.flatMap(m => Object.keys(m[dataKey])))];
     let tableData = allClasses.map(cls => {
@@ -1112,48 +1044,94 @@ function renderPerClassGeneric(opts) {
         const vals = finished.map(m => m[dataKey]?.[cls]).filter(v => v != null);
         row._avg = vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
         row._diff = vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : 0;
+        row._support = metaMap[cls]?.support_test ?? null;
+        row._parent = metaMap[cls]?.parent_l1 ?? '';
         return row;
     });
 
-    function renderTable(data) {
-        const shown = maxRows ? data.slice(0, maxRows) : data;
-        if (countId) {
-            const msg = maxRows && data.length > maxRows
-                ? `${shown.length} / ${data.length} classes affichées`
-                : `${data.length} classes`;
-            document.getElementById(countId).textContent = msg;
+    let currentData = [];
+    let shownCount = 0;
+
+    function renderTable(data, appendMode) {
+        if (!appendMode) {
+            shownCount = 0;
+            currentData = data;
         }
-        let html = '<thead><tr><th>Classe</th>';
-        for (const m of finished) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
-        if (finished.length > 1) html += '<th style="text-align:center">Écart</th>';
-        html += '</tr></thead><tbody>';
-        for (const row of shown) {
-            html += `<tr><td style="white-space:nowrap;font-size:0.85em">${row.name}</td>`;
+        const batch = currentData.slice(shownCount, shownCount + pageSize);
+        shownCount += batch.length;
+
+        const total = currentData.length;
+        if (countId) {
+            document.getElementById(countId).textContent =
+                shownCount < total
+                    ? `${shownCount} / ${total} classes affichées`
+                    : `${total} classe${total > 1 ? 's' : ''}`;
+        }
+
+        let html = '';
+        if (!appendMode) {
+            html += '<thead><tr><th>Classe</th>';
+            if (showParent) html += '<th>Catégorie L1</th>';
+            html += '<th style="text-align:right">Support test</th>';
+            for (const m of finished) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
+            if (finished.length > 1) html += '<th style="text-align:center">Écart</th>';
+            html += '</tr></thead><tbody id="' + tableId + '-body">';
+        } else {
+            html = '';
+        }
+
+        const tbody = appendMode ? document.getElementById(tableId + '-body') : null;
+        let rowsHtml = '';
+        for (const row of batch) {
+            rowsHtml += `<tr><td style="white-space:nowrap;font-size:0.85em">${row.name}</td>`;
+            if (showParent) rowsHtml += `<td style="font-size:0.8em;color:#6c757d">${row._parent || '--'}</td>`;
+            rowsHtml += `<td style="text-align:right;font-size:0.82em;color:#495057">${row._support != null ? row._support.toLocaleString() : '--'}</td>`;
             for (const m of finished) {
                 const v = row[m.id];
                 const cls = f1Color(v);
-                html += `<td style="text-align:center" class="${cls}">${v != null ? v.toFixed(4) : '--'}</td>`;
+                rowsHtml += `<td style="text-align:center" class="${cls}">${v != null ? (v * 100).toFixed(1) + '%' : '--'}</td>`;
             }
             if (finished.length > 1) {
                 const vals = finished.map(m => row[m.id]).filter(v => v != null);
                 const diff = vals.length > 1 ? Math.max(...vals) - Math.min(...vals) : 0;
-                html += `<td style="text-align:center;font-size:0.85em">${diff.toFixed(4)}</td>`;
+                rowsHtml += `<td style="text-align:center;font-size:0.85em">${(diff * 100).toFixed(1)}%</td>`;
             }
-            html += '</tr>';
+            rowsHtml += '</tr>';
         }
-        html += '</tbody>';
-        document.getElementById(tableId).innerHTML = html;
+
+        if (appendMode && tbody) {
+            tbody.insertAdjacentHTML('beforeend', rowsHtml);
+        } else {
+            document.getElementById(tableId).innerHTML = html + rowsHtml + '</tbody>';
+        }
+
+        // Bouton "voir plus"
+        const btnId = tableId + '-more-btn';
+        const existing = document.getElementById(btnId);
+        if (existing) existing.remove();
+        if (shownCount < total) {
+            const btn = document.createElement('button');
+            btn.id = btnId;
+            btn.textContent = `Afficher 50 de plus (${total - shownCount} restantes)`;
+            btn.style.cssText = 'margin:12px 0;padding:8px 20px;border:1px solid #dee2e6;border-radius:6px;background:#f8f9fa;cursor:pointer;font-size:0.9em';
+            btn.onclick = () => renderTable(null, true);
+            document.getElementById(tableId).insertAdjacentElement('afterend', btn);
+        }
     }
 
     function sortAndFilter() {
         const search = document.getElementById(searchId).value.toLowerCase();
         const sort = document.getElementById(sortId).value;
-        let data = tableData.filter(r => r.name.toLowerCase().includes(search));
+        let data = tableData.filter(r =>
+            r.name.toLowerCase().includes(search) ||
+            r._parent.toLowerCase().includes(search)
+        );
         if (sort === 'alpha') data.sort((a,b) => a.name.localeCompare(b.name));
         else if (sort === 'best-first') data.sort((a,b) => b._avg - a._avg);
         else if (sort === 'worst-first') data.sort((a,b) => a._avg - b._avg);
         else if (sort === 'diff') data.sort((a,b) => b._diff - a._diff);
-        renderTable(data);
+        else if (sort === 'support') data.sort((a,b) => (b._support ?? -1) - (a._support ?? -1));
+        renderTable(data, false);
     }
 
     document.getElementById(searchId).addEventListener('input', sortAndFilter);
@@ -1164,14 +1142,16 @@ function renderPerClassGeneric(opts) {
 function renderPerClassComparison() {
     renderPerClassGeneric({
         dataKey: 'f1_per_class_l1', tableId: 'per-class-table',
-        searchId: 'class-search', sortId: 'class-sort', countId: null, maxRows: null,
+        searchId: 'class-search', sortId: 'class-sort', countId: null,
+        pageSize: 157, metaLevel: 'l1', showParent: false,
     });
 }
 
 function renderPerClassL2Comparison() {
     renderPerClassGeneric({
         dataKey: 'f1_per_class_l2', tableId: 'per-class-l2-table',
-        searchId: 'class-l2-search', sortId: 'class-l2-sort', countId: 'class-l2-count', maxRows: 100,
+        searchId: 'class-l2-search', sortId: 'class-l2-sort', countId: 'class-l2-count',
+        pageSize: 50, metaLevel: 'l2', showParent: true,
     });
 }
 
@@ -1301,7 +1281,6 @@ const titleOnlyModels = finished.filter(m => m.family.endsWith('-title'));
 const fullTextModels  = finished.filter(m => !m.family.endsWith('-title'));
 renderRecapTable(titleOnlyModels, 'recap-table-title-only');
 renderRecapTable(fullTextModels,  'recap-table-full-text');
-renderCharts();
 renderPerClassComparison();
 renderPerClassL2Comparison();
 renderAccordions();

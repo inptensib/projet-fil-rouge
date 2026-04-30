@@ -1,13 +1,24 @@
-"""Génère les fichiers f1_per_class_l2.json pour les modèles HYDRA entraînés.
+"""Génère les fichiers f1_per_class_l1.json et f1_per_class_l2.json pour les modèles HYDRA.
 
 Charge chaque best_model.pt, évalue sur le test set, et sauvegarde
-le F1 per-class L1 et L2 en JSON dans results/hydra-{variant}-camembert/.
+le F1 per-class L1 et L2 en JSON dans results/hydra-{variant}-{tag}-{encoder}/.
 
 Usage:
-    CUDA_VISIBLE_DEVICES=0 python scripts/generate_f1_per_class.py \
-        --split-dir /path/to/splits
-    CUDA_VISIBLE_DEVICES=0 python scripts/generate_f1_per_class.py \
-        --split-dir /path/to/splits --variant local
+    # HYDRA CamemBERT Title+Description (standard)
+    python scripts/generate_f1_per_class.py --split-dir /path/to/splits
+
+    # HYDRA CamemBERT Title-only
+    python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
+        --no-description --results-tag title
+
+    # HYDRA CamemBERT hierarchy Title-only
+    python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
+        --no-description --model-dir models_title_hierarchy \
+        --results-tag title-hier --check-hierarchy
+
+    # HYDRA mBERT
+    python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
+        --config 02_hydra/configs/mbert_default.yaml --results-tag ''
 """
 from __future__ import annotations
 
@@ -62,9 +73,12 @@ def evaluate_and_save(
     model_dir: str = "models",
     results_tag: str = "",
     check_hierarchy: bool = False,
+    results_dir_override: str = "",
+    model_name_suffix: str = "",
 ):
     """Évalue un modèle et sauvegarde les F1 per-class en JSON."""
-    model_path = Path(_ROOT) / f"{model_dir}/HYDRA_{variant}_CamemBERT/best_model.pt"
+    encoder_name = cfg_kwargs.get("encoder_name", "CamemBERT")
+    model_path = Path(_ROOT) / f"{model_dir}/HYDRA_{variant}_{encoder_name}{model_name_suffix}/best_model.pt"
     if not model_path.exists():
         print(f"  [SKIP] {model_path} introuvable")
         return
@@ -102,8 +116,12 @@ def evaluate_and_save(
     f1_l2_pc = compute_per_class_f1(labels_l2, preds_l2, trainer.l2_encoder)
 
     # Sauvegarde
-    suffix = f"-{results_tag}" if results_tag else ""
-    out_dir = RESULTS_DIR / f"hydra-{variant}{suffix}-camembert"
+    if results_dir_override:
+        out_dir = RESULTS_DIR / results_dir_override
+    else:
+        enc_lower = encoder_name.lower()
+        suffix = f"-{results_tag}" if results_tag else ""
+        out_dir = RESULTS_DIR / f"hydra-{variant}{suffix}-{enc_lower}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     l1_path = out_dir / "f1_per_class_l1.json"
@@ -127,8 +145,14 @@ def main():
                         help="Répertoire racine des modèles (ex: 'models_hierarchy')")
     parser.add_argument("--results-tag", default="",
                         help="Suffixe dossier résultats (ex: 'hierarchy' → hydra-local-hierarchy-camembert/)")
+    parser.add_argument("--results-dir", default="",
+                        help="Chemin exact du dossier de sortie (override results-tag + encoder)")
+    parser.add_argument("--model-name-suffix", default="",
+                        help="Suffixe nom modèle : HYDRA_{variant}_{encoder}{suffix} (ex: '_title_hierarchy')")
     parser.add_argument("--check-hierarchy", action="store_true",
                         help="Activer le masque hiérarchique à l'inférence")
+    parser.add_argument("--no-description", action="store_true",
+                        help="Mode Title-only (use_description=False)")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -144,6 +168,7 @@ def main():
         val_path=str(split_dir / "val_split.jsonl"),
         test_path=str(split_dir / "test_split.jsonl"),
         seed=cfg.get("seed", 42),
+        use_description=not args.no_description,
     )
     print(f"  Test: {len(data['X_test']):,} samples, L1: {data['num_classes_l1']}, L2: {data['num_classes_l2']}")
 
@@ -156,7 +181,9 @@ def main():
         evaluate_and_save(variant, data, dict(cfg_kwargs),
                           model_dir=args.model_dir,
                           results_tag=args.results_tag,
-                          check_hierarchy=args.check_hierarchy)
+                          check_hierarchy=args.check_hierarchy,
+                          results_dir_override=args.results_dir,
+                          model_name_suffix=args.model_name_suffix)
 
 
 if __name__ == "__main__":
