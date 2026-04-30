@@ -9,6 +9,8 @@
 #SBATCH --error=slurm-f1-perclass-missing-%j.err
 
 # Génère f1_per_class_l1.json + f1_per_class_l2.json pour les modèles manquants :
+#   - FlatHydra Title+Description
+#   - FlatHydra Title-only
 #   - HYDRA {local,nested,global} CamemBERT Title-only std
 #   - HYDRA {local,nested,global} CamemBERT Title-only + Hierarchy
 #
@@ -26,6 +28,27 @@ echo "=== F1 per-class (modèles manquants) | $(hostname) | $(date) ==="
 echo "GPU : $(python -c 'import torch; [print(f"  GPU {i}: {torch.cuda.get_device_name(i)}") for i in range(torch.cuda.device_count())]' 2>/dev/null)"
 
 SPLIT_DIR=/home/infres/tandriam-25/fil_rouge/dataset/
+
+# --- FlatHydra Title+Description ---
+# Dossier modèle : models/flat_hydra/best_model.pt
+# Dossier résultats : results/flat_hydra/
+echo ""
+echo "=== 1/4 : FlatHydra Title+Description ==="
+python scripts/generate_f1_per_class.py \
+    --split-dir "$SPLIT_DIR" \
+    --flat-hydra \
+    --batch-size 512
+
+# --- FlatHydra Title-only ---
+# Dossier modèle : models/flat_hydra_title/best_model.pt
+# Dossier résultats : results/flat_hydra_title/
+echo ""
+echo "=== 2/4 : FlatHydra Title-only ==="
+python scripts/generate_f1_per_class.py \
+    --split-dir "$SPLIT_DIR" \
+    --flat-hydra \
+    --no-description \
+    --batch-size 512
 
 # --- HYDRA Title-only std ---
 # Dossiers modèle : models_title/HYDRA_{variant}_CamemBERT_title/best_model.pt

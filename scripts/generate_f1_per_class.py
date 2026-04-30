@@ -1,7 +1,7 @@
-"""Génère les fichiers f1_per_class_l1.json et f1_per_class_l2.json pour les modèles HYDRA.
+"""Génère les fichiers f1_per_class_l1.json et f1_per_class_l2.json pour les modèles HYDRA et FlatHydra.
 
 Charge chaque best_model.pt, évalue sur le test set, et sauvegarde
-le F1 per-class L1 et L2 en JSON dans results/hydra-{variant}-{tag}-{encoder}/.
+le F1 per-class L1 et L2 en JSON dans results/{model_dir}/.
 
 Usage:
     # HYDRA CamemBERT Title+Description (standard)
@@ -19,6 +19,13 @@ Usage:
     # HYDRA mBERT
     python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
         --config 02_hydra/configs/mbert_default.yaml --results-tag ''
+
+    # FlatHydra Title+Description
+    python scripts/generate_f1_per_class.py --split-dir /path/to/splits --flat-hydra
+
+    # FlatHydra Title-only
+    python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
+        --flat-hydra --no-description
 """
 from __future__ import annotations
 
@@ -35,8 +42,10 @@ _ROOT = str(Path(__file__).resolve().parents[1])
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
+sys.path.insert(0, str(Path(_ROOT) / "01_baselines"))
 
 from src.trainer import HYDRATrainer
+from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer
 from shared.data_loader import prepare_hierarchical_data_from_splits
 from shared.metrics import compute_per_class_f1
 
@@ -134,6 +143,55 @@ def evaluate_and_save(
     print(f"  → {l2_path} ({len(f1_l2_pc)} classes)")
 
 
+def evaluate_flat_hydra_and_save(
+    data: dict,
+    use_description: bool = True,
+    batch_size: int | None = None,
+):
+    """Évalue FlatHydra (std ou title-only) et sauvegarde les F1 per-class en JSON."""
+    model_subdir = "flat_hydra" if use_description else "flat_hydra_title"
+    model_path = Path(_ROOT) / "models" / model_subdir / "best_model.pt"
+    config_path = Path(_ROOT) / "models" / model_subdir / "config.json"
+
+    if not model_path.exists():
+        print(f"  [SKIP] {model_path} introuvable")
+        return
+
+    raw_cfg = json.loads(config_path.read_text()) if config_path.exists() else {}
+    known = set(FlatHydraConfig.__dataclass_fields__)
+    flat_cfg = FlatHydraConfig(**{k: v for k, v in raw_cfg.items() if k in known})
+    if batch_size:
+        flat_cfg.batch_size = batch_size
+
+    trainer = FlatHydraTrainer(data=data, config=flat_cfg)
+    ckpt = torch.load(model_path, map_location=trainer.device, weights_only=False)
+    state_dict = ckpt.get("model_state_dict", ckpt)
+    trainer._base_model.load_state_dict(state_dict)
+    print(f"  Modèle chargé: {model_path}")
+
+    test_loader = trainer._make_loader(
+        data["X_test"], data["y_l1_test"], data["y_l2_test"], shuffle=False,
+    )
+
+    print("  Évaluation sur le test set...")
+    t0 = time.time()
+    metrics = trainer.evaluate(test_loader)
+    elapsed = time.time() - t0
+
+    print(f"  F1 L1: {metrics['f1_l1_macro']:.4f} | F1 L2: {metrics['f1_l2_macro']:.4f} "
+          f"| HCR: {metrics.get('hcr', 0):.4f} | Temps: {elapsed:.0f}s")
+
+    f1_l1_pc = compute_per_class_f1(metrics["_labels_l1"], metrics["_preds_l1"], trainer.l1_encoder)
+    f1_l2_pc = compute_per_class_f1(metrics["_labels_l2"], metrics["_preds_l2"], trainer.l2_encoder)
+
+    out_dir = RESULTS_DIR / model_subdir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "f1_per_class_l1.json").write_text(json.dumps(f1_l1_pc, ensure_ascii=False, indent=2))
+    (out_dir / "f1_per_class_l2.json").write_text(json.dumps(f1_l2_pc, ensure_ascii=False, indent=2))
+    print(f"  → {out_dir}/f1_per_class_l1.json ({len(f1_l1_pc)} classes)")
+    print(f"  → {out_dir}/f1_per_class_l2.json ({len(f1_l2_pc)} classes)")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Génère f1_per_class L1/L2 en JSON")
     parser.add_argument("--split-dir", required=True, help="Répertoire des splits")
@@ -153,6 +211,8 @@ def main():
                         help="Activer le masque hiérarchique à l'inférence")
     parser.add_argument("--no-description", action="store_true",
                         help="Mode Title-only (use_description=False)")
+    parser.add_argument("--flat-hydra", action="store_true",
+                        help="Évaluer FlatHydra au lieu de HYDRA (ignore --config/--variant/--model-dir)")
     args = parser.parse_args()
 
     with open(args.config) as f:
@@ -162,15 +222,25 @@ def main():
         cfg_kwargs["batch_size"] = args.batch_size
 
     split_dir = Path(args.split_dir)
+    use_description = not args.no_description
+
     print("Chargement des données...")
     data = prepare_hierarchical_data_from_splits(
         train_path=str(split_dir / "train_split.jsonl"),
         val_path=str(split_dir / "val_split.jsonl"),
         test_path=str(split_dir / "test_split.jsonl"),
         seed=cfg.get("seed", 42),
-        use_description=not args.no_description,
+        use_description=use_description,
     )
     print(f"  Test: {len(data['X_test']):,} samples, L1: {data['num_classes_l1']}, L2: {data['num_classes_l2']}")
+
+    if args.flat_hydra:
+        label = "FlatHydra Title-only" if not use_description else "FlatHydra Title+Description"
+        print(f"\n{'='*60}")
+        print(f"  {label}")
+        print(f"{'='*60}")
+        evaluate_flat_hydra_and_save(data, use_description=use_description, batch_size=args.batch_size)
+        return
 
     variants = [args.variant] if args.variant else VARIANTS
 
