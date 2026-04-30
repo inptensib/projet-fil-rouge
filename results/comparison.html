@@ -195,7 +195,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-29 18:26",
+    "generated": "2026-04-30 04:28",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -39426,15 +39426,17 @@ const MODELS_DATA = {
       "name": "HYDRA Nested + Hierarchy (Title-only)",
       "family": "hydra-title",
       "subtitle": "CamemBERT — variante nested — Hierarchy + Title-only",
-      "status": "running",
+      "status": "finished",
       "color": "#239b56",
       "metrics": {
-        "test_f1_l1_macro": 0.8534287312864728,
-        "test_f1_l2_macro": 0.32864751903025047,
-        "test_hcr": 0.9976908191858694,
-        "test_constrained_f1_macro": 0.3435567047716265
+        "test_f1_l1_macro": 0.9078524660775329,
+        "test_f1_l2_macro": 0.5867312579193068,
+        "test_hcr": 0.9974874371859297,
+        "test_constrained_f1_macro": 0.6041292394550012
       },
-      "val_metrics": {},
+      "val_metrics": {
+        "val_f1_l2_macro": 0.5867
+      },
       "training": {
         "params": {
           "encoder": "camembert-base",
