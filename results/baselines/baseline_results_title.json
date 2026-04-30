@@ -42,5 +42,27 @@
       "classifier_l2": "SGDClassifier (hinge, class_weight=balanced)",
       "use_description": false
     }
+  },
+  {
+    "embedding": "word2vec-title",
+    "classifier": "LinearSVC",
+    "subtitle": "Word2Vec (200d, Skip-gram) + LinearSVC / SGDClassifier — designation seule",
+    "status": "finished",
+    "metrics": {
+      "test_f1_l1_macro": 0.6402,
+      "test_f1_l2_macro": 0.2816,
+      "test_hcr": 0.2755,
+      "test_constrained_f1_macro": 0.2183
+    },
+    "params": {
+      "vector_size": 200,
+      "window": 5,
+      "sg": 1,
+      "min_count": 3,
+      "epochs": 10,
+      "classifier_l1": "LinearSVC (C=1.0, class_weight=balanced)",
+      "classifier_l2": "SGDClassifier (hinge, class_weight=balanced, n_jobs=1)",
+      "use_description": false
+    }
   }
 ]
