@@ -174,12 +174,50 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-04-30 14:43",
+    "generated": "2026-04-30 16:31",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
   },
   "models": [
+    {
+      "id": "hlpd-camembert",
+      "name": "HLPD-CamemBERT",
+      "family": "hlpd",
+      "subtitle": "Décodeur multi-label hiérarchique — ZLPR + biais hiérarchique (ECIR 2025)",
+      "status": "finished",
+      "color": "#9b59b6",
+      "metrics": {
+        "test_f1_l1_macro": 0.807,
+        "test_f1_l2_macro": 0.615,
+        "test_hcr": 0.978
+      },
+      "val_metrics": {
+        "f1_l1_macro": 0.916,
+        "f1_l2_macro": 0.684,
+        "hcr": 0.979
+      },
+      "training": {
+        "params": {
+          "encoder": "camembert-base",
+          "num_decoder_layers": 1,
+          "nhead": 2,
+          "ffn_dim": 2048,
+          "batch_size": 16,
+          "epochs": 10,
+          "lr": 0.0001,
+          "weight_decay": 0.01,
+          "max_length": 128,
+          "precision": "bfloat16",
+          "gradient_accumulation_steps": 4,
+          "seed": 42
+        }
+      },
+      "history": null,
+      "f1_per_class_l1": null,
+      "f1_per_class_l2": null,
+      "images": {}
+    },
     {
       "id": "hydra-local-camembert",
       "name": "HYDRA Local",

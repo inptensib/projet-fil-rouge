@@ -1401,10 +1401,10 @@ def main():
             "num_classes_l2": 6126,
         },
         "models": (
-            hydra_models
+            hlpd_models
+            + hydra_models
             + hydra_hier_models
             + hydra_mbert_models
-            + hlpd_models
             + flat_hydra_models
             + hydra_title_models
             + hydra_title_hier_models
