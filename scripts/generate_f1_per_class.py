@@ -35,6 +35,7 @@ import sys
 import time
 from pathlib import Path
 
+import importlib.util
 import torch
 import yaml
 
@@ -42,12 +43,32 @@ _ROOT = str(Path(__file__).resolve().parents[1])
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
-sys.path.insert(0, str(Path(_ROOT) / "01_baselines"))
 
 from src.trainer import HYDRATrainer
-from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer
 from shared.data_loader import prepare_hierarchical_data_from_splits
 from shared.metrics import compute_per_class_f1
+
+# flat_trainer (01_baselines/src/) et HYDRATrainer (02_hydra/src/) partagent le même nom
+# de paquet `src`, ce qui provoque un conflit sys.path. On charge 01_baselines/src comme
+# paquet alias `_baselines_src` pour préserver les imports relatifs de flat_trainer.
+def _load_baselines_src() -> tuple:
+    bl = Path(_ROOT) / "01_baselines" / "src"
+
+    def _reg(name: str, path: Path) -> object:
+        spec = importlib.util.spec_from_file_location(
+            name, str(path), submodule_search_locations=[str(bl)]
+        )
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+
+    _reg("_baselines_src", bl / "__init__.py")
+    _reg("_baselines_src.flat_model", bl / "flat_model.py")
+    ft = _reg("_baselines_src.flat_trainer", bl / "flat_trainer.py")
+    return ft.FlatHydraConfig, ft.FlatHydraTrainer
+
+FlatHydraConfig, FlatHydraTrainer = _load_baselines_src()
 
 VARIANTS = ["local", "nested", "global"]
 RESULTS_DIR = Path(_ROOT) / "results"
