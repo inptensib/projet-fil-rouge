@@ -60,7 +60,8 @@ def evaluate_variant(
     model_suffix: str = "",
 ) -> dict:
     """Évalue une variante avec et sans conditioning hiérarchique."""
-    model_path = Path(_ROOT) / f"{model_dir}/HYDRA_{variant}_CamemBERT{model_suffix}/best_model.pt"
+    encoder_name = cfg_kwargs.get("encoder_name", "CamemBERT")
+    model_path = Path(_ROOT) / f"{model_dir}/HYDRA_{variant}_{encoder_name}{model_suffix}/best_model.pt"
     if not model_path.exists():
         print(f"  [SKIP] {model_path} introuvable")
         return {}

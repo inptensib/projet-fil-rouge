@@ -44,6 +44,7 @@ SKIP_PARAMS = {"gpu_type", "num_classes_l1", "num_classes_l2"}
 
 EVAL_TEST_METRICS = RESULTS_DIR / "hydra_eval_test_metrics.json"
 HYDRA_HIERARCHY_METRICS = RESULTS_DIR / "hydra_eval_hierarchy_metrics.json"
+HYDRA_MBERT_METRICS = RESULTS_DIR / "hydra_eval_test_metrics_mbert.json"
 
 HYDRA_HIERARCHY_VARIANTS = {
     "local":  {"name": "HYDRA Local + Hierarchy",  "color": "#1a5276"},
@@ -678,6 +679,56 @@ def discover_flat_hydra_title_model() -> list[dict]:
     }]
 
 
+def discover_hydra_mbert_models() -> list[dict]:
+    """Découvre HYDRA Local mBERT depuis le JSON produit par eval_hierarchy.py."""
+    if not HYDRA_MBERT_METRICS.exists():
+        return []
+
+    raw = json.loads(HYDRA_MBERT_METRICS.read_text())
+    m = raw.get("local", {})
+    if not m:
+        return []
+
+    results_dir = RESULTS_DIR / "hydra-local-mbert"
+
+    f1_per_class_l1, f1_per_class_l2 = None, None
+    if results_dir.exists():
+        p1 = results_dir / "f1_per_class_l1.json"
+        p2 = results_dir / "f1_per_class_l2.json"
+        if p1.exists():
+            f1_per_class_l1 = json.loads(p1.read_text())
+        if p2.exists():
+            f1_per_class_l2 = json.loads(p2.read_text())
+
+    images = {}
+    for fname in IMAGE_FILES:
+        key = fname.replace(".png", "")
+        encoded = encode_image(results_dir / fname)
+        if encoded:
+            images[key] = encoded
+
+    return [{
+        "id": "hydra-local-mbert",
+        "name": "HYDRA Local (mBERT)",
+        "family": "hydra",
+        "subtitle": "mBERT — variante local — bert-base-multilingual-cased",
+        "status": "finished",
+        "color": "#e74c3c",
+        "metrics": {
+            "test_f1_l1_macro": m.get("f1_l1_macro"),
+            "test_f1_l2_macro": m.get("f1_l2_macro"),
+            "test_hcr": m.get("hcr"),
+            "test_constrained_f1_macro": m.get("constrained_f1_macro"),
+        },
+        "val_metrics": {},
+        "training": {"params": {"encoder": "bert-base-multilingual-cased", "variant": "local"}},
+        "history": None,
+        "f1_per_class_l1": f1_per_class_l1,
+        "f1_per_class_l2": f1_per_class_l2,
+        "images": images,
+    }]
+
+
 def render_html(models_data: dict) -> str:
     data_json = json.dumps(models_data, ensure_ascii=False, indent=2)
     return HTML_TEMPLATE.replace("/* __MODELS_DATA__ */", data_json)
@@ -1271,6 +1322,10 @@ def main():
     hydra_hier_models = discover_hydra_hierarchy_models()
     print(f"  → {len(hydra_hier_models)} variante(s) HYDRA hierarchy")
 
+    print("Découverte du modèle HYDRA Local mBERT...")
+    hydra_mbert_models = discover_hydra_mbert_models()
+    print(f"  → {len(hydra_mbert_models)} modèle(s) HYDRA mBERT")
+
     print("Découverte des baselines...")
     baseline_models = discover_baseline_models()
     print(f"  → {len(baseline_models)} baseline(s)")
@@ -1305,6 +1360,7 @@ def main():
         "models": (
             hydra_models
             + hydra_hier_models
+            + hydra_mbert_models
             + flat_hydra_models
             + hydra_title_models
             + hydra_title_hier_models

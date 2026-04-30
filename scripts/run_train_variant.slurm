@@ -27,7 +27,12 @@ VARIANT="${1:?Usage: sbatch --array=0-9%1 $0 <variant> [config]}"
 CONFIG="${2:-02_hydra/configs/default.yaml}"
 
 SAVE_DIR=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models'))" 2>/dev/null || echo "models")
-MODEL_DIR="${SAVE_DIR}/HYDRA_${VARIANT}_CamemBERT"
+ENCODER_KEY=$(python3 -c "
+import yaml
+m={'camembert-base':'CamemBERT','xlm-roberta-base':'XLM-RoBERTa','bert-base-multilingual-cased':'mBERT'}
+print(m.get(yaml.safe_load(open('$CONFIG')).get('encoder','camembert-base'),'CamemBERT'))
+" 2>/dev/null || echo "CamemBERT")
+MODEL_DIR="${SAVE_DIR}/HYDRA_${VARIANT}_${ENCODER_KEY}"
 CKPT="${MODEL_DIR}/checkpoint_latest.pt"
 COMPLETE="${MODEL_DIR}/training_complete.txt"
 
