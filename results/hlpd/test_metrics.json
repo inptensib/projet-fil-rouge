@@ -1,0 +1,10 @@
+{
+  "f1_l1_macro": 0.807,
+  "f1_l2_macro": 0.615,
+  "hcr": 0.978,
+  "hierarchical_accuracy": 0.820,
+  "l1_accuracy": 0.931,
+  "l2_accuracy": 0.826,
+  "test_set_size": 1170000,
+  "_source": "Reported by Mehdi Aithamma — best model @ step 345k, test 1.17M samples"
+}

@@ -1,0 +1,9 @@
+{
+  "f1_l1_macro": 0.916,
+  "f1_l2_macro": 0.684,
+  "hcr": 0.979,
+  "hierarchical_accuracy": 0.823,
+  "l1_accuracy": 0.931,
+  "l2_accuracy": 0.828,
+  "val_set_size": 100000
+}

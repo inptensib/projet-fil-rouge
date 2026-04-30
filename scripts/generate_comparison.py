@@ -14,6 +14,8 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / "results"
 MLFLOW_DB = PROJECT_ROOT / "mlflow.db"
@@ -38,6 +40,8 @@ IMAGE_FILES = [
     "confusion_matrix_l2_top50.png",
     "f1_per_class_l1.png",
     "f1_per_class_l2.png",
+    "metrics_global.png",
+    "l2_accuracy_distribution.png",
 ]
 
 SKIP_PARAMS = {"gpu_type", "num_classes_l1", "num_classes_l2"}
@@ -45,6 +49,7 @@ SKIP_PARAMS = {"gpu_type", "num_classes_l1", "num_classes_l2"}
 EVAL_TEST_METRICS = RESULTS_DIR / "hydra_eval_test_metrics.json"
 HYDRA_HIERARCHY_METRICS = RESULTS_DIR / "hydra_eval_hierarchy_metrics.json"
 HYDRA_MBERT_METRICS = RESULTS_DIR / "hydra_eval_test_metrics_mbert.json"
+HLPD_RESULTS_DIR = RESULTS_DIR / "hlpd"
 
 HYDRA_HIERARCHY_VARIANTS = {
     "local":  {"name": "HYDRA Local + Hierarchy",  "color": "#1a5276"},
@@ -775,6 +780,61 @@ def discover_hydra_mbert_models() -> list[dict]:
     }]
 
 
+def _hlpd_config_to_params(cfg: dict) -> dict:
+    """Extrait les hyperparamètres HLPD pertinents pour la table #config."""
+    keys = (
+        "encoder", "num_decoder_layers", "nhead", "ffn_dim",
+        "batch_size", "epochs", "lr", "weight_decay", "max_length",
+        "precision", "gradient_accumulation_steps", "seed",
+    )
+    return {k: cfg[k] for k in keys if k in cfg}
+
+
+def discover_hlpd_model() -> list[dict]:
+    """Découvre HLPD-CamemBERT depuis results/hlpd/test_metrics.json."""
+    test_path = HLPD_RESULTS_DIR / "test_metrics.json"
+    if not test_path.exists():
+        return []
+
+    test_m = json.loads(test_path.read_text())
+    val_path = HLPD_RESULTS_DIR / "val_metrics.json"
+    val_m = json.loads(val_path.read_text()) if val_path.exists() else {}
+
+    cfg_path = Path("02b_hlpd/configs/hlpd_3090.yaml")
+    cfg = yaml.safe_load(cfg_path.read_text()) if cfg_path.exists() else {}
+
+    images = {}
+    for fname in IMAGE_FILES:
+        key = fname.replace(".png", "")
+        encoded = encode_image(HLPD_RESULTS_DIR / fname)
+        if encoded:
+            images[key] = encoded
+
+    return [{
+        "id": "hlpd-camembert",
+        "name": "HLPD-CamemBERT",
+        "family": "hlpd",
+        "subtitle": "Décodeur multi-label hiérarchique — ZLPR + biais hiérarchique (ECIR 2025)",
+        "status": "finished",
+        "color": "#9b59b6",
+        "metrics": {
+            "test_f1_l1_macro": test_m.get("f1_l1_macro"),
+            "test_f1_l2_macro": test_m.get("f1_l2_macro"),
+            "test_hcr": test_m.get("hcr"),
+        },
+        "val_metrics": {
+            "f1_l1_macro": val_m.get("f1_l1_macro"),
+            "f1_l2_macro": val_m.get("f1_l2_macro"),
+            "hcr": val_m.get("hcr"),
+        },
+        "training": {"params": _hlpd_config_to_params(cfg)},
+        "history": None,
+        "f1_per_class_l1": None,
+        "f1_per_class_l2": None,
+        "images": images,
+    }]
+
+
 CLASS_METADATA_PATH = RESULTS_DIR / "class_metadata.json"
 
 
@@ -1329,6 +1389,10 @@ def main():
     baseline_title_models = discover_baseline_title_models()
     print(f"  → {len(baseline_title_models)} baseline(s) Title-only")
 
+    print("Découverte de HLPD-CamemBERT...")
+    hlpd_models = discover_hlpd_model()
+    print(f"  → {len(hlpd_models)} modèle(s) HLPD")
+
     models_data = {
         "meta": {
             "generated": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -1340,6 +1404,7 @@ def main():
             hydra_models
             + hydra_hier_models
             + hydra_mbert_models
+            + hlpd_models
             + flat_hydra_models
             + hydra_title_models
             + hydra_title_hier_models
