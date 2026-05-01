@@ -93,6 +93,17 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     .chart-row { flex-direction: column; }
     .chart-container { min-width: 100%; }
 }
+@media print {
+    .table-container { overflow: visible; }
+    nav, .view-toggle { display: none; }
+}
+.recap-compact td, .recap-compact th { padding: 6px 8px; font-size: 0.88em; }
+.recap-compact th { white-space: nowrap; }
+.view-toggle {
+    background: #f1f3f5; border: 1px solid #dee2e6; border-radius: 6px;
+    padding: 4px 10px; font-size: 0.85em; cursor: pointer; margin-bottom: 4px;
+}
+.view-toggle:hover { background: #e9ecef; }
 </style>
 </head>
 <body>
@@ -128,9 +139,15 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     <h2>Tableau récapitulatif</h2>
     <h3 style="color:#5dade2;border-left:4px solid #5dade2;padding-left:10px">Title-only (<code>designation</code> seule)</h3>
     <p style="color:#6c757d;font-size:0.9em">Modèles entraînés sur le titre du produit uniquement (benchmark sans description).</p>
+    <div style="display:flex;justify-content:flex-end;margin:4px 0">
+        <button class="view-toggle" id="toggle-title-only">Vue large ▶</button>
+    </div>
     <div class="table-container"><table id="recap-table-title-only"></table></div>
     <h3 style="color:#3498db;border-left:4px solid #3498db;padding-left:10px;margin-top:30px">Title + Description (<code>designation + description</code>)</h3>
     <p style="color:#6c757d;font-size:0.9em">Modèles entraînés sur la concaténation titre + description (régime principal).</p>
+    <div style="display:flex;justify-content:flex-end;margin:4px 0">
+        <button class="view-toggle" id="toggle-full-text">Vue large ▶</button>
+    </div>
     <div class="table-container"><table id="recap-table-full-text"></table></div>
 </section>
 <section id="per-class">
@@ -174,7 +191,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 <script>
 const MODELS_DATA = {
   "meta": {
-    "generated": "2026-05-01 03:21",
+    "generated": "2026-05-01 03:43",
     "project": "Rakuten Classification Hiérarchique",
     "num_classes_l1": 157,
     "num_classes_l2": 6126
@@ -134200,6 +134217,11 @@ const badgeHtml = (status) => {
     return `<span class="badge ${cls}">${txt}</span>`;
 };
 const finished = MODELS_DATA.models.filter(m => m.status !== 'planned');
+const familyLabel = (family) => {
+    if (family.startsWith('hydra')) return 'HYDRA';
+    if (family === 'hlpd') return 'HLPD';
+    return 'Baseline';
+};
 
 // --- 1. Recap Table ---
 function renderRecapTable(modelList, tableId) {
@@ -134223,7 +134245,7 @@ function renderRecapTable(modelList, tableId) {
     }
     html += '</tr></thead><tbody>';
     html += '<tr><td style="font-weight:600">Famille</td>';
-    for (const m of modelList) html += `<td style="text-align:center">${m.family.startsWith('hydra') ? 'HYDRA' : 'Baseline'}</td>`;
+    for (const m of modelList) html += `<td style="text-align:center">${familyLabel(m.family)}</td>`;
     html += '</tr>';
     for (const mdef of metrics) {
         const vals = modelList.map(m => {
@@ -134247,6 +134269,49 @@ function renderRecapTable(modelList, tableId) {
     }
     html += '</tbody>';
     t.innerHTML = html;
+}
+
+function renderRecapTableCompact(modelList, tableId) {
+    const t = document.getElementById(tableId);
+    if (!t) return;
+    if (modelList.length === 0) {
+        t.innerHTML = '<tbody><tr><td style="text-align:center;padding:20px;color:#6c757d">Aucun modèle dans cette catégorie.</td></tr></tbody>';
+        t.className = '';
+        return;
+    }
+    const metrics = [
+        {key: 'test_f1_l1_macro', label: 'F1 L1 test', main: false},
+        {key: 'test_f1_l2_macro', label: 'F1 L2 test', main: true},
+        {key: 'test_hcr', label: 'HCR test', main: false},
+        {key: 'val_f1_l1_macro', label: 'F1 L1 val', src: 'val_metrics'},
+        {key: 'val_f1_l2_macro', label: 'F1 L2 val', src: 'val_metrics'},
+    ];
+    const colVals = metrics.map(mdef => modelList.map(m => {
+        const src = mdef.src === 'val_metrics' ? m.val_metrics : m.metrics;
+        return src ? src[mdef.key] : null;
+    }));
+    const colBest  = colVals.map(vals => { const v = vals.filter(x => x != null); return v.length > 1 ? Math.max(...v) : null; });
+    const colWorst = colVals.map(vals => { const v = vals.filter(x => x != null); return v.length > 1 ? Math.min(...v) : null; });
+
+    let html = '<thead><tr><th>Modèle</th><th>Famille</th>';
+    for (const mdef of metrics) html += `<th style="text-align:center">${mdef.label}</th>`;
+    html += '</tr></thead><tbody>';
+    for (let i = 0; i < modelList.length; i++) {
+        const m = modelList[i];
+        html += `<tr><td><span style="color:${m.color}">●</span> ${m.name} ${badgeHtml(m.status)}</td>`;
+        html += `<td style="text-align:center">${familyLabel(m.family)}</td>`;
+        for (let j = 0; j < metrics.length; j++) {
+            const v = colVals[j][i];
+            let cls = metrics[j].main ? 'metric-main' : '';
+            if (v != null && v === colBest[j])  cls += ' best-cell';
+            else if (v != null && v === colWorst[j]) cls += ' worst-cell';
+            html += `<td class="${cls}" style="text-align:center"><span class="${f1Color(v)}">${fmt(v)}</span></td>`;
+        }
+        html += '</tr>';
+    }
+    html += '</tbody>';
+    t.innerHTML = html;
+    t.className = 'recap-compact';
 }
 
 // --- 2. Per-class comparison (generic for L1 and L2) ---
@@ -134456,7 +134521,7 @@ function renderConfigTable(modelList, tableId, allKeysGlobal) {
     for (const m of modelList) html += `<th style="text-align:center"><span style="color:${m.color}">●</span> ${m.name}</th>`;
     html += '</tr></thead><tbody>';
     html += '<tr><td style="font-weight:600">Famille</td>';
-    for (const m of modelList) html += `<td style="text-align:center">${m.family.startsWith('hydra') ? 'HYDRA' : 'Baseline'}</td>`;
+    for (const m of modelList) html += `<td style="text-align:center">${familyLabel(m.family)}</td>`;
     html += '</tr>';
     for (const key of sorted) {
         html += `<tr><td style="font-weight:600">${key}</td>`;
@@ -134502,8 +134567,31 @@ overlay.addEventListener('click', e => { if (e.target === overlay) closeOverlay(
 document.getElementById('gen-date').textContent = MODELS_DATA.meta.generated;
 const titleOnlyModels = finished.filter(m => m.family.endsWith('-title'));
 const fullTextModels  = finished.filter(m => !m.family.endsWith('-title'));
-renderRecapTable(titleOnlyModels, 'recap-table-title-only');
-renderRecapTable(fullTextModels,  'recap-table-full-text');
+
+// Compact par défaut (optimisé capture PowerPoint)
+const _recapState = {
+    'recap-table-title-only': { compact: true, models: titleOnlyModels },
+    'recap-table-full-text':  { compact: true, models: fullTextModels  },
+};
+function _renderRecap(tableId) {
+    const s = _recapState[tableId];
+    if (s.compact) renderRecapTableCompact(s.models, tableId);
+    else           renderRecapTable(s.models, tableId);
+}
+_renderRecap('recap-table-title-only');
+_renderRecap('recap-table-full-text');
+
+document.getElementById('toggle-title-only').addEventListener('click', function() {
+    _recapState['recap-table-title-only'].compact = !_recapState['recap-table-title-only'].compact;
+    _renderRecap('recap-table-title-only');
+    this.textContent = _recapState['recap-table-title-only'].compact ? 'Vue large ▶' : '◀ Vue compacte';
+});
+document.getElementById('toggle-full-text').addEventListener('click', function() {
+    _recapState['recap-table-full-text'].compact = !_recapState['recap-table-full-text'].compact;
+    _renderRecap('recap-table-full-text');
+    this.textContent = _recapState['recap-table-full-text'].compact ? 'Vue large ▶' : '◀ Vue compacte';
+});
+
 renderPerClassComparison();
 renderPerClassL2Comparison();
 renderAccordions();
