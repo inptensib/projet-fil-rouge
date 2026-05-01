@@ -969,6 +969,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 
 <nav>
     <a href="#recap">Récapitulatif</a>
+    <a href="#impact-description">Apport de la description</a>
     <a href="#per-class">F1 par classe L1</a>
     <a href="#per-class-l2">F1 par classe L2</a>
     <a href="#details">Détail par modèle</a>
@@ -1003,6 +1004,21 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     </div>
     <div class="table-container"><table id="recap-table-full-text"></table></div>
 </section>
+
+<section id="impact-description">
+    <h2>Apport de la description</h2>
+    <p style="color:#6c757d;font-size:0.95em">
+        Que change l'ajout de la <code>description</code> au <code>title</code> ? Pour chaque modèle existant
+        dans les deux régimes, on affiche les scores Title-only, Title + Description, et l'écart
+        en points absolus + variation relative (style cours de bourse).
+    </p>
+    <p style="color:#6c757d;font-size:0.85em;margin-top:-8px">
+        Δ &gt; 0 (vert) = la description aide · Δ &lt; 0 (rouge) = la description dégrade ·
+        cellules vides = pas de variante Title-only entraînée. Tri par Δ F1 L2 macro décroissant.
+    </p>
+    <div class="table-container"><table id="impact-table"></table></div>
+</section>
+
 <section id="per-class">
     <h2>Comparaison par classe L1 (157 classes)</h2>
     <div class="controls-bar">
@@ -1106,6 +1122,102 @@ function renderRecapTable(modelList, tableId) {
     }
     html += '</tbody>';
     t.innerHTML = html;
+}
+
+// --- 1bis. Impact Description (Title-only vs Title+Description) ---
+const MODEL_PAIRS = [
+    // [fullTextId, titleOnlyId|null]
+    ['hlpd-camembert', null],
+    ['hydra-local-hierarchy-camembert',  'hydra-local-title-hier-camembert'],
+    ['hydra-nested-hierarchy-camembert', 'hydra-nested-title-hier-camembert'],
+    ['hydra-global-hierarchy-camembert', 'hydra-global-title-hier-camembert'],
+    ['hydra-local-camembert',  'hydra-local-title-camembert'],
+    ['hydra-nested-camembert', 'hydra-nested-title-camembert'],
+    ['hydra-global-camembert', 'hydra-global-title-camembert'],
+    ['flat-hydra-camembert',   'flat-hydra-title-camembert'],
+    ['tfidf-linearsvc',           'tfidf-title-linearsvc'],
+    ['word2vec-linearsvc',        'word2vec-title-linearsvc'],
+    ['fasttext-softmax-softmax',  'fasttext-softmax-title-softmax'],
+    ['fasttext-supervised', null],
+];
+
+function _deltaCell(titleVal, fullVal) {
+    if (titleVal == null || fullVal == null) return '<td style="text-align:center;color:#adb5bd">--</td>';
+    const deltaPts = (fullVal - titleVal) * 100;     // points
+    const deltaRel = titleVal !== 0 ? (fullVal - titleVal) / titleVal * 100 : 0;
+    const arrow = deltaPts > 0 ? '▲' : (deltaPts < 0 ? '▼' : '–');
+    const sign  = deltaPts > 0 ? '+' : '';
+    const color = deltaPts > 0 ? '#27ae60' : (deltaPts < 0 ? '#e74c3c' : '#7f8c8d');
+    // Intensité fond ∝ |Δ pts|, capée à 5 pts → alpha max 0.28
+    const alpha = Math.min(Math.abs(deltaPts) / 5, 1) * 0.28;
+    const bg = deltaPts > 0 ? `rgba(39,174,96,${alpha.toFixed(3)})`
+            : deltaPts < 0 ? `rgba(231,76,60,${alpha.toFixed(3)})`
+            : 'transparent';
+    return `<td style="text-align:center;background:${bg};font-weight:600;color:${color};white-space:nowrap">
+        ${arrow} ${sign}${deltaPts.toFixed(2)} pts<br>
+        <span style="font-size:0.82em;font-weight:500">(${sign}${deltaRel.toFixed(1)}%)</span>
+    </td>`;
+}
+
+function renderImpactTable() {
+    const t = document.getElementById('impact-table');
+    if (!t) return;
+    const byId = Object.fromEntries(finished.map(m => [m.id, m]));
+    const rows = [];
+    for (const [fullId, titleId] of MODEL_PAIRS) {
+        const full  = byId[fullId];
+        if (!full) continue;
+        const title = titleId ? byId[titleId] : null;
+        rows.push({ full, title });
+    }
+    // Tri par Δ F1 L2 décroissant ; les modèles sans pendant title-only restent en haut
+    rows.sort((a, b) => {
+        const da = (a.title && a.full.metrics?.test_f1_l2_macro != null && a.title.metrics?.test_f1_l2_macro != null)
+            ? a.full.metrics.test_f1_l2_macro - a.title.metrics.test_f1_l2_macro : Number.POSITIVE_INFINITY;
+        const db = (b.title && b.full.metrics?.test_f1_l2_macro != null && b.title.metrics?.test_f1_l2_macro != null)
+            ? b.full.metrics.test_f1_l2_macro - b.title.metrics.test_f1_l2_macro : Number.POSITIVE_INFINITY;
+        return db - da;
+    });
+
+    let html = `<thead>
+        <tr>
+            <th rowspan="2" style="vertical-align:middle">Modèle</th>
+            <th rowspan="2" style="vertical-align:middle;text-align:center">Famille</th>
+            <th colspan="3" style="text-align:center;background:#eaf3fb">F1 L1 macro (test)</th>
+            <th colspan="3" style="text-align:center;background:#fff5e6">F1 L2 macro (test)</th>
+            <th colspan="3" style="text-align:center;background:#f0f0f0">HCR (test)</th>
+        </tr>
+        <tr>
+            <th style="text-align:center;font-size:0.78em;background:#eaf3fb">Title</th>
+            <th style="text-align:center;font-size:0.78em;background:#eaf3fb">Title+Desc</th>
+            <th style="text-align:center;font-size:0.78em;background:#eaf3fb">Δ</th>
+            <th style="text-align:center;font-size:0.78em;background:#fff5e6">Title</th>
+            <th style="text-align:center;font-size:0.78em;background:#fff5e6">Title+Desc</th>
+            <th style="text-align:center;font-size:0.78em;background:#fff5e6">Δ</th>
+            <th style="text-align:center;font-size:0.78em;background:#f0f0f0">Title</th>
+            <th style="text-align:center;font-size:0.78em;background:#f0f0f0">Title+Desc</th>
+            <th style="text-align:center;font-size:0.78em;background:#f0f0f0">Δ</th>
+        </tr>
+    </thead><tbody>`;
+
+    for (const { full, title } of rows) {
+        const fM = full.metrics  || {};
+        const tM = title ? (title.metrics || {}) : {};
+        html += `<tr>
+            <td><span style="color:${full.color}">●</span> ${full.name}</td>
+            <td style="text-align:center">${familyLabel(full.family)}</td>`;
+        for (const key of ['test_f1_l1_macro', 'test_f1_l2_macro', 'test_hcr']) {
+            const tVal = title ? tM[key] : null;
+            const fVal = fM[key];
+            html += `<td style="text-align:center"><span class="${f1Color(tVal)}">${fmt(tVal)}</span></td>`;
+            html += `<td style="text-align:center"><span class="${f1Color(fVal)}">${fmt(fVal)}</span></td>`;
+            html += _deltaCell(tVal, fVal);
+        }
+        html += '</tr>';
+    }
+    html += '</tbody>';
+    t.innerHTML = html;
+    t.className = 'recap-compact';
 }
 
 function renderRecapTableCompact(modelList, tableId) {
@@ -1429,6 +1541,7 @@ document.getElementById('toggle-full-text').addEventListener('click', function()
     this.textContent = _recapState['recap-table-full-text'].compact ? 'Vue large ▶' : '◀ Vue compacte';
 });
 
+renderImpactTable();
 renderPerClassComparison();
 renderPerClassL2Comparison();
 renderAccordions();
