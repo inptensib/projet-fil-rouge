@@ -968,6 +968,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 </p>
 
 <nav>
+    <a href="#synthese">Synthèse</a>
     <a href="#recap">Récapitulatif</a>
     <a href="#impact-description">Apport de la description</a>
     <a href="#per-class">F1 par classe L1</a>
@@ -988,6 +989,14 @@ details[open] summary { border-radius: 8px 8px 0 0; }
         <button onclick="closeOverlay()">Fermer (Echap)</button>
     </div>
 </div>
+
+<section id="synthese" style="background:linear-gradient(135deg,#f8fff9 0%,#f0f8ff 100%);border:1px solid #d4edda;border-radius:10px;padding:20px;margin:20px 0">
+    <h2 style="margin-top:0;border:none;padding:0;color:#27ae60">Synthèse — modèles champions</h2>
+    <p style="color:#6c757d;font-size:0.88em;margin:6px 0 14px">
+        Meilleur modèle par catégorie sur le test set. <em>F1 = métrique principale (macro, toutes classes).</em>
+    </p>
+    <div id="champions-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px"></div>
+</section>
 
 <section id="recap">
     <h2>Tableau récapitulatif</h2>
@@ -1124,9 +1133,52 @@ function renderRecapTable(modelList, tableId) {
     t.innerHTML = html;
 }
 
+// --- 0. Champions ---
+function _championCard(label, model, metricVal, metricLabel) {
+    if (!model) return '';
+    return `<div style="background:#fff;border:1px solid #e9ecef;border-radius:8px;
+        padding:14px 16px;border-left:4px solid ${model.color}">
+        <div style="font-size:0.75em;color:#6c757d;font-weight:700;
+            text-transform:uppercase;letter-spacing:0.6px;margin-bottom:6px">${label}</div>
+        <div style="font-size:1em;font-weight:600;color:#2c3e50;margin-bottom:4px">
+            <span style="color:${model.color}">●</span> ${model.name}</div>
+        <div style="font-size:1.55em;font-weight:700;color:#27ae60;line-height:1.2">
+            ${(metricVal*100).toFixed(2)}<span style="font-size:0.6em">%</span></div>
+        <div style="font-size:0.78em;color:#6c757d;margin-top:2px">${metricLabel}</div>
+    </div>`;
+}
+
+function renderChampions() {
+    const grid = document.getElementById('champions-grid');
+    if (!grid) return;
+    const best = (arr, getter) => arr.reduce((a, b) => (getter(b) ?? -1) > (getter(a) ?? -1) ? b : a, arr[0]);
+    const get = (m, key) => m.metrics?.[key] ?? null;
+    const fullText  = finished.filter(m => !m.family.endsWith('-title'));
+    const titleOnly = finished.filter(m => m.family.endsWith('-title'));
+    const baselines = finished.filter(m => m.family.startsWith('baseline'));
+    const cards = [
+        ['Champion F1 L2 (test)',
+            best(fullText, m => get(m, 'test_f1_l2_macro')),
+            m => get(m, 'test_f1_l2_macro'), 'F1 L2 macro — test set'],
+        ['Champion HCR (test)',
+            best(fullText, m => get(m, 'test_hcr')),
+            m => get(m, 'test_hcr'), 'Hiérarchical Consistency Rate — test set'],
+        ['Champion Title-only F1 L2',
+            titleOnly.length ? best(titleOnly, m => get(m, 'test_f1_l2_macro')) : null,
+            m => get(m, 'test_f1_l2_macro'), 'F1 L2 macro — title seule, test set'],
+        ['Meilleure Baseline F1 L2',
+            baselines.length ? best(baselines, m => get(m, 'test_f1_l2_macro')) : null,
+            m => get(m, 'test_f1_l2_macro'), 'F1 L2 macro — baseline, test set'],
+    ];
+    grid.innerHTML = cards.map(([label, model, getter, metricLabel]) =>
+        model ? _championCard(label, model, getter(model), metricLabel) : ''
+    ).join('');
+}
+
 // --- 1bis. Impact Description (Title-only vs Title+Description) ---
 const MODEL_PAIRS = [
     // [fullTextId, titleOnlyId|null]
+    ['hydra-local-mbert', null],
     ['hlpd-camembert', null],
     ['hydra-local-hierarchy-camembert',  'hydra-local-title-hier-camembert'],
     ['hydra-nested-hierarchy-camembert', 'hydra-nested-title-hier-camembert'],
@@ -1529,6 +1581,7 @@ function _renderRecap(tableId) {
 }
 _renderRecap('recap-table-title-only');
 _renderRecap('recap-table-full-text');
+renderChampions();
 
 document.getElementById('toggle-title-only').addEventListener('click', function() {
     _recapState['recap-table-title-only'].compact = !_recapState['recap-table-title-only'].compact;
