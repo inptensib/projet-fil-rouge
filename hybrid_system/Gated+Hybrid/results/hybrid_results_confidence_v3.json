@@ -1,0 +1,65 @@
+{
+  "method": "confidence_v3_setfit_gated_gen_probe",
+  "priority": "SetFit > XGBoost > LoRA (all gated); Gen probe on l1_uncertain",
+  "l1_accuracy": 0.9199292338297794,
+  "l2_e2e_accuracy": 0.8234873019434742,
+  "l2_e2e_f1_macro": 0.592201241640492,
+  "l2_e2e_f1_weighted": 0.8214628506504019,
+  "thresholds": {
+    "camembert_accept": 0.5,
+    "l1_confidence_min": 0.7,
+    "generative_fallback": 0.3
+  },
+  "override_stats": {
+    "setfit_tried": 16594,
+    "setfit_won": 10636,
+    "xgb_tried": 39494,
+    "xgb_won": 32958
+  },
+  "route_breakdown": {
+    "camembert_accept": {
+      "n_samples": 1034777,
+      "pct": 86.64,
+      "accuracy": 0.8984,
+      "f1_macro": 0.665
+    },
+    "camembert_l1_uncertain_gen_probed": {
+      "n_samples": 103467,
+      "pct": 8.66,
+      "accuracy": 0.2759,
+      "f1_macro": 0.2228
+    },
+    "xgboost_override": {
+      "n_samples": 32958,
+      "pct": 2.76,
+      "accuracy": 0.6025,
+      "f1_macro": 0.4833
+    },
+    "camembert_no_override": {
+      "n_samples": 12518,
+      "pct": 1.05,
+      "accuracy": 0.3958,
+      "f1_macro": 0.3073
+    },
+    "setfit_override": {
+      "n_samples": 10636,
+      "pct": 0.89,
+      "accuracy": 0.0487,
+      "f1_macro": 0.0391
+    }
+  },
+  "gen_probe_summary": {
+    "n_samples": 103467,
+    "cam_only_accuracy": 0.275875399885954,
+    "gen_only_accuracy": 0.07313442933495704,
+    "oracle_accuracy": 0.31927087863763326,
+    "cam_wins": 25467,
+    "gen_wins": 4490,
+    "both_right": 3077,
+    "both_wrong": 70433,
+    "cam_only_f1_macro": 0.22281235324917864,
+    "gen_only_f1_macro": 0.05385940873242129
+  },
+  "eval_time_minutes": 1349.5310897469521,
+  "n_samples": 1194356
+}

@@ -1,0 +1,96 @@
+{
+  "project": "Rakuten Hybrid Product Classification",
+  "task": "L2 subcategory prediction (~6K classes)",
+  "language": "French",
+
+  "models": {
+    "camembert_l2": {
+      "type": "CamemBERT-base fine-tuned",
+      "checkpoint": "checkpoints/l2_camembert_run2/",
+      "description": "Flat classifier over all L2 subcategories",
+      "standalone_accuracy": 0.8197,
+      "standalone_f1_macro": 0.5733,
+      "standalone_f1_weighted": 0.8148
+    },
+    "l1_classifier": {
+      "type": "CamemBERT-base fine-tuned",
+      "checkpoint": "checkpoints/l1_classifier/",
+      "description": "Classifies into 157 L1 categories (used as router for XGBoost)",
+      "accuracy": 0.9199
+    },
+    "xgboost": {
+      "type": "Per-L1-class XGBoost ensemble (149 models)",
+      "checkpoint": "checkpoints/l2_xgboost/",
+      "description": "Uses CLS embeddings from L1 encoder as features; predicts L2 within predicted L1 class",
+      "coverage": "149/157 L1 classes",
+      "feature_dim": 768
+    },
+    "setfit": {
+      "type": "SetFit (sentence-transformers + logistic head)",
+      "checkpoint": "checkpoints/setfit_models/",
+      "coverage": "27/157 L1 classes",
+      "status": "EXCLUDED",
+      "reason": "Poorly calibrated confidence — 4.87% accuracy on overrides despite high reported confidence"
+    },
+    "lora": {
+      "type": "CamemBERT + LoRA adapters",
+      "checkpoint": "checkpoints/lora_models/",
+      "coverage": "59/157 L1 classes",
+      "status": "EXCLUDED",
+      "reason": "L1 routing errors cascade — 1.2% accuracy on specialist-handled samples"
+    },
+    "generative": {
+      "type": "CroissantLLM (croissantllm/CroissantLLMChat-v0.1)",
+      "status": "EXCLUDED",
+      "reason": "7.3% accuracy vs CamemBERT's 27.6% on same uncertain samples"
+    }
+  },
+
+  "final_system": {
+    "name": "max_conf hybrid (CamemBERT L2 + XGBoost)",
+    "strategy": "max_conf",
+    "description": "For each sample: CamemBERT L2 predicts subcategory. If cam_conf < 0.9, also run L1 classifier to route to XGBoost. Pick whichever model (CamemBERT or XGBoost) is more confident.",
+    "threshold_for_xgboost_trigger": 0.9,
+    "override_rule": "use XGBoost prediction when xgb_conf > cam_conf",
+    "results": {
+      "accuracy": 0.8354,
+      "f1_macro": 0.6321,
+      "f1_weighted": 0.8312,
+      "pct_xgboost_overrides": 22.8,
+      "pct_camembert_kept": 77.2
+    },
+    "improvement_vs_camembert_alone": {
+      "accuracy_delta": "+1.57%",
+      "f1_macro_delta": "+5.88%",
+      "f1_weighted_delta": "+1.64%"
+    }
+  },
+
+  "sweep_parameters": {
+    "thresholds_tested": [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+    "modes_tested": {
+      "gated": "XGBoost overrides only if xgb_conf > cam_conf AND cam_conf < threshold",
+      "always_xgb": "XGBoost always overrides when cam_conf < threshold",
+      "max_conf": "Always pick whoever is more confident (threshold-independent)"
+    },
+    "total_combinations": 21,
+    "best_combination": {
+      "mode": "max_conf",
+      "note": "Threshold-independent — same result at all thresholds"
+    }
+  },
+
+  "dataset": {
+    "test_split": "dataset/test_split.jsonl",
+    "test_samples": 1194356,
+    "l1_classes": 157,
+    "l2_subcategories": "~6000+"
+  },
+
+  "infrastructure": {
+    "gpu": "NVIDIA RTX 3090 (24GB)",
+    "cluster": "SLURM (partition: 3090)",
+    "python": "3.12",
+    "key_libraries": ["transformers", "torch", "xgboost", "scikit-learn", "datasets"]
+  }
+}

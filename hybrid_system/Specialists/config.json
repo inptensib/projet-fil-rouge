@@ -1,0 +1,92 @@
+{
+  "project": "Rakuten Specialist Models (SetFit, LoRA, Generative)",
+  "purpose": "Per-L1-class specialists for rare L2 subcategory classification",
+  "language": "French",
+  "status": "EVALUATED — all three excluded from final hybrid system",
+
+  "models": {
+    "setfit": {
+      "type": "SetFit (sentence-transformers + logistic head)",
+      "base_model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      "checkpoint_dir": "checkpoints/setfit_models/",
+      "coverage": "27/157 L1 classes",
+      "training": {
+        "approach": "One model per L1 class with rare subcategories (< T_rare samples)",
+        "contrastive_pairs": "8 pairs per class",
+        "epochs": 1,
+        "body_learning_rate": 2e-5,
+        "head_learning_rate": 1e-2
+      },
+      "evaluation": {
+        "override_rate": "64% (10,636/16,594 attempted overrides)",
+        "accuracy_on_overrides": "4.87%",
+        "problem": "Poorly calibrated — predict_proba returns high confidence even on wrong predictions; not comparable to CamemBERT softmax"
+      },
+      "runner": "run_setfit.sh"
+    },
+    "lora": {
+      "type": "CamemBERT-base + LoRA adapters (PEFT)",
+      "base_model": "camembert-base",
+      "checkpoint_dir": "checkpoints/lora_models/",
+      "coverage": "59/157 L1 classes",
+      "training": {
+        "approach": "One LoRA adapter per L1 class with rare subcategories",
+        "lora_rank": 16,
+        "lora_alpha": 32,
+        "lora_dropout": 0.1,
+        "target_modules": ["query", "value"],
+        "learning_rate": 2e-4,
+        "epochs": 5,
+        "adapter_size": "~2-4MB per class"
+      },
+      "evaluation": {
+        "accuracy_on_specialist_samples": "1.2%",
+        "problem": "L1 classifier has ~8% error rate; on hard samples (where specialists are needed) error rate is much higher → wrong L1 → wrong adapter → catastrophic"
+      },
+      "runner": "run_lora.sh"
+    },
+    "generative": {
+      "type": "CroissantLLM (croissantllm/CroissantLLMChat-v0.1)",
+      "size": "1.3B parameters",
+      "approach": "Constrained log-probability scoring over valid L2 candidates",
+      "description": "For each product, compute P(label | prompt) for every valid subcategory within the predicted L1 class. Pick the label with highest log-prob.",
+      "evaluation": {
+        "accuracy_on_uncertain_samples": "7.3%",
+        "camembert_on_same_samples": "27.6%",
+        "oracle_ceiling": "31.9%",
+        "gen_wins_vs_cam": "4,490 vs 25,467 (out of 103,467 probed samples)",
+        "problem": "Consistently underperforms CamemBERT even on ambiguous/low-confidence samples"
+      },
+      "runner": "run_generative.sh"
+    }
+  },
+
+  "key_findings": {
+    "why_specialists_fail": [
+      "L1 routing is the bottleneck: 8% error on average, much higher on hard samples",
+      "Wrong L1 prediction → wrong specialist → accuracy drops to 1-5%",
+      "SetFit confidence is not calibrated — cannot be compared to CamemBERT softmax",
+      "Generative models lack the discriminative precision needed for 6K-class taxonomy",
+      "Only XGBoost (in Gated+Hybrid/) succeeds because it's well-calibrated and batch-efficient"
+    ],
+    "recommendation": "Use CamemBERT L2 + XGBoost max_conf hybrid instead (see Gated+Hybrid/)"
+  },
+
+  "dataset": {
+    "training_data": "dataset/train_split.jsonl",
+    "test_data": "dataset/test_split.jsonl",
+    "rare_threshold": 50,
+    "note": "Specialists trained only on subcategories with < T_rare training samples per L1 class"
+  },
+
+  "infrastructure": {
+    "gpu": "NVIDIA RTX 3090 (24GB)",
+    "cluster": "SLURM (partition: 3090)",
+    "python": "3.12",
+    "key_libraries": {
+      "setfit": ["setfit", "sentence-transformers", "huggingface_hub"],
+      "lora": ["peft", "transformers", "torch"],
+      "generative": ["transformers", "torch (float16)"]
+    }
+  }
+}

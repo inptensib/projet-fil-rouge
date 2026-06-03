@@ -1,0 +1,39 @@
+{
+  "method": "confidence_only_routing",
+  "l1_accuracy": 0.9199292338297794,
+  "l2_e2e_accuracy": 0.8319856056318217,
+  "l2_e2e_f1_macro": 0.6205147445884868,
+  "l2_e2e_f1_weighted": 0.8274868250447104,
+  "thresholds": {
+    "camembert_accept": 0.5,
+    "generative_fallback": 0.3
+  },
+  "route_breakdown": {
+    "camembert_accept": {
+      "n_samples": 1034777,
+      "pct": 86.64,
+      "accuracy": 0.8984,
+      "f1_macro": 0.665
+    },
+    "xgboost": {
+      "n_samples": 159286,
+      "pct": 13.34,
+      "accuracy": 0.4014,
+      "f1_macro": 0.373
+    },
+    "camembert_midconf": {
+      "n_samples": 173,
+      "pct": 0.01,
+      "accuracy": 0.3815,
+      "f1_macro": 0.2059
+    },
+    "camembert_lowconf": {
+      "n_samples": 120,
+      "pct": 0.01,
+      "accuracy": 0.2,
+      "f1_macro": 0.0747
+    }
+  },
+  "eval_time_minutes": 447.40421792666115,
+  "n_samples": 1194356
+}
