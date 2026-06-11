@@ -1,6 +1,6 @@
 ---
 name: sync-check
-description: Verifie la coherence entre le code Python et la documentation (READMEs, blog.md, configs YAML). Detecte les drifts.
+description: Verifie la coherence entre le code Python et la documentation (READMEs, docs/, configs YAML). Detecte les drifts.
 user-invocable: true
 allowed-tools: Read, Glob, Grep, Bash
 ---

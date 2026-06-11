@@ -33,7 +33,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 5. EVALUER        Analyser les resultats, comparer aux baselines, error analysis
                   → MLflow MCP (compare_runs), error_analysis.py, /content-report
 
-6. DOCUMENTER     Mettre a jour READMEs, blog.md, diagrammes
+6. DOCUMENTER     Mettre a jour READMEs, docs/, diagrammes
                   → /sync-check, /markdown, /diagram
 
 7. COMMITTER      Pipeline qualite puis commit
@@ -46,7 +46,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 - **TOUJOURS verifier la coherence hierarchique** (HCR) en plus du F1
 - **Tester** apres chaque modification de code (le hook auto-test le fait, sinon manuellement) :
   ```bash
-  /home/infres/tandriam-25/fil_rouge/venv/bin/python -m pytest tests/ -v --tb=short
+  python -m pytest tests/ -v --tb=short   # depuis le venv du projet
   ```
 
 ## Conventions techniques
@@ -73,14 +73,13 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 01_baselines/notebooks/ fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb
 02_hydra/src/          models.py, losses.py, trainer.py, predict.py
 02_hydra/configs/      default.yaml, hierarchy.yaml (source de verite hyperparametres)
-02b_hlpd/              HLPD (a venir — Mehdi Aithamma)
+02b_hlpd/              HLPD (decodeur hierarchique — Mehdi Aithamma)
 03_distributed/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
 shared/                data_loader.py, metrics.py, utils.py
 scripts/               run_train.py, generate_comparison.py, generate_f1_per_class.py, eval_hierarchy.py
                        run_train_variant.slurm, run_train_array.slurm, chain_submit_array.sh
 results/               comparison.html, rapports HTML par modele, metriques JSON
-tests/                 77 tests pytest
-blog.md                article technique du projet
+tests/                 164 tests pytest
 docker-compose.yml     services : test, training, baselines, mlflow
 ```
 
@@ -135,9 +134,9 @@ Invoquer le skill correspondant est **OBLIGATOIRE** dans chaque situation listee
 
 | Quand | Skill | Pourquoi |
 |:------|:------|:---------|
-| Code Python, docs (.md), ou configs (.yaml) modifies | `/sync-check` | Detecte TOUT drift entre code, configs, READMEs et blog.md. Sans lui, des incoherences passent silencieusement. |
+| Code Python, docs (.md), ou configs (.yaml) modifies | `/sync-check` | Detecte TOUT drift entre code, configs, READMEs et docs/. Sans lui, des incoherences passent silencieusement. |
 | Refactoring, nouvelle feature, ou >3 fichiers touches | `/simplify` | Detecte code duplique, abstractions inutiles, imports morts. Garantit un code minimal. |
-| Avant tout commit (BLOQUANT) | `/pre-commit` | Pipeline complet : lint + 77 tests + sync-check + scan securite. Ne JAMAIS committer sans. Inclut deja `/sync-check`. |
+| Avant tout commit (BLOQUANT) | `/pre-commit` | Pipeline complet : lint + tests + sync-check + scan securite. Ne JAMAIS committer sans. Inclut deja `/sync-check`. |
 | requirements.txt modifie, import ajoute/supprime, nouveau fichier .py | `/dep-audit` | Croise imports reels vs requirements.txt. Package manquant = crash en prod. |
 
 ### Experimentation & Training — cycle complet

@@ -10,7 +10,7 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-yellow?logo=huggingface&logoColor=white)
 ![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?logo=mlflow&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-77%20passed-brightgreen?logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-164%20passed-brightgreen?logo=pytest&logoColor=white)
 ![SLURM](https://img.shields.io/badge/SLURM-Multi--GPU-orange)
 
 > **Télécom Paris** (IP Paris) × **Rakuten France**
@@ -39,7 +39,7 @@ Un produit arrive avec un titre et une description en français. Le modèle pré
 
 Deux approches comparées :
 - **HYDRA** (EMNLP 2025) — Multi-tête encoder-only ✅
-- **HLPD** (ECIR 2025) — Décodeur non-autorégressif avec attention hiérarchique 📋 *(à venir)*
+- **HLPD** (ECIR 2025) — Décodeur non-autorégressif avec attention hiérarchique ✅
 
 ---
 
@@ -108,7 +108,7 @@ graph TD
 - Per-class F1 (barplots triés)
 - Training curves (loss + F1 + HCR)
 - Explicabilité Gradient × Input (HTML)
-- 77 tests pytest
+- 164 tests pytest
 
 </td>
 </tr>
@@ -223,12 +223,12 @@ rakuten-classification/
 ├── 02_hydra/
 │   ├── configs/               default.yaml, hierarchy.yaml
 │   └── src/                   models, losses, trainer, predict
-├── 02b_hlpd/                  HLPD (à venir — Mehdi Aithamma)
+├── 02b_hlpd/                  HLPD (décodeur hiérarchique — Mehdi Aithamma)
 ├── 03_distributed/             DDP multi-nœud, SLURM
 ├── shared/                    data_loader, metrics, utils
 ├── scripts/                   train, SLURM arrays, évaluation, comparaison
 ├── results/                   Rapports HTML, métriques par modèle
-├── tests/                     77 tests pytest
+├── tests/                     164 tests pytest
 └── docker-compose.yml         MLflow, tests, training
 ```
 
