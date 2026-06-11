@@ -56,15 +56,17 @@ from shared.metrics import (
 )
 from shared.utils import ENCODERS, enforce_hierarchy
 
-# Models and losses from 02_hydra
-_HYDRA_ROOT = os.path.join(_PROJECT_ROOT, "02_hydra")
-if _HYDRA_ROOT not in sys.path:
-    sys.path.insert(0, _HYDRA_ROOT)
-
-from src.losses import HYDRALoss
-from src.models import HYDRAGlobal, HYDRALocal, HYDRANested
-
+# Models and losses from 02_hydra — chargés par chemin explicite car le
+# package local s'appelle aussi `src` (from src.losses échoue via -m src.main)
 from .ddp_utils import cleanup_ddp, print_rank0
+from .hydra_imports import load_hydra_module
+
+_losses_mod = load_hydra_module("losses")
+_models_mod = load_hydra_module("models")
+HYDRALoss = _losses_mod.HYDRALoss
+HYDRALocal = _models_mod.HYDRALocal
+HYDRAGlobal = _models_mod.HYDRAGlobal
+HYDRANested = _models_mod.HYDRANested
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -107,6 +109,9 @@ class HYDRATrainerDDP:
         gradient_accumulation_steps: Number of gradient accumulation steps.
         project_embedding: Whether to project encoder embeddings.
         pooling: Pooling strategy ('cls', 'mean', 'max', 'last').
+        dropout: Dropout rate of the classification heads.
+        hidden_dim: Hidden dimension of the classification heads.
+        freeze_encoder: Freeze encoder weights (train heads only).
         use_unified_predictions: Use global/nested head for predictions.
         check_hierarchy_consistency: Enforce parent-child constraints at inference.
         early_stopping_patience: Patience for early stopping (in eval intervals).
@@ -132,6 +137,9 @@ class HYDRATrainerDDP:
         gradient_accumulation_steps: int = 1,
         project_embedding: bool = True,
         pooling: str = "cls",
+        dropout: float = 0.3,
+        hidden_dim: int = 256,
+        freeze_encoder: bool = False,
         use_unified_predictions: bool = True,
         check_hierarchy_consistency: bool = False,
         early_stopping_patience: int = 2,
@@ -154,6 +162,9 @@ class HYDRATrainerDDP:
         self.gradient_accumulation_steps = gradient_accumulation_steps
         self.project_embedding = project_embedding
         self.pooling = pooling
+        self.dropout = dropout
+        self.hidden_dim = hidden_dim
+        self.freeze_encoder = freeze_encoder
         self.use_unified_predictions = use_unified_predictions
         self.check_hierarchy_consistency = check_hierarchy_consistency
         self.early_stopping_patience = early_stopping_patience
@@ -524,6 +535,9 @@ class HYDRATrainerDDP:
             num_classes_l2=self.num_classes_l2,
             pooling=self.pooling,
             project_embedding=self.project_embedding,
+            dropout=self.dropout,
+            hidden_dim=self.hidden_dim,
+            freeze_encoder=self.freeze_encoder,
         )
         model = model.to(self.device)
 
@@ -819,6 +833,8 @@ class HYDRATrainerDDP:
                                             "encoder_name": encoder_name,
                                             "pooling": self.pooling,
                                             "project_embedding": self.project_embedding,
+                                            "dropout": self.dropout,
+                                            "hidden_dim": self.hidden_dim,
                                         },
                                     },
                                     os.path.join(model_dir, "hydra_model.pt"),
