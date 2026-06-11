@@ -3,6 +3,15 @@
 Compare les métriques (F1 L1, F1 L2, HCR, constrained F1) pour chaque
 variante (local, nested, global) en mode standard vs hiérarchique.
 
+ATTENTION — deux modes d'évaluation NON comparables entre eux :
+- "base" : sans masque hiérarchique (HCR ~0.86) — le mode des modèles standards
+- "hier" : avec masque (HCR ~0.997 par construction) — le mode des modèles
+  entraînés avec condition_l2_on_l1/check_hierarchy
+
+Le JSON de sortie (--output-json) suit --output-mode ; le défaut "auto"
+choisit selon la config pour éviter de mélanger les deux familles de chiffres
+(cf. docs/METRICS.md, incident mBERT).
+
 Usage:
     python scripts/eval_hierarchy.py --split-dir /path/to/splits
     python scripts/eval_hierarchy.py --split-dir /path/to/splits --variant local
@@ -10,6 +19,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import datetime
+import json
 import sys
 import time
 from pathlib import Path
@@ -38,6 +49,41 @@ _EVAL_IRRELEVANT_KEYS = (
     "experiment_suffix",
     "condition_l2_on_l1",
 )
+
+
+def _resolve_output_mode(args_mode: str, cfg: dict) -> str:
+    """Détermine le mode des métriques sérialisées dans le JSON.
+
+    "auto" suit la config : un modèle entraîné pour la hiérarchie
+    (check_hierarchy ou condition_l2_on_l1) est publié en mode "hier",
+    un modèle standard en mode "base". Évite de publier des métriques
+    masquées pour un modèle standard (incident mBERT).
+    """
+    if args_mode != "auto":
+        return args_mode
+    if cfg.get("check_hierarchy", False) or cfg.get("condition_l2_on_l1", False):
+        return "hier"
+    return "base"
+
+
+def _serialize_results(all_results: dict, mode: str, config_path: str) -> dict:
+    """Construit le JSON plat {variant: {métriques}} + métadonnées préfixées _."""
+    time_key = f"time_{mode}"
+    output = {
+        "_mode": mode,
+        "_config": config_path,
+        "_date": datetime.date.today().isoformat(),
+    }
+    for variant, r in all_results.items():
+        m = r.get(mode, {})
+        output[variant] = {
+            "f1_l1_macro": m.get("f1_l1_macro"),
+            "f1_l2_macro": m.get("f1_l2_macro"),
+            "hcr": m.get("hcr"),
+            "constrained_f1_macro": m.get("constrained_f1_macro"),
+            "eval_time_s": round(r.get(time_key, 0), 1),
+        }
+    return output
 
 
 def evaluate_variant(
@@ -173,7 +219,13 @@ def main():
     )
     parser.add_argument(
         "--output-json", default=None,
-        help="Si fourni, sérialise les métriques (mode hier) dans ce fichier JSON.",
+        help="Si fourni, sérialise les métriques dans ce fichier JSON (voir --output-mode).",
+    )
+    parser.add_argument(
+        "--output-mode", default="auto", choices=["auto", "base", "hier"],
+        help="Mode des métriques sérialisées : 'base' (sans masque hiérarchique), "
+             "'hier' (avec masque), 'auto' (défaut : 'hier' si la config a "
+             "check_hierarchy/condition_l2_on_l1, sinon 'base').",
     )
     args = parser.parse_args()
 
@@ -213,20 +265,15 @@ def main():
     print_results(all_results)
 
     if args.output_json and all_results:
-        import json
-        output = {}
-        for variant, r in all_results.items():
-            m = r.get("hier", {})
-            output[variant] = {
-                "f1_l1_macro": m.get("f1_l1_macro"),
-                "f1_l2_macro": m.get("f1_l2_macro"),
-                "hcr": m.get("hcr"),
-                "constrained_f1_macro": m.get("constrained_f1_macro"),
-                "eval_time_s": round(r.get("time_hier", 0), 1),
-            }
+        mode = _resolve_output_mode(args.output_mode, cfg)
+        output = _serialize_results(all_results, mode, args.config)
         Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output_json).write_text(json.dumps(output, indent=2, ensure_ascii=False))
-        print(f"\n[Saved] {args.output_json}")
+        mode_desc = (
+            "AVEC masque hiérarchique" if mode == "hier"
+            else "SANS masque hiérarchique"
+        )
+        print(f"\n[Saved] {args.output_json} (mode={mode} — métriques {mode_desc})")
 
 
 if __name__ == "__main__":
