@@ -118,6 +118,12 @@ graph TD
 
 ## 🚀 Quick Start
 
+> **Nouveau sur le projet ?** Suivre [ONBOARDING.md](ONBOARDING.md) —
+> installation, données, modèles pré-entraînés, premier training, SLURM.
+> Référence détaillée : [docs/PIPELINE.md](docs/PIPELINE.md) (quel script
+> pour quel modèle) et [docs/METRICS.md](docs/METRICS.md) (métriques et
+> provenance des résultats).
+
 ```bash
 # Installation
 git clone <repo-url> && cd rakuten-classification
@@ -146,9 +152,13 @@ python -m pytest tests/ -v
 
 ---
 
-## 📊 Dataset
+## 📊 Dataset & Modèles
 
-> Propriétaire — non inclus dans le repo. Hébergé sur HuggingFace Hub (privé).
+> Propriétaires — non inclus dans le repo. Hébergés sur HuggingFace Hub (privé) :
+> données sur [`TahianaAndriambahoaka/rakuten-dataset`](https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset)
+> (`scripts/download_dataset.py`), poids entraînés (~50 Go) sur
+> [`TahianaAndriambahoaka/rakuten-models`](https://huggingface.co/TahianaAndriambahoaka/rakuten-models)
+> — procédure complète dans [ONBOARDING.md](ONBOARDING.md).
 
 | Split | Échantillons | % | Champs |
 |-------|-------------|---|--------|
@@ -227,8 +237,10 @@ rakuten-classification/
 ├── 03_distributed/             DDP multi-nœud, SLURM
 ├── shared/                    data_loader, metrics, utils
 ├── scripts/                   train, SLURM arrays, évaluation, comparaison
+├── docs/                      PIPELINE.md, METRICS.md, conception FlatHydra
 ├── results/                   Rapports HTML, métriques par modèle
 ├── tests/                     164 tests pytest
+├── ONBOARDING.md              Guide de prise en main (nouveau dev)
 └── docker-compose.yml         MLflow, tests, training
 ```
 

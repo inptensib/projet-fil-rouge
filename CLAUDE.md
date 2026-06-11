@@ -71,15 +71,17 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 00_eda/                Analyse exploratoire (EDA)
 01_baselines/src/      tfidf_pipeline.py, word2vec_pipeline.py, bert_flat_classifier.py, evaluate.py
 01_baselines/notebooks/ fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb
-02_hydra/src/          models.py, losses.py, trainer.py, predict.py
-02_hydra/configs/      default.yaml, hierarchy.yaml (source de verite hyperparametres)
+02_hydra/src/          models.py, losses.py, trainer.py, predict.py, config.py (mapping YAML)
+02_hydra/configs/      default.yaml (source de verite), hierarchy.yaml, title_only*.yaml, mbert_default.yaml
 02b_hlpd/              HLPD (decodeur hierarchique — Mehdi Aithamma)
 03_distributed/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
 shared/                data_loader.py, metrics.py, utils.py
 scripts/               run_train.py, generate_comparison.py, generate_f1_per_class.py, eval_hierarchy.py
                        run_train_variant.slurm, run_train_array.slurm, chain_submit_array.sh
+docs/                  PIPELINE.md (matrice scripts), METRICS.md (provenance metriques)
 results/               comparison.html, rapports HTML par modele, metriques JSON
 tests/                 164 tests pytest
+ONBOARDING.md          guide de prise en main pour nouveau developpeur
 docker-compose.yml     services : test, training, baselines, mlflow
 ```
 
