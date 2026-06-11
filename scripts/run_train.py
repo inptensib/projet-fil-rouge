@@ -21,45 +21,10 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
 
+from src.config import map_config
 from src.trainer import HYDRATrainer
 
 from shared.data_loader import prepare_hierarchical_data, prepare_hierarchical_data_from_splits
-
-
-def _map_config(cfg: dict) -> dict:
-    """Map YAML config keys to HYDRATrainer constructor kwargs."""
-    kwargs = {}
-
-    # Direct mappings (same name)
-    for key in ("variant", "batch_size", "epochs", "lr", "weight_decay",
-                "max_length", "seed", "condition_l2_on_l1", "check_hierarchy",
-                "save_dir", "use_focal", "focal_gamma",
-                "gradient_accumulation_steps", "warmup_ratio", "fp16",
-                "experiment_suffix"):
-        if key in cfg:
-            kwargs[key] = cfg[key]
-
-    # Renamed mappings
-    if "encoder" in cfg:
-        # Config uses HF model name; trainer expects our key (CamemBERT, etc.)
-        encoder_map = {
-            "camembert-base": "CamemBERT",
-            "xlm-roberta-base": "XLM-RoBERTa",
-            "bert-base-multilingual-cased": "mBERT",
-        }
-        kwargs["encoder_name"] = encoder_map.get(cfg["encoder"], cfg["encoder"])
-
-    for src, dst in [("gradient_clip", "max_grad_norm"), ("max_grad_norm", "max_grad_norm")]:
-        if src in cfg:
-            kwargs[dst] = cfg[src]
-
-    if "level_weights" in cfg and len(cfg["level_weights"]) >= 1:
-        kwargs["level_weight_l1"] = cfg["level_weights"][0]
-
-    # Note: dropout and hidden_dim are model-level params handled internally
-    # by HYDRATrainer via create_hydra_model, not constructor kwargs.
-
-    return kwargs
 
 
 def main():
@@ -142,7 +107,7 @@ def main():
             use_description=cfg.get("use_description", True),
         )
 
-    trainer_kwargs = _map_config(cfg)
+    trainer_kwargs = map_config(cfg)
     print(f"Starting training: variant={trainer_kwargs.get('variant', 'local')}, "
           f"encoder={trainer_kwargs.get('encoder_name', 'CamemBERT')}")
 

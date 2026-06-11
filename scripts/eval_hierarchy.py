@@ -22,33 +22,22 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
 
+from src.config import map_config
 from src.trainer import HYDRATrainer
 from shared.data_loader import prepare_hierarchical_data_from_splits
 
 
 VARIANTS = ["local", "nested", "global"]
 
-
-def _map_config(cfg: dict) -> dict:
-    """Map YAML config keys to HYDRATrainer constructor kwargs."""
-    kwargs = {}
-    for key in ("batch_size", "epochs", "lr", "weight_decay", "max_length", "seed"):
-        if key in cfg:
-            kwargs[key] = cfg[key]
-    if "encoder" in cfg:
-        encoder_map = {
-            "camembert-base": "CamemBERT",
-            "xlm-roberta-base": "XLM-RoBERTa",
-            "bert-base-multilingual-cased": "mBERT",
-        }
-        kwargs["encoder_name"] = encoder_map.get(cfg["encoder"], cfg["encoder"])
-    if "gradient_clip" in cfg:
-        kwargs["max_grad_norm"] = cfg["gradient_clip"]
-    if "level_weights" in cfg and len(cfg["level_weights"]) >= 1:
-        kwargs["level_weight_l1"] = cfg["level_weights"][0]
-    if "loss" in cfg:
-        kwargs["use_focal"] = cfg["loss"] == "focal"
-    return kwargs
+# Clés pilotées explicitement par evaluate_variant() ou sans effet en évaluation
+_EVAL_IRRELEVANT_KEYS = (
+    "variant",
+    "check_hierarchy",
+    "epochs",
+    "save_dir",
+    "experiment_suffix",
+    "condition_l2_on_l1",
+)
 
 
 def evaluate_variant(
@@ -67,7 +56,6 @@ def evaluate_variant(
         return {}
 
     # Créer le trainer (check_hierarchy=False d'abord)
-    cfg_kwargs.pop("epochs", None)
     trainer = HYDRATrainer(
         data=data, variant=variant, check_hierarchy=False,
         epochs=1, **cfg_kwargs,
@@ -191,7 +179,9 @@ def main():
 
     with open(args.config) as f:
         cfg = yaml.safe_load(f)
-    cfg_kwargs = _map_config(cfg)
+    cfg_kwargs = map_config(cfg)
+    for key in _EVAL_IRRELEVANT_KEYS:
+        cfg_kwargs.pop(key, None)
 
     split_dir = Path(args.split_dir)
     print("Chargement des données...")

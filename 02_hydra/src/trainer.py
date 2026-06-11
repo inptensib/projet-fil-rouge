@@ -82,6 +82,9 @@ class HYDRATrainer:
         early_stopping_min_delta: Minimum improvement to count as progress.
         project_embedding: Whether to project encoder embeddings.
         pooling: Pooling strategy.
+        dropout: Dropout rate of the classification heads.
+        hidden_dim: Hidden dimension of the classification heads.
+        freeze_encoder: Freeze encoder weights (train heads only).
         check_hierarchy: Whether to enforce hierarchy at inference.
         save_dir: Directory for saving model checkpoints.
         seed: Random seed.
@@ -109,6 +112,9 @@ class HYDRATrainer:
         early_stopping_min_delta: float = 0.001,
         project_embedding: bool = True,
         pooling: str = "cls",
+        dropout: float = 0.3,
+        hidden_dim: int = 256,
+        freeze_encoder: bool = False,
         check_hierarchy: bool = False,
         save_dir: str = "models",
         seed: int = 42,
@@ -143,6 +149,11 @@ class HYDRATrainer:
         self.warmup_ratio = warmup_ratio
         self.fp16 = fp16 and self.device.type == "cuda"
         self.lr = lr
+        self.pooling = pooling
+        self.project_embedding = project_embedding
+        self.dropout = dropout
+        self.hidden_dim = hidden_dim
+        self.freeze_encoder = freeze_encoder
 
         # Data
         self.data = data
@@ -169,6 +180,9 @@ class HYDRATrainer:
             num_classes_l2=self.num_classes_l2,
             pooling=pooling,
             project_embedding=project_embedding,
+            dropout=dropout,
+            hidden_dim=hidden_dim,
+            freeze_encoder=freeze_encoder,
         ).to(self.device)
 
         # DataParallel if multiple GPUs available
@@ -426,6 +440,10 @@ class HYDRATrainer:
                                     "encoder_name": self.encoder_name,
                                     "num_classes_l1": self.num_classes_l1,
                                     "num_classes_l2": self.num_classes_l2,
+                                    "pooling": self.pooling,
+                                    "project_embedding": self.project_embedding,
+                                    "dropout": self.dropout,
+                                    "hidden_dim": self.hidden_dim,
                                 },
                             },
                             model_dir / "checkpoint_latest.pt",
@@ -564,10 +582,10 @@ class HYDRATrainer:
                             "encoder_name": self.encoder_name,
                             "num_classes_l1": self.num_classes_l1,
                             "num_classes_l2": self.num_classes_l2,
-                            "pooling": self._base_model.pooling,
-                            "project_embedding": self._base_model.project_embedding,
-                            "dropout": self._base_model.level_1_head[3].p,
-                            "hidden_dim": self._base_model.hidden_dim,
+                            "pooling": self.pooling,
+                            "project_embedding": self.project_embedding,
+                            "dropout": self.dropout,
+                            "hidden_dim": self.hidden_dim,
                         },
                         "best_val_f1_l2": best_val_f1,
                         "epoch": epoch + 1,
@@ -596,10 +614,10 @@ class HYDRATrainer:
                         "encoder_name": self.encoder_name,
                         "num_classes_l1": self.num_classes_l1,
                         "num_classes_l2": self.num_classes_l2,
-                        "pooling": self._base_model.pooling,
-                        "project_embedding": self._base_model.project_embedding,
-                        "dropout": self._base_model.level_1_head[3].p,
-                        "hidden_dim": self._base_model.hidden_dim,
+                        "pooling": self.pooling,
+                        "project_embedding": self.project_embedding,
+                        "dropout": self.dropout,
+                        "hidden_dim": self.hidden_dim,
                     },
                 },
                 model_dir / "checkpoint_latest.pt",

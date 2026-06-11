@@ -60,6 +60,8 @@ def load_model(
         num_classes_l2=config["num_classes_l2"],
         pooling=config.get("pooling", "cls"),
         project_embedding=config.get("project_embedding", True),
+        dropout=config.get("dropout", 0.3),
+        hidden_dim=config.get("hidden_dim", 256),
     )
 
     # Handle DDP-wrapped state dicts
