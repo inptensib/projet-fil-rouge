@@ -15,11 +15,16 @@
 #   sbatch scripts/run_eval.slurm                  # évalue models/ (ancienne approche)
 #   sbatch scripts/run_eval.slurm models_hierarchy # évalue models_hierarchy/
 
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
+# --- Chemins (surcharger via export avant sbatch si besoin) ---
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
+VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
+DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset}"
+
+source "$VENV_ACTIVATE"
+cd "$PROJECT_ROOT"
 
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
+export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 
 MODEL_DIR="${1:-models}"
 
@@ -27,7 +32,7 @@ echo "=== Évaluation HYDRA | model_dir=${MODEL_DIR} | $(hostname) ==="
 echo "GPUs disponibles : $(python3 -c 'import torch; print(torch.cuda.device_count())')"
 
 python scripts/eval_hierarchy.py \
-    --split-dir /home/infres/tandriam-25/fil_rouge/dataset/ \
+    --split-dir "$DATA_DIR/" \
     --config 02_hydra/configs/default.yaml \
     --model-dir "$MODEL_DIR" \
     --eval-batch-size 2048

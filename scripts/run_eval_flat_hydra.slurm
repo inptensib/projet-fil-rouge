@@ -12,17 +12,23 @@
 # Usage :
 #   sbatch scripts/run_eval_flat_hydra.slurm
 
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
+# --- Chemins (surcharger via export avant sbatch si besoin) ---
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
+VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
+DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset}"
+
+source "$VENV_ACTIVATE"
+cd "$PROJECT_ROOT"
 
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
+export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
 echo "=== Évaluation FlatHydra | $(hostname) | $(date) ==="
 echo "GPU : $(python -c 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")')"
 
 python - <<'PYEOF'
+import os
 import sys, json, time
 from pathlib import Path
 
@@ -36,7 +42,7 @@ from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer
 
 CONFIG   = "01_baselines/configs/flat_hydra_3090.yaml"
 MODEL_PT = "models/flat_hydra/best_model.pt"
-SPLIT_DIR = Path("/home/infres/tandriam-25/fil_rouge/dataset")
+SPLIT_DIR = Path(os.environ.get("DATA_DIR", str(Path.home() / "fil_rouge" / "dataset")))
 RESULTS_DIR = Path("results/flat_hydra")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 

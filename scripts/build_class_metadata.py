@@ -12,7 +12,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = PROJECT_ROOT / "results"
-DEFAULT_DATASET_DIR = "/home/infres/tandriam-25/fil_rouge/dataset"
+DEFAULT_DATASET_DIR = str(Path.home() / "fil_rouge" / "dataset")
 
 
 def main():

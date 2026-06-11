@@ -331,7 +331,7 @@ def main():
         print("Options :")
         print("  1. Exporter : export HF_TOKEN=hf_xxx")
         print("  2. Passer en argument : --token hf_xxx")
-        print("  3. Se connecter : /home/infres/tandriam-25/fil_rouge/venv/bin/hf auth login")
+        print("  3. Se connecter : hf auth login")
         sys.exit(1)
 
     # Filtrer le mapping si --target

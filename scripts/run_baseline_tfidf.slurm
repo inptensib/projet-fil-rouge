@@ -11,8 +11,13 @@
 # Les modèles déjà entraînés (tfidf_vectorizer, clf_l1) sont chargés depuis le disque.
 # Seul clf_l2 est ré-entraîné.
 
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
+# --- Chemins (surcharger via export avant sbatch si besoin) ---
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
+VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
+DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset}"
+
+source "$VENV_ACTIVATE"
+cd "$PROJECT_ROOT"
 
 export N_JOBS=26
 

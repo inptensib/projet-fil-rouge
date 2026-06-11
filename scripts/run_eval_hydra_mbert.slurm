@@ -16,18 +16,23 @@
 # Usage :
 #   sbatch scripts/run_eval_hydra_mbert.slurm
 
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
+# --- Chemins (surcharger via export avant sbatch si besoin) ---
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
+VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
+DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset}"
+
+source "$VENV_ACTIVATE"
+cd "$PROJECT_ROOT"
 
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
+export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
 echo "=== Évaluation HYDRA Local mBERT | $(hostname) | $(date) ==="
 echo "GPU : $(python -c 'import torch; [print(f"  GPU {i}: {torch.cuda.get_device_name(i)}") for i in range(torch.cuda.device_count())]' 2>/dev/null)"
 
 python scripts/eval_hierarchy.py \
-    --split-dir /home/infres/tandriam-25/fil_rouge/dataset/ \
+    --split-dir "$DATA_DIR/" \
     --config 02_hydra/configs/mbert_default.yaml \
     --variant local \
     --model-dir models \

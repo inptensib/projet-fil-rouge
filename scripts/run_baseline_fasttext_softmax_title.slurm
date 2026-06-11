@@ -13,8 +13,13 @@
 # Usage :
 #   sbatch scripts/run_baseline_fasttext_softmax_title.slurm
 
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
+# --- Chemins (surcharger via export avant sbatch si besoin) ---
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
+VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
+DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset}"
+
+source "$VENV_ACTIVATE"
+cd "$PROJECT_ROOT"
 
 export N_JOBS=10
 export OMP_NUM_THREADS=1
@@ -39,7 +44,7 @@ from shared.metrics import compute_all_metrics, compute_per_class_f1
 
 N_JOBS      = int(os.environ.get("N_JOBS", 10))
 SEED        = 42
-DATASET_DIR = Path("/home/infres/tandriam-25/fil_rouge/dataset")
+DATASET_DIR = Path(os.environ.get("DATA_DIR", str(Path.home() / "fil_rouge" / "dataset")))
 SAVE_DIR    = Path("models/baselines/fasttext-softmax-title")
 RESULTS_DIR = Path("results/baselines")
 SAVE_DIR.mkdir(parents=True, exist_ok=True)

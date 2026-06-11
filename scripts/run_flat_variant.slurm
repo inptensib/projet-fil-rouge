@@ -22,20 +22,23 @@
 #   Smoke test sur 5 000 samples stratifiés :
 #     sbatch --job-name=flat-hydra-smoke --array=0-2%1 scripts/run_flat_variant.slurm 01_baselines/configs/flat_hydra.yaml 5000
 
-PYTHON=/home/infres/tandriam-25/fil_rouge/venv/bin/python
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-#cd /home/infres/boutrouft-25/projects/IADATA-706/projet-fil-rouge
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
+# --- Chemins (surcharger via export avant sbatch si besoin) ---
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
+VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
+DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset}"
+
+source "$VENV_ACTIVATE"
+cd "$PROJECT_ROOT"
 
 export TRANSFORMERS_OFFLINE=1
 #export HF_HOME=/home/infres/boutrouft-25/.cache/huggingface
-export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
+export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
 CONFIG="${1:-01_baselines/configs/flat_hydra.yaml}"
 N_SAMPLES="${2:-}"  # optionnel — si vide, charge le dataset complet
 
-SAVE_DIR=$($PYTHON -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/flat_hydra'))" 2>/dev/null || echo "models/flat_hydra")
+SAVE_DIR=$(python -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/flat_hydra'))" 2>/dev/null || echo "models/flat_hydra")
 CKPT="${SAVE_DIR}/checkpoint_latest.pt"
 COMPLETE="${SAVE_DIR}/training_complete.txt"
 
@@ -58,8 +61,8 @@ if [ -n "$N_SAMPLES" ]; then
     N_SAMPLES_FLAG="--n-samples $N_SAMPLES"
 fi
 
-$PYTHON scripts/run_flat_hydra.py \
-    --split-dir /home/infres/tandriam-25/fil_rouge/dataset/ \
+python scripts/run_flat_hydra.py \
+    --split-dir "$DATA_DIR/" \
     --config "$CONFIG" \
     $RESUME_FLAG \
     $N_SAMPLES_FLAG

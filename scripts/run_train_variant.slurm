@@ -17,11 +17,16 @@
 #   sbatch --job-name=hydra-nested --array=0-9%1 scripts/run_train_variant.slurm nested [config]
 #   sbatch --job-name=hydra-global --array=0-9%1 scripts/run_train_variant.slurm global [config]
 
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
+# --- Chemins (surcharger via export avant sbatch si besoin) ---
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
+VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
+DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset}"
+
+source "$VENV_ACTIVATE"
+cd "$PROJECT_ROOT"
 
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
+export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 
 VARIANT="${1:?Usage: sbatch --array=0-9%1 $0 <variant> [config]}"
 CONFIG="${2:-02_hydra/configs/default.yaml}"
@@ -51,7 +56,7 @@ if [ -f "$CKPT" ]; then
 fi
 
 python scripts/run_train.py \
-    --split-dir /home/infres/tandriam-25/fil_rouge/dataset/ \
+    --split-dir "$DATA_DIR/" \
     --config "$CONFIG" \
     --variant "$VARIANT" \
     $RESUME_FLAG

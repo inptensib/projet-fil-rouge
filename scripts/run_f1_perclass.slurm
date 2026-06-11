@@ -16,18 +16,23 @@
 #   sbatch scripts/run_f1_perclass.slurm
 #   sbatch scripts/run_f1_perclass.slurm --variant local   # une seule variante
 
-source /home/infres/tandriam-25/fil_rouge/venv/bin/activate
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification
+# --- Chemins (surcharger via export avant sbatch si besoin) ---
+PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
+VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
+DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset}"
+
+source "$VENV_ACTIVATE"
+cd "$PROJECT_ROOT"
 
 export TRANSFORMERS_OFFLINE=1
-export HF_HOME=/home/infres/tandriam-25/.cache/huggingface
+export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
 echo "=== F1 per-class HYDRA | $(hostname) | $(date) ==="
 echo "GPUs : $(python -c 'import torch; print(torch.cuda.device_count())')"
 
 python scripts/generate_f1_per_class.py \
-    --split-dir /home/infres/tandriam-25/fil_rouge/dataset/ \
+    --split-dir "$DATA_DIR/" \
     --config 02_hydra/configs/default.yaml \
     --batch-size 512
 
