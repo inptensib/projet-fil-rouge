@@ -34,9 +34,11 @@ dataset HF (splits JSONL)
 
 ## Matrice Modèle × Étape
 
-Commandes depuis la racine du repo. Les scripts SLURM lisent
-`PROJECT_ROOT`, `VENV_ACTIVATE` et `DATA_DIR` (voir
-[ONBOARDING.md](../ONBOARDING.md)).
+Commandes depuis la racine du repo.
+
+> **Prérequis** : exporter `PROJECT_ROOT`, `VENV_ACTIVATE` et `DATA_DIR`
+> avant tout `sbatch` (voir [ONBOARDING.md](../ONBOARDING.md)) ;
+> `--array=0-9%1` = reprise automatique sur checkpoint, une tâche à la fois.
 
 ### HYDRA CamemBERT standard (local, nested, global)
 

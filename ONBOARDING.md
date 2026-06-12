@@ -65,6 +65,8 @@ Les 164 tests doivent passer. Alternative Docker :
 docker compose run --rm --profile test test
 ```
 
+Pour entraîner localement sur GPU : `docker compose run --rm --profile gpu train`
+
 ## Récupérer le Dataset
 
 Les splits pré-générés (70/15/15, stratifiés par classe L2) sont hébergés
@@ -87,6 +89,9 @@ Chaque ligne est un objet JSON avec les champs `designation`,
 > **Note** : les scripts SLURM cherchent les données dans
 > `$HOME/fil_rouge/dataset` par défaut. Si vous les téléchargez ailleurs,
 > exportez `DATA_DIR=/chemin/vers/dataset` avant tout `sbatch`.
+
+> **Attention** : vérifier `ls -lh "$DATA_DIR/train_split.jsonl"` avant
+> tout `sbatch` — un chemin erroné produit "ERROR: Split file not found".
 
 ## Récupérer les Modèles Entraînés
 
@@ -193,12 +198,13 @@ docs/                   PIPELINE.md, METRICS.md, conception FlatHydra
 - **`TRANSFORMERS_OFFLINE=1`** dans les scripts SLURM : les nœuds GPU
   n'ont pas d'accès internet. Pré-télécharger les poids des encodeurs en
   local (`AutoModel.from_pretrained(...)` une fois) pour peupler le cache.
-- **Packages `src` homonymes** : `01_baselines/src`, `02_hydra/src` et
-  `03_distributed/src` entrent en collision. Utiliser
+- **Packages `src` homonymes** : `01_baselines/src`, `02_hydra/src`,
+  `02b_hlpd/src` et `03_distributed/src` entrent en collision. Utiliser
   `tests/helpers.py::import_from_*` dans les tests et
   `03_distributed/src/hydra_imports.py` côté DDP.
-- **`_ensure_l2_coverage()`** duplique ~923 échantillons au chargement
-  pour garantir chaque classe L2 dans chaque split — comportement normal.
+- **`_ensure_l2_coverage()`** duplique ~923 échantillons (valeur
+  indicative, recalculée à chaque chargement) pour garantir chaque classe
+  L2 dans chaque split — comportement normal.
 - **Configs title-only** : `batch_size`/`lr` plus élevés que `default.yaml`
   (scaling en racine carrée, séquences plus courtes) — justifié dans
   [docs/PIPELINE.md](docs/PIPELINE.md).

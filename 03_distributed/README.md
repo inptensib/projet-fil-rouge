@@ -10,6 +10,14 @@ Training Distributed Data Parallel des modèles HYDRA sur cluster SLURM multi-n�
 ./03_distributed/scripts/launch_distributed.sh nested XLM-RoBERTa 1 rtx3090  # 1 nœud RTX 3090
 ```
 
+Les hyperparamètres se chargent depuis un YAML via `--config` (priorité :
+flags CLI explicites > YAML > défauts du trainer) :
+
+```bash
+# Depuis 03_distributed/ :
+python -m src.main --config ../02_hydra/configs/default.yaml --split_dir $DATA_DIR
+```
+
 ## Apports
 
 - **Gradient clipping** (`max_norm=1.0`) pour la stabilité
@@ -27,6 +35,7 @@ Training Distributed Data Parallel des modèles HYDRA sur cluster SLURM multi-n�
   src/
     main.py               # Point d'entrée CLI pour le training DDP
     ddp_utils.py          # Setup/teardown DDP, print rank-aware
+    hydra_imports.py      # Chargement des modules 02_hydra sans collision de package
     data_sharding.py      # Sharding des données (rank 0)
     trainer_ddp.py        # Trainer DDP + MLflow
     error_analysis.py     # Analyse d'erreurs par sample et cross-epochs
@@ -40,5 +49,5 @@ Training Distributed Data Parallel des modèles HYDRA sur cluster SLURM multi-n�
 
 - Cluster SLURM avec partitions GPU (P100 / RTX 3090)
 - RoCE pour NCCL multi-nœuds
-- Environnement Python (voir `scripts/setup_cluster.sh`)
+- Environnement Python (voir `requirements.txt` à la racine, ou `docker-compose.yml`)
 - Cache HuggingFace pré-chargé (nœuds offline)

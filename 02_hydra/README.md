@@ -34,7 +34,18 @@ Implémentation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hi
 
 > La dimension de projection est calculée automatiquement : `d_model * num_levels` (768 * 2 = 1536 pour CamemBERT).
 
+### Configurations spécialisées
+
+| Config                      | Description |
+|-----------------------------|-------------|
+| `hierarchy.yaml`            | Conditioning hiérarchique L2\|L1 : teacher forcing au training, masque à l'inférence, `save_dir: models_hierarchy` |
+| `mbert_default.yaml`        | Encodeur mBERT (`bert-base-multilingual-cased`), identique à `default.yaml` sinon |
+| `title_only.yaml`           | Designation seule (sans description), `max_length: 128`, `save_dir: models_title` |
+| `title_only_hierarchy.yaml` | Title-only + conditioning hiérarchique, `save_dir: models_title_hierarchy` |
+
 ## Usage
+
+*Note : exemple d'API bas-niveau. Pour entraîner, passer par HYDRATrainer via scripts/run_train.py (voir docs/PIPELINE.md).*
 
 ```python
 from src.models import create_hydra_model
@@ -42,11 +53,11 @@ from src.losses import HYDRALoss
 
 model = create_hydra_model(
     variant="local", encoder_name="camembert-base",
-    num_classes_l1=157, num_classes_l2=6100,
+    num_classes_l1=157, num_classes_l2=6126,
 )
 
 criterion = HYDRALoss(
-    architecture="local", num_classes_l1=157, num_classes_l2=6100,
+    architecture="local", num_classes_l1=157, num_classes_l2=6126,
     use_focal=True, level_weight_l1=0.5,
 )
 
@@ -65,6 +76,7 @@ loss, loss_l1, loss_l2 = criterion(level_outputs, unified_output, labels_l1, lab
     losses.py             # FocalLoss, HYDRALoss
     trainer.py            # Boucle d'entraînement single-GPU
     predict.py            # Inférence et évaluation
+    config.py             # Mapping YAML → kwargs HYDRATrainer (source unique)
 ```
 
 ## Références
