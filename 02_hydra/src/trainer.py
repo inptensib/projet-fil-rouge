@@ -22,15 +22,20 @@ import torch
 import yaml
 from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from shared.data_loader import HierarchicalProductDataset, build_parent_child_matrix
+from shared.data_loader import build_parent_child_matrix
 from shared.metrics import compute_all_metrics
+from shared.training_utils import (
+    EarlyStopping,
+    MLflowSession,
+    get_linear_schedule_with_warmup,
+    make_hierarchical_loader,
+)
 from shared.utils import ENCODERS, enforce_hierarchy, get_device, set_seed
 
 from .losses import HYDRALoss
@@ -45,19 +50,6 @@ def load_config(path: Path | str | None = None) -> dict:
     path = Path(path) if path else _CONFIG_PATH
     with open(path, "r") as f:
         return yaml.safe_load(f)
-
-
-def get_linear_schedule_with_warmup(optimizer, num_warmup_steps: int, num_training_steps: int):
-    """Linear warmup then linear decay to 0."""
-    def lr_lambda(current_step: int) -> float:
-        if current_step < num_warmup_steps:
-            return float(current_step) / float(max(1, num_warmup_steps))
-        return max(
-            0.0,
-            float(num_training_steps - current_step)
-            / float(max(1, num_training_steps - num_warmup_steps)),
-        )
-    return LambdaLR(optimizer, lr_lambda)
 
 
 class HYDRATrainer:
@@ -212,12 +204,15 @@ class HYDRATrainer:
         self.scaler = GradScaler("cuda", enabled=self.fp16)
 
     def _create_dataloader(self, texts, labels_l1, labels_l2, shuffle: bool = True) -> DataLoader:
-        dataset = HierarchicalProductDataset(
-            texts, labels_l1, labels_l2, self.tokenizer, self.max_length
-        )
-        return DataLoader(
-            dataset, batch_size=self.batch_size, shuffle=shuffle,
-            num_workers=4, pin_memory=True, drop_last=shuffle,
+        return make_hierarchical_loader(
+            texts, labels_l1, labels_l2,
+            tokenizer=self.tokenizer,
+            max_length=self.max_length,
+            batch_size=self.batch_size,
+            shuffle=shuffle,
+            num_workers=4,
+            pin_memory=True,
+            drop_last=shuffle,
         )
 
     def _enforce_hierarchy(self, logits_l1: torch.Tensor, logits_l2: torch.Tensor) -> torch.Tensor:
@@ -298,339 +293,322 @@ class HYDRATrainer:
         )
 
         # MLflow logging
-        mlflow_active = False
-        try:
-            import mlflow
-            db_path = Path(__file__).resolve().parents[2] / "mlflow.db"
-            mlflow.set_tracking_uri(f"sqlite:///{db_path}")
-            mlflow.set_experiment(model_key)
-            mlflow.start_run()
-            gpu_type = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
-            mlflow.log_params({
-                "variant": self.variant,
-                "encoder": self.encoder_name,
-                "batch_size": self.batch_size,
-                "epochs": self.epochs,
-                "lr": self.lr,
-                "warmup_ratio": self.warmup_ratio,
-                "fp16": self.fp16,
-                "gradient_accumulation_steps": self.gradient_accumulation_steps,
-                "num_classes_l1": self.num_classes_l1,
-                "num_classes_l2": self.num_classes_l2,
-                "weight_decay": self.weight_decay,
-                "max_length": self.max_length,
-                "max_grad_norm": self.max_grad_norm,
-                "level_weight_l1": self.level_weight_l1,
-                "use_focal": self.use_focal,
-                "focal_gamma": self.focal_gamma,
-                "early_stopping_patience": self.early_stopping_patience,
-                "early_stopping_min_delta": self.early_stopping_min_delta,
-                "gpu_type": gpu_type,
-            })
-            mlflow_active = True
-            print(f"[MLflow] Tracking active → {db_path}")
-        except Exception as e:
-            print(f"[MLflow] Warning: logging disabled ({e})")
+        self._setup_mlflow(model_key)
 
         # Training state
-        best_val_f1 = 0.0
-        epochs_without_improvement = 0
-        start_epoch = 0
-        history = {
+        self._early_stopping = EarlyStopping(
+            self.early_stopping_patience, self.early_stopping_min_delta
+        )
+        self._history = {
             "epoch": [], "train_loss": [],
             "val_f1_l1_macro": [], "val_f1_l2_macro": [],
             "val_hcr": [],
         }
-        model_dir = self.save_dir / model_key
-        model_dir.mkdir(parents=True, exist_ok=True)
+        self._model_dir = self.save_dir / model_key
+        self._model_dir.mkdir(parents=True, exist_ok=True)
 
         start_time = time.time()
-        global_step = 0
-
-        start_step_in_epoch = 0
+        self._global_step = 0
+        self._start_epoch = 0
+        self._start_step_in_epoch = 0
 
         # Resume from checkpoint if provided
         if self.resume_from:
-            print(f"[Resume] Loading checkpoint from {self.resume_from}")
-            ckpt = torch.load(self.resume_from, map_location=self.device, weights_only=False)
-            self._base_model.load_state_dict(ckpt["model_state_dict"])
-            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-            self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
-            self.scaler.load_state_dict(ckpt["scaler_state_dict"])
-            start_epoch = ckpt["epoch"]
-            global_step = ckpt["global_step"]
-            best_val_f1 = ckpt["best_val_f1"]
-            epochs_without_improvement = ckpt["epochs_without_improvement"]
-            history = ckpt.get("history", history)
-            start_step_in_epoch = ckpt.get("step_in_epoch", 0)
-            print(
-                f"[Resume] Reprise à epoch {start_epoch}, "
-                f"step_in_epoch {start_step_in_epoch}, "
-                f"global_step {global_step}, best F1={best_val_f1:.4f}"
+            self._resume_from_checkpoint()
+
+        for epoch in range(self._start_epoch, self.epochs):
+            avg_train_loss = self._train_epoch(train_loader, epoch)
+            if self._evaluate_and_checkpoint(val_loader, epoch, avg_train_loss):
+                break
+
+        return self._finalize(test_loader, epoch, start_time)
+
+    def _setup_mlflow(self, model_key: str) -> None:
+        """Open the MLflow run and log hyperparameters."""
+        db_path = Path(__file__).resolve().parents[2] / "mlflow.db"
+        self._mlflow = MLflowSession(f"sqlite:///{db_path}", model_key)
+        gpu_type = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
+        self._mlflow.start(params={
+            "variant": self.variant,
+            "encoder": self.encoder_name,
+            "batch_size": self.batch_size,
+            "epochs": self.epochs,
+            "lr": self.lr,
+            "warmup_ratio": self.warmup_ratio,
+            "fp16": self.fp16,
+            "gradient_accumulation_steps": self.gradient_accumulation_steps,
+            "num_classes_l1": self.num_classes_l1,
+            "num_classes_l2": self.num_classes_l2,
+            "weight_decay": self.weight_decay,
+            "max_length": self.max_length,
+            "max_grad_norm": self.max_grad_norm,
+            "level_weight_l1": self.level_weight_l1,
+            "use_focal": self.use_focal,
+            "focal_gamma": self.focal_gamma,
+            "early_stopping_patience": self.early_stopping_patience,
+            "early_stopping_min_delta": self.early_stopping_min_delta,
+            "gpu_type": gpu_type,
+        })
+
+    def _resume_from_checkpoint(self) -> None:
+        """Restore model, optimizer, scheduler, scaler and training state."""
+        print(f"[Resume] Loading checkpoint from {self.resume_from}")
+        ckpt = torch.load(self.resume_from, map_location=self.device, weights_only=False)
+        self._base_model.load_state_dict(ckpt["model_state_dict"])
+        self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+        self.scaler.load_state_dict(ckpt["scaler_state_dict"])
+        self._start_epoch = ckpt["epoch"]
+        self._global_step = ckpt["global_step"]
+        self._early_stopping.best = ckpt["best_val_f1"]
+        self._early_stopping.counter = ckpt["epochs_without_improvement"]
+        self._history = ckpt.get("history", self._history)
+        self._start_step_in_epoch = ckpt.get("step_in_epoch", 0)
+        print(
+            f"[Resume] Reprise à epoch {self._start_epoch}, "
+            f"step_in_epoch {self._start_step_in_epoch}, "
+            f"global_step {self._global_step}, best F1={self._early_stopping.best:.4f}"
+        )
+
+    def _train_epoch(self, train_loader: DataLoader, epoch: int) -> float:
+        """Run one training epoch and return the average train loss."""
+        self.model.train()
+        epoch_loss = 0.0
+        num_batches = 0
+
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{self.epochs}")
+        for step, batch in enumerate(pbar):
+            # Fast-forward if resuming mid-epoch
+            if step < self._start_step_in_epoch:
+                continue
+
+            input_ids = batch["input_ids"].to(self.device)
+            mask = batch["attention_mask"].to(self.device)
+            l1 = batch["label_l1"].to(self.device)
+            l2 = batch["label_l2"].to(self.device)
+
+            with autocast("cuda", enabled=self.fp16):
+                level_outputs, unified_output = self.model(input_ids, mask)
+
+            # Cast fp32 + clamp : élimine les +inf dus à l'overflow fp16
+            level_outputs_fp32 = [o.float().clamp(-1e4, 1e4) for o in level_outputs]
+            unified_output_fp32 = (
+                unified_output.float().clamp(-1e4, 1e4)
+                if unified_output is not None else None
             )
-
-        for epoch in range(start_epoch, self.epochs):
-            self.model.train()
-            epoch_loss = 0.0
-            num_batches = 0
-
-            pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{self.epochs}")
-            for step, batch in enumerate(pbar):
-                # Fast-forward if resuming mid-epoch
-                if step < start_step_in_epoch:
-                    continue
-
-                input_ids = batch["input_ids"].to(self.device)
-                mask = batch["attention_mask"].to(self.device)
-                l1 = batch["label_l1"].to(self.device)
-                l2 = batch["label_l2"].to(self.device)
-
-                with autocast("cuda", enabled=self.fp16):
-                    level_outputs, unified_output = self.model(input_ids, mask)
-
-                # Cast fp32 + clamp : élimine les +inf dus à l'overflow fp16
-                level_outputs_fp32 = [o.float().clamp(-1e4, 1e4) for o in level_outputs]
-                unified_output_fp32 = (
-                    unified_output.float().clamp(-1e4, 1e4)
-                    if unified_output is not None else None
+            if self.condition_l2_on_l1:
+                logits_l1, logits_l2 = level_outputs_fp32
+                valid_mask = self.parent_child_matrix[l1]  # [B, num_l2]
+                # has_valid : lignes non vides (L1 ayant au moins 1 enfant L2 connu)
+                has_valid = valid_mask.any(dim=1, keepdim=True)  # [B, 1]
+                # -1e9 au lieu de -inf : évite -inf - (-inf) = nan sur lignes vides
+                logits_l2 = logits_l2.masked_fill(
+                    (valid_mask == 0) & has_valid, -1e9
                 )
-                if self.condition_l2_on_l1:
-                    logits_l1, logits_l2 = level_outputs_fp32
-                    valid_mask = self.parent_child_matrix[l1]  # [B, num_l2]
-                    # has_valid : lignes non vides (L1 ayant au moins 1 enfant L2 connu)
-                    has_valid = valid_mask.any(dim=1, keepdim=True)  # [B, 1]
-                    # -1e9 au lieu de -inf : évite -inf - (-inf) = nan sur lignes vides
-                    logits_l2 = logits_l2.masked_fill(
-                        (valid_mask == 0) & has_valid, -1e9
-                    )
-                    level_outputs_fp32 = [logits_l1, logits_l2]
+                level_outputs_fp32 = [logits_l1, logits_l2]
 
-                loss, _, _ = self.criterion(level_outputs_fp32, unified_output_fp32, l1, l2)
-                loss = loss / self.gradient_accumulation_steps
+            loss, _, _ = self.criterion(level_outputs_fp32, unified_output_fp32, l1, l2)
+            loss = loss / self.gradient_accumulation_steps
 
-                self.scaler.scale(loss).backward()
+            self.scaler.scale(loss).backward()
 
-                if (step + 1) % self.gradient_accumulation_steps == 0:
-                    self.scaler.unscale_(self.optimizer)
-                    torch.nn.utils.clip_grad_norm_(
-                        self.model.parameters(), self.max_grad_norm
-                    )
-                    self.scaler.step(self.optimizer)
-                    self.scaler.update()
-                    self.optimizer.zero_grad()
-                    self.scheduler.step()
-                    global_step += 1
+            if (step + 1) % self.gradient_accumulation_steps == 0:
+                self._optimizer_step()
 
-                    # Intra-epoch checkpoint every N steps
-                    if global_step % self.checkpoint_every_n_steps == 0:
-                        torch.save(
-                            {
-                                "model_state_dict": self._base_model.state_dict(),
-                                "optimizer_state_dict": self.optimizer.state_dict(),
-                                "scheduler_state_dict": self.scheduler.state_dict(),
-                                "scaler_state_dict": self.scaler.state_dict(),
-                                "epoch": epoch,
-                                "step_in_epoch": step + 1,
-                                "global_step": global_step,
-                                "best_val_f1": best_val_f1,
-                                "epochs_without_improvement": epochs_without_improvement,
-                                "history": history,
-                                "config": {
-                                    "variant": self.variant,
-                                    "encoder_name": self.encoder_name,
-                                    "num_classes_l1": self.num_classes_l1,
-                                    "num_classes_l2": self.num_classes_l2,
-                                    "pooling": self.pooling,
-                                    "project_embedding": self.project_embedding,
-                                    "dropout": self.dropout,
-                                    "hidden_dim": self.hidden_dim,
-                                },
-                            },
-                            model_dir / "checkpoint_latest.pt",
-                        )
-                        print(f"\n  [Checkpoint] Step {global_step} saved")
+                # Intra-epoch checkpoint every N steps
+                if self._global_step % self.checkpoint_every_n_steps == 0:
+                    self._save_latest_checkpoint(epoch, step + 1)
+                    print(f"\n  [Checkpoint] Step {self._global_step} saved")
 
-                epoch_loss += loss.item() * self.gradient_accumulation_steps
-                num_batches += 1
-                pbar.set_postfix({"loss": f"{epoch_loss / num_batches:.4f}"})
+            epoch_loss += loss.item() * self.gradient_accumulation_steps
+            num_batches += 1
+            pbar.set_postfix({"loss": f"{epoch_loss / num_batches:.4f}"})
 
-            # Reset start_step for subsequent epochs
-            start_step_in_epoch = 0
+        # Reset start_step for subsequent epochs
+        self._start_step_in_epoch = 0
 
-            # Flush remaining accumulated gradients
-            if num_batches % self.gradient_accumulation_steps != 0:
-                self.scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(), self.max_grad_norm
-                )
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-                self.optimizer.zero_grad()
-                self.scheduler.step()
-                global_step += 1
+        # Flush remaining accumulated gradients
+        if num_batches % self.gradient_accumulation_steps != 0:
+            self._optimizer_step()
 
-            # Epoch-level metrics
-            avg_train_loss = epoch_loss / num_batches
+        return epoch_loss / num_batches
 
-            # Validation
-            val_metrics = self.evaluate(val_loader)
-            val_f1_l2 = val_metrics["f1_l2_macro"]
+    def _optimizer_step(self) -> None:
+        """Unscale, clip, step the optimizer and scheduler."""
+        self.scaler.unscale_(self.optimizer)
+        torch.nn.utils.clip_grad_norm_(
+            self.model.parameters(), self.max_grad_norm
+        )
+        self.scaler.step(self.optimizer)
+        self.scaler.update()
+        self.optimizer.zero_grad()
+        self.scheduler.step()
+        self._global_step += 1
 
-            history["epoch"].append(epoch + 1)
-            history["train_loss"].append(avg_train_loss)
-            history["val_f1_l1_macro"].append(val_metrics["f1_l1_macro"])
-            history["val_f1_l2_macro"].append(val_f1_l2)
-            history["val_hcr"].append(val_metrics.get("hcr", 0.0))
+    def _checkpoint_config(self) -> dict:
+        """Model hyperparameters stored alongside checkpoint weights."""
+        return {
+            "variant": self.variant,
+            "encoder_name": self.encoder_name,
+            "num_classes_l1": self.num_classes_l1,
+            "num_classes_l2": self.num_classes_l2,
+            "pooling": self.pooling,
+            "project_embedding": self.project_embedding,
+            "dropout": self.dropout,
+            "hidden_dim": self.hidden_dim,
+        }
 
-            print(
-                f"  Loss: {avg_train_loss:.4f} | "
-                f"Val F1 L1: {val_metrics['f1_l1_macro']:.4f} | "
-                f"Val F1 L2: {val_f1_l2:.4f} | "
-                f"HCR: {val_metrics.get('hcr', 0):.4f}"
-            )
+    def _save_latest_checkpoint(self, epoch: int, step_in_epoch: int) -> None:
+        """Save the full resume checkpoint (checkpoint_latest.pt)."""
+        torch.save(
+            {
+                "model_state_dict": self._base_model.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "scheduler_state_dict": self.scheduler.state_dict(),
+                "scaler_state_dict": self.scaler.state_dict(),
+                "epoch": epoch,
+                "step_in_epoch": step_in_epoch,
+                "global_step": self._global_step,
+                "best_val_f1": self._early_stopping.best,
+                "epochs_without_improvement": self._early_stopping.counter,
+                "history": self._history,
+                "config": self._checkpoint_config(),
+            },
+            self._model_dir / "checkpoint_latest.pt",
+        )
 
-            # MLflow per-epoch logging + audit artifacts
-            if mlflow_active:
-                try:
-                    import matplotlib.pyplot as plt
+    def _evaluate_and_checkpoint(
+        self, val_loader: DataLoader, epoch: int, avg_train_loss: float
+    ) -> bool:
+        """Validate, save best/latest checkpoints; return True to early stop."""
+        val_metrics = self.evaluate(val_loader)
+        val_f1_l2 = val_metrics["f1_l2_macro"]
 
-                    from shared.metrics import (
-                        compute_per_class_f1,
-                        plot_confusion_matrix,
-                        plot_per_class_f1,
-                        plot_training_curves,
-                    )
+        self._history["epoch"].append(epoch + 1)
+        self._history["train_loss"].append(avg_train_loss)
+        self._history["val_f1_l1_macro"].append(val_metrics["f1_l1_macro"])
+        self._history["val_f1_l2_macro"].append(val_f1_l2)
+        self._history["val_hcr"].append(val_metrics.get("hcr", 0.0))
 
-                    mlflow.log_metrics({
-                        "train_loss": avg_train_loss,
-                        "val_f1_l1_macro": val_metrics["f1_l1_macro"],
-                        "val_f1_l2_macro": val_f1_l2,
-                        "val_hcr": val_metrics.get("hcr", 0.0),
-                    }, step=epoch + 1)
+        print(
+            f"  Loss: {avg_train_loss:.4f} | "
+            f"Val F1 L1: {val_metrics['f1_l1_macro']:.4f} | "
+            f"Val F1 L2: {val_f1_l2:.4f} | "
+            f"HCR: {val_metrics.get('hcr', 0):.4f}"
+        )
 
-                    # Audit visualizations (overwritten each epoch)
-                    v_preds_l1 = val_metrics.get("_preds_l1", [])
-                    v_labels_l1 = val_metrics.get("_labels_l1", [])
-                    v_preds_l2 = val_metrics.get("_preds_l2", [])
-                    v_labels_l2 = val_metrics.get("_labels_l2", [])
-                    v_confs_l1 = val_metrics.get("_confs_l1", [])
-                    v_confs_l2 = val_metrics.get("_confs_l2", [])
+        # MLflow per-epoch logging + audit artifacts
+        self._log_audit_artifacts(epoch, avg_train_loss, val_metrics)
 
-                    if v_labels_l1:
-                        fig = plot_confusion_matrix(
-                            v_labels_l1, v_preds_l1, self.l1_encoder,
-                            title=f"Confusion L1 — epoch {epoch + 1}",
-                        )
-                        mlflow.log_figure(fig, "confusion_matrix_l1.png")
-                        plt.close(fig)
-
-                        fig = plot_confusion_matrix(
-                            v_labels_l2, v_preds_l2, self.l2_encoder,
-                            title=f"Confusion L2 (top 50) — epoch {epoch + 1}", top_n=50,
-                        )
-                        mlflow.log_figure(fig, "confusion_matrix_l2_top50.png")
-                        plt.close(fig)
-
-                        f1_l1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
-                        fig = plot_per_class_f1(f1_l1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
-                        mlflow.log_figure(fig, "f1_per_class_l1.png")
-                        plt.close(fig)
-                        mlflow.log_dict(f1_l1_pc, "f1_per_class_l1.json")
-
-                        f1_l2_pc = compute_per_class_f1(v_labels_l2, v_preds_l2, self.l2_encoder)
-                        fig = plot_per_class_f1(f1_l2_pc, f"F1 par classe L2 — epoch {epoch + 1}")
-                        mlflow.log_figure(fig, "f1_per_class_l2.png")
-                        mlflow.log_dict(f1_l2_pc, "f1_per_class_l2.json")
-                        plt.close(fig)
-
-                    if history["epoch"]:
-                        fig = plot_training_curves(history)
-                        mlflow.log_figure(fig, "training_curves.png")
-                        plt.close(fig)
-
-                    # Explainability report (on validation set)
-                    if v_labels_l1:
-                        from shared.explainability import generate_explainability_report
-                        val_texts = self.data["X_val"].tolist() if hasattr(self.data["X_val"], "tolist") else list(self.data["X_val"])
-                        explain_html = generate_explainability_report(
-                            model=self._base_model,
-                            tokenizer=self.tokenizer,
-                            texts=val_texts,
-                            labels_l1=list(self.data["y_l1_val"]),
-                            labels_l2=list(self.data["y_l2_val"]),
-                            preds_l1=v_preds_l1,
-                            preds_l2=v_preds_l2,
-                            confs_l2=v_confs_l2,
-                            parent_child_matrix=self.parent_child_matrix if self.condition_l2_on_l1 else None,
-                            l1_encoder=self.l1_encoder,
-                            l2_encoder=self.l2_encoder,
-                            device=self.device,
-                        )
-                        mlflow.log_text(explain_html, "explainability_report.html")
-                except Exception as e:
-                    print(f"  [MLflow] Warning: per-epoch artifacts failed ({e})")
-
-            # Early stopping & checkpointing on f1_l2_macro only
-            if val_f1_l2 > best_val_f1 + self.early_stopping_min_delta:
-                best_val_f1 = val_f1_l2
-                epochs_without_improvement = 0
-                torch.save(
-                    {
-                        "model_state_dict": self._base_model.state_dict(),
-                        "config": {
-                            "variant": self.variant,
-                            "encoder_name": self.encoder_name,
-                            "num_classes_l1": self.num_classes_l1,
-                            "num_classes_l2": self.num_classes_l2,
-                            "pooling": self.pooling,
-                            "project_embedding": self.project_embedding,
-                            "dropout": self.dropout,
-                            "hidden_dim": self.hidden_dim,
-                        },
-                        "best_val_f1_l2": best_val_f1,
-                        "epoch": epoch + 1,
-                    },
-                    model_dir / "best_model.pt",
-                )
-                print(f"  -> New best model saved (F1 L2: {best_val_f1:.4f})")
-            else:
-                epochs_without_improvement += 1
-
-            # Save full checkpoint for resume (end of epoch)
+        # Early stopping & checkpointing on f1_l2_macro only
+        if self._early_stopping.update(val_f1_l2):
             torch.save(
                 {
                     "model_state_dict": self._base_model.state_dict(),
-                    "optimizer_state_dict": self.optimizer.state_dict(),
-                    "scheduler_state_dict": self.scheduler.state_dict(),
-                    "scaler_state_dict": self.scaler.state_dict(),
+                    "config": self._checkpoint_config(),
+                    "best_val_f1_l2": self._early_stopping.best,
                     "epoch": epoch + 1,
-                    "step_in_epoch": 0,
-                    "global_step": global_step,
-                    "best_val_f1": best_val_f1,
-                    "epochs_without_improvement": epochs_without_improvement,
-                    "history": history,
-                    "config": {
-                        "variant": self.variant,
-                        "encoder_name": self.encoder_name,
-                        "num_classes_l1": self.num_classes_l1,
-                        "num_classes_l2": self.num_classes_l2,
-                        "pooling": self.pooling,
-                        "project_embedding": self.project_embedding,
-                        "dropout": self.dropout,
-                        "hidden_dim": self.hidden_dim,
-                    },
                 },
-                model_dir / "checkpoint_latest.pt",
+                self._model_dir / "best_model.pt",
             )
-            print(f"  -> Checkpoint saved (epoch {epoch + 1}, step {global_step})")
+            print(f"  -> New best model saved (F1 L2: {self._early_stopping.best:.4f})")
 
-            if epochs_without_improvement >= self.early_stopping_patience:
-                print(f"  Early stopping after {epoch + 1} epochs.")
-                break
+        # Save full checkpoint for resume (end of epoch)
+        self._save_latest_checkpoint(epoch + 1, 0)
+        print(f"  -> Checkpoint saved (epoch {epoch + 1}, step {self._global_step})")
 
-        # Mark training as complete
-        (model_dir / "training_complete.txt").write_text(
-            f"Training finished. Epochs: {epoch + 1}, Best F1 L2: {best_val_f1:.4f}\n"
+        if self._early_stopping.should_stop:
+            print(f"  Early stopping after {epoch + 1} epochs.")
+            return True
+        return False
+
+    def _log_audit_artifacts(self, epoch: int, avg_train_loss: float, val_metrics: dict) -> None:
+        """Log per-epoch metrics and audit visualizations to MLflow."""
+        if not self._mlflow.active:
+            return
+        try:
+            import matplotlib.pyplot as plt
+
+            from shared.metrics import (
+                compute_per_class_f1,
+                plot_confusion_matrix,
+                plot_per_class_f1,
+                plot_training_curves,
+            )
+
+            self._mlflow.log_metrics({
+                "train_loss": avg_train_loss,
+                "val_f1_l1_macro": val_metrics["f1_l1_macro"],
+                "val_f1_l2_macro": val_metrics["f1_l2_macro"],
+                "val_hcr": val_metrics.get("hcr", 0.0),
+            }, step=epoch + 1)
+
+            # Audit visualizations (overwritten each epoch)
+            v_preds_l1 = val_metrics.get("_preds_l1", [])
+            v_labels_l1 = val_metrics.get("_labels_l1", [])
+            v_preds_l2 = val_metrics.get("_preds_l2", [])
+            v_labels_l2 = val_metrics.get("_labels_l2", [])
+            v_confs_l1 = val_metrics.get("_confs_l1", [])
+            v_confs_l2 = val_metrics.get("_confs_l2", [])
+
+            if v_labels_l1:
+                fig = plot_confusion_matrix(
+                    v_labels_l1, v_preds_l1, self.l1_encoder,
+                    title=f"Confusion L1 — epoch {epoch + 1}",
+                )
+                self._mlflow.log_figure(fig, "confusion_matrix_l1.png")
+                plt.close(fig)
+
+                fig = plot_confusion_matrix(
+                    v_labels_l2, v_preds_l2, self.l2_encoder,
+                    title=f"Confusion L2 (top 50) — epoch {epoch + 1}", top_n=50,
+                )
+                self._mlflow.log_figure(fig, "confusion_matrix_l2_top50.png")
+                plt.close(fig)
+
+                f1_l1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
+                fig = plot_per_class_f1(f1_l1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
+                self._mlflow.log_figure(fig, "f1_per_class_l1.png")
+                plt.close(fig)
+                self._mlflow.log_dict(f1_l1_pc, "f1_per_class_l1.json")
+
+                f1_l2_pc = compute_per_class_f1(v_labels_l2, v_preds_l2, self.l2_encoder)
+                fig = plot_per_class_f1(f1_l2_pc, f"F1 par classe L2 — epoch {epoch + 1}")
+                self._mlflow.log_figure(fig, "f1_per_class_l2.png")
+                self._mlflow.log_dict(f1_l2_pc, "f1_per_class_l2.json")
+                plt.close(fig)
+
+            if self._history["epoch"]:
+                fig = plot_training_curves(self._history)
+                self._mlflow.log_figure(fig, "training_curves.png")
+                plt.close(fig)
+
+            # Explainability report (on validation set)
+            if v_labels_l1:
+                from shared.explainability import generate_explainability_report
+                val_texts = self.data["X_val"].tolist() if hasattr(self.data["X_val"], "tolist") else list(self.data["X_val"])
+                explain_html = generate_explainability_report(
+                    model=self._base_model,
+                    tokenizer=self.tokenizer,
+                    texts=val_texts,
+                    labels_l1=list(self.data["y_l1_val"]),
+                    labels_l2=list(self.data["y_l2_val"]),
+                    preds_l1=v_preds_l1,
+                    preds_l2=v_preds_l2,
+                    confs_l2=v_confs_l2,
+                    parent_child_matrix=self.parent_child_matrix if self.condition_l2_on_l1 else None,
+                    l1_encoder=self.l1_encoder,
+                    l2_encoder=self.l2_encoder,
+                    device=self.device,
+                )
+                self._mlflow.log_text(explain_html, "explainability_report.html")
+        except Exception as e:
+            print(f"  [MLflow] Warning: per-epoch artifacts failed ({e})")
+
+    def _finalize(self, test_loader: DataLoader, epoch: int, start_time: float) -> dict:
+        """Mark training complete, run the final test evaluation, close MLflow."""
+        (self._model_dir / "training_complete.txt").write_text(
+            f"Training finished. Epochs: {epoch + 1}, Best F1 L2: {self._early_stopping.best:.4f}\n"
         )
 
         # Final test evaluation
@@ -645,22 +623,18 @@ class HYDRATrainer:
         print(f"{'='*60}")
 
         # MLflow: log final test metrics
-        if mlflow_active:
-            try:
-                mlflow.log_metrics({
-                    "test_f1_l1_macro": test_metrics["f1_l1_macro"],
-                    "test_f1_l2_macro": test_metrics["f1_l2_macro"],
-                    "test_hcr": test_metrics.get("hcr", 0),
-                    "total_time_s": total_time,
-                })
-                mlflow.log_artifact(str(model_dir / "best_model.pt"))
-                mlflow.end_run()
-            except Exception as e:
-                print(f"[MLflow] Warning: final logging failed ({e})")
+        self._mlflow.log_metrics({
+            "test_f1_l1_macro": test_metrics["f1_l1_macro"],
+            "test_f1_l2_macro": test_metrics["f1_l2_macro"],
+            "test_hcr": test_metrics.get("hcr", 0),
+            "total_time_s": total_time,
+        })
+        self._mlflow.log_artifact(str(self._model_dir / "best_model.pt"))
+        self._mlflow.end()
 
         return {
-            "history": history,
+            "history": self._history,
             "test_metrics": test_metrics,
-            "best_val_f1_l2": best_val_f1,
+            "best_val_f1_l2": self._early_stopping.best,
             "total_time": total_time,
         }
