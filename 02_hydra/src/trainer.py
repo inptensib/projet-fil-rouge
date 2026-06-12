@@ -204,6 +204,7 @@ class HYDRATrainer:
         self.scaler = GradScaler("cuda", enabled=self.fp16)
 
     def _create_dataloader(self, texts, labels_l1, labels_l2, shuffle: bool = True) -> DataLoader:
+        """Build a DataLoader with trainer settings; drops the last batch when shuffling."""
         return make_hierarchical_loader(
             texts, labels_l1, labels_l2,
             tokenizer=self.tokenizer,
@@ -286,7 +287,8 @@ class HYDRATrainer:
 
         # Warmup scheduler
         extra_steps = int((len(train_loader) % self.gradient_accumulation_steps) > 0)
-        num_training_steps = (len(train_loader) // self.gradient_accumulation_steps + extra_steps) * self.epochs
+        steps_per_epoch = len(train_loader) // self.gradient_accumulation_steps + extra_steps
+        num_training_steps = steps_per_epoch * self.epochs
         num_warmup_steps = int(num_training_steps * self.warmup_ratio)
         self.scheduler = get_linear_schedule_with_warmup(
             self.optimizer, num_warmup_steps, num_training_steps
@@ -529,12 +531,7 @@ class HYDRATrainer:
         try:
             import matplotlib.pyplot as plt
 
-            from shared.metrics import (
-                compute_per_class_f1,
-                plot_confusion_matrix,
-                plot_per_class_f1,
-                plot_training_curves,
-            )
+            from shared.metrics import plot_training_curves
 
             self._mlflow.log_metrics({
                 "train_loss": avg_train_loss,
@@ -544,39 +541,10 @@ class HYDRATrainer:
             }, step=epoch + 1)
 
             # Audit visualizations (overwritten each epoch)
-            v_preds_l1 = val_metrics.get("_preds_l1", [])
-            v_labels_l1 = val_metrics.get("_labels_l1", [])
-            v_preds_l2 = val_metrics.get("_preds_l2", [])
-            v_labels_l2 = val_metrics.get("_labels_l2", [])
-            v_confs_l1 = val_metrics.get("_confs_l1", [])
-            v_confs_l2 = val_metrics.get("_confs_l2", [])
-
-            if v_labels_l1:
-                fig = plot_confusion_matrix(
-                    v_labels_l1, v_preds_l1, self.l1_encoder,
-                    title=f"Confusion L1 — epoch {epoch + 1}",
-                )
-                self._mlflow.log_figure(fig, "confusion_matrix_l1.png")
-                plt.close(fig)
-
-                fig = plot_confusion_matrix(
-                    v_labels_l2, v_preds_l2, self.l2_encoder,
-                    title=f"Confusion L2 (top 50) — epoch {epoch + 1}", top_n=50,
-                )
-                self._mlflow.log_figure(fig, "confusion_matrix_l2_top50.png")
-                plt.close(fig)
-
-                f1_l1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
-                fig = plot_per_class_f1(f1_l1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
-                self._mlflow.log_figure(fig, "f1_per_class_l1.png")
-                plt.close(fig)
-                self._mlflow.log_dict(f1_l1_pc, "f1_per_class_l1.json")
-
-                f1_l2_pc = compute_per_class_f1(v_labels_l2, v_preds_l2, self.l2_encoder)
-                fig = plot_per_class_f1(f1_l2_pc, f"F1 par classe L2 — epoch {epoch + 1}")
-                self._mlflow.log_figure(fig, "f1_per_class_l2.png")
-                self._mlflow.log_dict(f1_l2_pc, "f1_per_class_l2.json")
-                plt.close(fig)
+            has_val_preds = bool(val_metrics.get("_labels_l1", []))
+            if has_val_preds:
+                self._log_confusion_matrices(epoch, val_metrics)
+                self._log_f1_plots(epoch, val_metrics)
 
             if self._history["epoch"]:
                 fig = plot_training_curves(self._history)
@@ -584,26 +552,81 @@ class HYDRATrainer:
                 plt.close(fig)
 
             # Explainability report (on validation set)
-            if v_labels_l1:
-                from shared.explainability import generate_explainability_report
-                val_texts = self.data["X_val"].tolist() if hasattr(self.data["X_val"], "tolist") else list(self.data["X_val"])
-                explain_html = generate_explainability_report(
-                    model=self._base_model,
-                    tokenizer=self.tokenizer,
-                    texts=val_texts,
-                    labels_l1=list(self.data["y_l1_val"]),
-                    labels_l2=list(self.data["y_l2_val"]),
-                    preds_l1=v_preds_l1,
-                    preds_l2=v_preds_l2,
-                    confs_l2=v_confs_l2,
-                    parent_child_matrix=self.parent_child_matrix if self.condition_l2_on_l1 else None,
-                    l1_encoder=self.l1_encoder,
-                    l2_encoder=self.l2_encoder,
-                    device=self.device,
-                )
-                self._mlflow.log_text(explain_html, "explainability_report.html")
+            if has_val_preds:
+                self._log_explainability(val_metrics)
         except Exception as e:
             print(f"  [MLflow] Warning: per-epoch artifacts failed ({e})")
+
+    def _log_confusion_matrices(self, epoch: int, val_metrics: dict) -> None:
+        """Log the L1 and L2 (top 50) confusion matrix figures to MLflow."""
+        import matplotlib.pyplot as plt
+
+        from shared.metrics import plot_confusion_matrix
+
+        v_preds_l1 = val_metrics.get("_preds_l1", [])
+        v_labels_l1 = val_metrics.get("_labels_l1", [])
+        v_preds_l2 = val_metrics.get("_preds_l2", [])
+        v_labels_l2 = val_metrics.get("_labels_l2", [])
+
+        fig = plot_confusion_matrix(
+            v_labels_l1, v_preds_l1, self.l1_encoder,
+            title=f"Confusion L1 — epoch {epoch + 1}",
+        )
+        self._mlflow.log_figure(fig, "confusion_matrix_l1.png")
+        plt.close(fig)
+
+        fig = plot_confusion_matrix(
+            v_labels_l2, v_preds_l2, self.l2_encoder,
+            title=f"Confusion L2 (top 50) — epoch {epoch + 1}", top_n=50,
+        )
+        self._mlflow.log_figure(fig, "confusion_matrix_l2_top50.png")
+        plt.close(fig)
+
+    def _log_f1_plots(self, epoch: int, val_metrics: dict) -> None:
+        """Log the per-class F1 figures and JSON dicts (L1 and L2) to MLflow."""
+        import matplotlib.pyplot as plt
+
+        from shared.metrics import compute_per_class_f1, plot_per_class_f1
+
+        v_preds_l1 = val_metrics.get("_preds_l1", [])
+        v_labels_l1 = val_metrics.get("_labels_l1", [])
+        v_preds_l2 = val_metrics.get("_preds_l2", [])
+        v_labels_l2 = val_metrics.get("_labels_l2", [])
+
+        f1_l1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
+        fig = plot_per_class_f1(f1_l1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
+        self._mlflow.log_figure(fig, "f1_per_class_l1.png")
+        plt.close(fig)
+        self._mlflow.log_dict(f1_l1_pc, "f1_per_class_l1.json")
+
+        f1_l2_pc = compute_per_class_f1(v_labels_l2, v_preds_l2, self.l2_encoder)
+        fig = plot_per_class_f1(f1_l2_pc, f"F1 par classe L2 — epoch {epoch + 1}")
+        self._mlflow.log_figure(fig, "f1_per_class_l2.png")
+        self._mlflow.log_dict(f1_l2_pc, "f1_per_class_l2.json")
+        plt.close(fig)
+
+    def _log_explainability(self, val_metrics: dict) -> None:
+        """Generate the validation explainability HTML report and log it to MLflow."""
+        from shared.explainability import generate_explainability_report
+
+        X_val = self.data["X_val"]
+        val_texts = X_val.tolist() if hasattr(X_val, "tolist") else list(X_val)
+        parent_child = self.parent_child_matrix if self.condition_l2_on_l1 else None
+        explain_html = generate_explainability_report(
+            model=self._base_model,
+            tokenizer=self.tokenizer,
+            texts=val_texts,
+            labels_l1=list(self.data["y_l1_val"]),
+            labels_l2=list(self.data["y_l2_val"]),
+            preds_l1=val_metrics.get("_preds_l1", []),
+            preds_l2=val_metrics.get("_preds_l2", []),
+            confs_l2=val_metrics.get("_confs_l2", []),
+            parent_child_matrix=parent_child,
+            l1_encoder=self.l1_encoder,
+            l2_encoder=self.l2_encoder,
+            device=self.device,
+        )
+        self._mlflow.log_text(explain_html, "explainability_report.html")
 
     def _finalize(self, test_loader: DataLoader, epoch: int, start_time: float) -> dict:
         """Mark training complete, run the final test evaluation, close MLflow."""

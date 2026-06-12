@@ -18,7 +18,12 @@ from shared.data_loader import HierarchicalProductDataset
 def get_linear_schedule_with_warmup(
     optimizer, num_warmup_steps: int, num_training_steps: int
 ) -> LambdaLR:
-    """Linear warmup then linear decay to 0."""
+    """Linear warmup then linear decay scheduler.
+
+    The LR multiplier rises linearly from 0 to 1 over ``num_warmup_steps``,
+    then decreases linearly from 1 back to 0 at ``num_training_steps``.
+    It is clamped at 0 afterwards, so the learning rate is never negative.
+    """
     def lr_lambda(current_step: int) -> float:
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
@@ -141,6 +146,7 @@ class MLflowSession:
             print(f"[MLflow] Disabled ({e})")
 
     def _safe(self, method: str, *args, **kwargs) -> None:
+        """Call ``mlflow.<method>`` if a run is active, swallowing exceptions."""
         if not self.active:
             return
         try:

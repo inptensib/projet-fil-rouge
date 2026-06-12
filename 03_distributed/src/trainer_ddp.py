@@ -566,7 +566,7 @@ class HYDRATrainerDDP:
             })
         return model, criterion, optimizer, scheduler, total_steps
 
-    def _train_one_epoch(
+    def _train_epoch(
         self,
         model: torch.nn.Module,
         criterion: HYDRALoss,
@@ -890,8 +890,10 @@ class HYDRATrainerDDP:
             val_audit_metrics, _ = self._evaluate_model(
                 base_model, val_loader, variant, collect_errors=False,
             )
-            all_preds_l1, all_labels_l1 = val_audit_metrics.get("_preds_l1", []), val_audit_metrics.get("_labels_l1", [])
-            all_preds_l2, all_labels_l2 = val_audit_metrics.get("_preds_l2", []), val_audit_metrics.get("_labels_l2", [])
+            all_preds_l1 = val_audit_metrics.get("_preds_l1", [])
+            all_labels_l1 = val_audit_metrics.get("_labels_l1", [])
+            all_preds_l2 = val_audit_metrics.get("_preds_l2", [])
+            all_labels_l2 = val_audit_metrics.get("_labels_l2", [])
 
             if all_labels_l1:
                 # Confusion matrices
@@ -918,13 +920,16 @@ class HYDRATrainerDDP:
                 mlflow.log_dict(f1_l1, "f1_per_class_l1.json")
 
                 f1_l2 = compute_per_class_f1(all_labels_l2, all_preds_l2, self.l2_encoder)
-                fig_f1_l2 = plot_per_class_f1(f1_l2, "F1 par classe — L2 (top/bottom 30)", top_n=30)
+                fig_f1_l2 = plot_per_class_f1(
+                    f1_l2, "F1 par classe — L2 (top/bottom 30)", top_n=30
+                )
                 mlflow.log_figure(fig_f1_l2, "f1_per_class_l2.png")
                 plt.close(fig_f1_l2)
-                mlflow.log_dict(
-                    {k: v for i, (k, v) in enumerate(f1_l2.items()) if i < 30 or i >= len(f1_l2) - 30},
-                    "f1_per_class_l2_extremes.json",
-                )
+                f1_l2_extremes = {
+                    k: v for i, (k, v) in enumerate(f1_l2.items())
+                    if i < 30 or i >= len(f1_l2) - 30
+                }
+                mlflow.log_dict(f1_l2_extremes, "f1_per_class_l2_extremes.json")
 
             # Training curves
             if epoch_history["epoch"]:
@@ -1014,7 +1019,7 @@ class HYDRATrainerDDP:
 
         # -- Epoch loop --------------------------------------------------
         for epoch in range(self.epochs):
-            early_stopped = self._train_one_epoch(
+            early_stopped = self._train_epoch(
                 model, criterion, optimizer, scheduler,
                 train_loader, val_loader, test_loader,
                 epoch, variant, encoder_name, model_dir, total_steps,

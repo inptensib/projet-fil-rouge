@@ -110,6 +110,7 @@ class FlatHydraConfig:
     use_description: bool = True
 
     def __post_init__(self) -> None:
+        """Validate hyperparameter ranges, raising ValueError on invalid values."""
         if self.lr <= 0:
             raise ValueError(f"lr must be positive, got {self.lr}")
         if not (0.0 <= self.dropout < 1.0):
@@ -206,6 +207,7 @@ class FlatHydraTrainer:
         self.scaler = GradScaler("cuda", enabled=self.fp16)
 
     def _make_loader(self, texts, labels_l1, labels_l2, shuffle: bool) -> DataLoader:
+        """Build a DataLoader with config settings; drops the last batch when shuffling."""
         return make_hierarchical_loader(
             texts,
             labels_l1,

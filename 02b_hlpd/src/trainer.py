@@ -102,6 +102,7 @@ class HLPDConfig:
     precision: str = "bfloat16"
 
     def __post_init__(self) -> None:
+        """Validate hyperparameter ranges, raising ValueError on invalid values."""
         if self.lr <= 0:
             raise ValueError(f"lr must be positive, got {self.lr}")
         if not (0.0 <= self.decoder_dropout < 1.0):
@@ -202,6 +203,7 @@ class HLPDTrainer:
     # ------------------------------------------------------------------
 
     def _make_loader(self, texts, labels_l1, labels_l2, shuffle: bool) -> DataLoader:
+        """Build a DataLoader with config settings; drops the last batch when shuffling."""
         return make_hierarchical_loader(
             texts,
             labels_l1,
@@ -301,7 +303,7 @@ class HLPDTrainer:
         start_time = time.time()
 
         for epoch in range(start_epoch, self.config.epochs):
-            avg_loss = self._run_epoch(train_loader, epoch, model_dir)
+            avg_loss = self._train_epoch(train_loader, epoch, model_dir)
             if self._validate_and_checkpoint(
                 val_loader, model_dir, epoch, start_epoch, avg_loss, start_time
             ):
@@ -390,7 +392,7 @@ class HLPDTrainer:
 
         return train_loader, val_loader, model_dir, start_epoch
 
-    def _run_epoch(self, train_loader: DataLoader, epoch: int, model_dir: Path) -> float:
+    def _train_epoch(self, train_loader: DataLoader, epoch: int, model_dir: Path) -> float:
         """Train one epoch, returns the average loss."""
         self.model.train()
         epoch_loss = 0.0
@@ -559,6 +561,7 @@ class HLPDTrainer:
         epochs_no_improve: int,
         history: dict,
     ) -> None:
+        """Write the full resume checkpoint to ``checkpoint_latest.pt``."""
         torch.save(
             {
                 "model_state_dict": self._base_model.state_dict(),

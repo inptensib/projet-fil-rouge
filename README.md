@@ -10,7 +10,7 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-yellow?logo=huggingface&logoColor=white)
 ![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?logo=mlflow&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-164%20passed-brightgreen?logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-192%20passed-brightgreen?logo=pytest&logoColor=white)
 ![SLURM](https://img.shields.io/badge/SLURM-Multi--GPU-orange)
 
 > **Télécom Paris** (IP Paris) × **Rakuten France**
@@ -108,7 +108,7 @@ graph TD
 - Per-class F1 (barplots triés)
 - Training curves (loss + F1 + HCR)
 - Explicabilité Gradient × Input (HTML)
-- 164 tests pytest
+- 192 tests pytest
 
 </td>
 </tr>
@@ -235,11 +235,11 @@ rakuten-classification/
 │   └── src/                   models, losses, trainer, predict
 ├── 02b_hlpd/                  HLPD (décodeur hiérarchique — Mehdi Aithamma)
 ├── 03_distributed/             DDP multi-nœud, SLURM
-├── shared/                    data_loader, metrics, utils
+├── shared/                    data_loader, metrics, training_utils, utils
 ├── scripts/                   train, SLURM arrays, évaluation, comparaison
 ├── docs/                      PIPELINE.md, METRICS.md, conception FlatHydra
 ├── results/                   Rapports HTML, métriques par modèle
-├── tests/                     164 tests pytest
+├── tests/                     192 tests pytest
 ├── ONBOARDING.md              Guide de prise en main (nouveau dev)
 └── docker-compose.yml         MLflow, tests, training
 ```
