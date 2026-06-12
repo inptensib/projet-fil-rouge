@@ -590,11 +590,14 @@ def discover_hydra_title_hierarchy_models() -> list[dict]:
         model_dir = models_root / f"HYDRA_{variant}_CamemBERT_title_hierarchy"
         complete_txt = model_dir / "training_complete.txt"
         ckpt_latest = model_dir / "checkpoint_latest.pt"
+        has_eval = bool(test_metrics.get(variant))
 
-        if not model_dir.exists():
+        # Poids éventuellement archivés sur HF (rakuten-models) : les métriques
+        # d'éval suffisent à inclure le modèle même sans dossier local.
+        if not model_dir.exists() and not has_eval:
             continue
 
-        if complete_txt.exists():
+        if complete_txt.exists() or (not model_dir.exists() and has_eval):
             status = "finished"
         elif ckpt_latest.exists():
             status = "running"
@@ -669,19 +672,22 @@ def discover_hydra_title_hierarchy_models() -> list[dict]:
 def discover_flat_hydra_title_model() -> list[dict]:
     """Découvre le modèle FlatHydra Title-only depuis models/flat_hydra_title/."""
     history_path = FLAT_HYDRA_TITLE_MODELS_DIR / "metrics.json"
-    if not history_path.exists():
+    # Poids/historique éventuellement archivés sur HF (rakuten-models) : les
+    # métriques d'éval de results/ suffisent à inclure le modèle.
+    if not history_path.exists() and not (FLAT_HYDRA_TITLE_RESULTS_DIR / "test_metrics.json").exists():
         return []
 
-    h = json.loads(history_path.read_text())
-    epochs = h.get("epoch", [])
     history: dict = {}
     val_metrics: dict = {}
-    for key in ("train_loss", "val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
-        if key in h:
-            history[key] = {"epochs": epochs, "values": h[key]}
-    for mk in ("val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
-        if mk in h and h[mk]:
-            val_metrics[mk] = h[mk][-1]
+    if history_path.exists():
+        h = json.loads(history_path.read_text())
+        epochs = h.get("epoch", [])
+        for key in ("train_loss", "val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
+            if key in h:
+                history[key] = {"epochs": epochs, "values": h[key]}
+        for mk in ("val_f1_l1_macro", "val_f1_l2_macro", "val_hcr"):
+            if mk in h and h[mk]:
+                val_metrics[mk] = h[mk][-1]
 
     params: dict = {}
     config_path = FLAT_HYDRA_TITLE_MODELS_DIR / "config.json"
@@ -966,6 +972,19 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     157 catégories L1 · 6 126 catégories L2 · 8M+ produits<br>
     Télécom Paris × Rakuten France · Généré le <span id="gen-date"></span>
 </p>
+
+<div style="background:#fff3cd;border:1px solid #ffc107;border-left:5px solid #ffc107;
+    border-radius:8px;padding:14px 18px;margin:16px 0;color:#664d03">
+    <strong>⚠ Benchmarks v1 — fuite de données identifiée (audit du 12/06/2026).</strong>
+    11,2&nbsp;% des lignes de val/test avaient un jumeau exact dans le train
+    (98&nbsp;% avec le même label) : les scores absolus de cette page sont
+    <strong>optimistes de +1,5 à +3 points</strong>. Les comparaisons
+    <em>entre</em> modèles restent valides (même fuite pour tous). Le dataset
+    redressé (v2, fuite purgée) servira aux prochains benchmarks — leurs scores,
+    plus bas, ne seront pas comparables à ceux-ci : la baisse correspond à la
+    disparition de la triche, pas à une régression. Détails :
+    <code>docs/METRICS.md</code>.
+</div>
 
 <nav>
     <a href="#synthese">Synthèse</a>

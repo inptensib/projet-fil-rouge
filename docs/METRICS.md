@@ -4,6 +4,18 @@ Définitions des métriques du projet, explication des deux modes
 d'évaluation (le piège classique du repo) et traçabilité de chaque chiffre
 publié dans `results/`.
 
+> **Warning — fuite de données dans les benchmarks v1 (12/06/2026)** :
+> un audit du dataset a révélé que **11,2 % des lignes de val et de test
+> avaient un jumeau exact dans le train** (même fiche produit scrapée
+> plusieurs fois, 98 % avec le même label). Tous les résultats actuels de
+> `results/` et `comparison.html` — entraînés et évalués sur ce dataset
+> « v1 » — sont donc **optimistes de +1,5 à +3 points** en absolu. Les
+> comparaisons *entre* modèles restent valides (même fuite pour tous).
+> Le dataset redressé (« v2 », fuite purgée : −448 359 lignes de train)
+> est sur HuggingFace dans `datasets_finaux/` — les futurs benchmarks v2
+> ne seront **pas comparables** aux chiffres v1 : la baisse attendue
+> correspond à la disparition de la triche, pas à une régression.
+
 ## Table des Matières
 
 1. [Définitions](#définitions)
