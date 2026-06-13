@@ -34,18 +34,36 @@ hybrid_system/
 │       ├── hybrid_results_confidence.json     v1 per-route breakdown
 │       └── hybrid_results_confidence_v3.json  v3 with generative probe stats
 │
-└── Specialists/                               ← ABLATION MODELS (all excluded from final)
+├── Specialists/                               ← ABLATION MODELS (all excluded from final)
+│   │
+│   ├── config.json                            Hyperparameters, results, exclusion reasons
+│   ├── README.md                              Purpose, individual findings, why each failed
+│   │
+│   └── scripts/                               Training & evaluation code + SLURM runners
+│       ├── train_setfit.py                    SetFit training (27 L1 classes)
+│       ├── train_l2_lora.py                   LoRA adapter training (59 L1 classes)
+│       ├── generative_fallback.py             CroissantLLM constrained decoding evaluation
+│       ├── run_setfit.sh                      SLURM job script for SetFit
+│       ├── run_lora.sh                        SLURM job script for LoRA
+│       └── run_generative.sh                  SLURM job script for generative
+│
+└── improvements/                              ← BEATS BASELINE (acc=84.76%, F1m=67.22%)
     │
-    ├── config.json                            Hyperparameters, results, exclusion reasons
-    ├── README.md                              Purpose, individual findings, why each failed
+    ├── config.json                            Parameters & final results
+    ├── README.md                              Final results, isolated-sweep methodology
     │
-    └── scripts/                               Training & evaluation code + SLURM runners
-        ├── train_setfit.py                    SetFit training (27 L1 classes)
-        ├── train_l2_lora.py                   LoRA adapter training (59 L1 classes)
-        ├── generative_fallback.py             CroissantLLM constrained decoding evaluation
-        ├── run_setfit.sh                      SLURM job script for SetFit
-        ├── run_lora.sh                        SLURM job script for LoRA
-        └── run_generative.sh                  SLURM job script for generative
+    ├── results/                               Threshold-sweep outputs (JSON)
+    │   ├── threshold_sweep_results_focal.json     Isolated: focal L2 + XGB v1
+    │   ├── threshold_sweep_results_v2.json        Isolated: run2 + XGB v2 (concat)
+    │   └── threshold_sweep_results_combined.json  FINAL: focal L2 + XGB v2
+    │
+    └── scripts/                               Training code + SLURM runners
+        ├── train_l2_focal.py                  Step 1: focal-loss CamemBERT L2
+        ├── train_xgboost_v2.py                Step 2: XGBoost on L1+L2 concat embeddings
+        ├── train_meta_learner.py              Step 3: meta-learner stacking (rejected)
+        ├── run_focal_train.sh                 SLURM job script for focal training
+        ├── run_xgboost_v2.sh                  SLURM job script for XGBoost v2
+        └── run_meta_learner.sh                SLURM job script for meta-learner
 ```
 
 ---
@@ -92,10 +110,15 @@ Input (product title + description)
 |--------|----------|----------|-------------|-------|
 | CamemBERT L2 alone | 0.8197 | 0.5733 | 0.8148 | Baseline |
 | XGBoost alone | 0.8069 | 0.6058 | 0.8038 | All samples through XGBoost |
-| **max_conf hybrid (FINAL)** | **0.8354** | **0.6321** | **0.8312** | **+1.57% acc, +5.88% F1m** |
+| max_conf hybrid (v1 baseline) | 0.8354 | 0.6321 | 0.8312 | +1.57% acc, +5.88% F1m |
 | Confidence v1 (gated, t=0.5) | 0.8320 | 0.6205 | 0.8275 | Previous best |
 | Confidence v3 (SetFit+gates) | 0.8230 | 0.5920 | 0.8210 | SetFit hurts |
 | Gated routing v2 | 0.7850 | 0.5420 | 0.8180 | L1 errors cascade |
+| **Focal L2 + XGB v2 (FINAL, `improvements/`)** | **0.8476** | **0.6722** | **0.8463** | **+1.22% acc, +4.01% F1m over v1** |
+
+The `improvements/` folder pushes past the v1 baseline by retraining the two
+component models (focal-loss CamemBERT + XGBoost on richer 1536d embeddings).
+Same `max_conf` decision rule — see [improvements/README.md](improvements/README.md).
 
 ---
 
@@ -124,6 +147,10 @@ python Gated+Hybrid/scripts/eval_threshold_sweep.py --sweep-only
 sbatch Specialists/scripts/run_setfit.sh
 sbatch Specialists/scripts/run_lora.sh
 sbatch Specialists/scripts/run_generative.sh
+
+# Improvements that beat the baseline (focal L2 + XGBoost v2):
+sbatch improvements/scripts/run_focal_train.sh
+sbatch improvements/scripts/run_xgboost_v2.sh
 ```
 
 ### Requirements
