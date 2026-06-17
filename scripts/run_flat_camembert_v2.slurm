@@ -1,6 +1,6 @@
 #!/bin/bash
-#SBATCH --partition=3090,P100
-#SBATCH --gres=gpu:1
+#SBATCH --partition=P100,3090
+#SBATCH --gres=gpu:2
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=40G
 #SBATCH --time=1-12:00:00
@@ -8,8 +8,8 @@
 #SBATCH --error=slurm-flat-camembert-v2-%A_%a.err
 
 # FlatHydra CamemBERT sur le dataset v2 (fuite purgée), méthode naïve.
-# 1 GPU (priorité 3090 puis P100), batch 128 pour tenir sur une seule carte.
-# Auto-resume par checkpoint.
+# 2 GPU P100 — batch 256 (128/GPU) = identique au CamemBERT v1 (71,7 %)
+# → comparaison v1↔v2 propre. Auto-resume par checkpoint.
 #
 # Usage :
 #   sbatch --job-name=flat-cam-v2 --array=0-9%1 scripts/run_flat_camembert_v2.slurm
@@ -51,7 +51,6 @@ fi
 python scripts/run_flat_hydra.py \
     --split-dir "$DATA_DIR/" \
     --config "$CONFIG" \
-    --batch-size 128 \
     $RESUME_FLAG
 
 echo "=== Terminé : $(date) ==="
