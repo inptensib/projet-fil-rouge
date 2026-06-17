@@ -1,14 +1,14 @@
 #!/bin/bash
-#SBATCH --partition=P100,3090
-#SBATCH --gres=gpu:2
+#SBATCH --partition=3090,P100
+#SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=5
 #SBATCH --mem=40G
 #SBATCH --time=1-12:00:00
 #SBATCH --output=slurm-flat-mbert-%A_%a.out
 #SBATCH --error=slurm-flat-mbert-%A_%a.err
 
-# FlatHydra mBERT — 2 GPUs, dataset complet.
-# Auto-resume : chaque tâche reprend le checkpoint de la précédente.
+# FlatHydra mBERT — 1 GPU (priorité 3090 puis P100), batch 96 pour tenir
+# sur une seule carte. Dataset v1 complet. Auto-resume par checkpoint.
 #
 # Usage :
 #   sbatch --job-name=flat-mbert --array=0-9%1 scripts/run_flat_mbert.slurm
@@ -49,6 +49,7 @@ fi
 python scripts/run_flat_hydra.py \
     --split-dir "$DATA_DIR/" \
     --config "$CONFIG" \
+    --batch-size 96 \
     $RESUME_FLAG
 
 echo "=== Terminé : $(date) ==="
