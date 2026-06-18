@@ -42,8 +42,13 @@ comparaison est `results/comparison.html`.
 
 - Python 3.10+ (le projet tourne en 3.13)
 - GPU optionnel en local (obligatoire pour le full training — cluster SLURM)
-- **Deux tokens HuggingFace** (repos privés) à demander au propriétaire
-  (`TahianaAndriambahoaka`) : un token *read* suffit pour dataset et modèles
+- **Token HuggingFace en lecture** pour accéder aux repos privés
+  (`TahianaAndriambahoaka/rakuten-dataset` et `TahianaAndriambahoaka/rakuten-models`) :
+  à demander au propriétaire (`TahianaAndriambahoaka`)
+
+> **Sans ce token** : le package s'installe et les 301 tests passent, mais il est
+> impossible de reproduire les entraînements ou évaluations (pas de données locales).
+> C'est la voie de repli recommandée pour une prise en main initiale du code.
 
 ## Installation
 
@@ -173,6 +178,11 @@ s'arrête proprement quand `training_complete.txt` apparaît.
 > toujours des job arrays `%1`, jamais de soumission en boucle ni de
 > script de surveillance qui resoumets automatiquement. Partitions GPU :
 > `P100` (2×16 Go) et `3090` (2-4×24 Go), limite 36 h, QOS 10 CPUs/job.
+
+> **Autre infrastructure ?** Les directives `#SBATCH` (partition, mémoire, temps)
+> sont en tête de chaque fichier `.slurm` et s'adaptent facilement.
+> Les variables `PROJECT_ROOT`, `VENV_ACTIVATE` et `DATA_DIR` sont paramétrables
+> via `export` avant chaque `sbatch`.
 
 La matrice complète « quel script pour quel modèle » est dans
 [docs/PIPELINE.md](docs/PIPELINE.md).
