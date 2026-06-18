@@ -30,11 +30,10 @@ echo "=== TF-IDF Title-only | $(hostname) | $(date) ==="
 echo "CPUs: $SLURM_CPUS_PER_TASK | RAM: $SLURM_MEM_PER_NODE MB"
 
 python - <<'PYEOF'
-import os, sys, time, json, warnings
+import os, time, json, warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
-sys.path.insert(0, str(Path(".").resolve()))
 
 import numpy as np
 import joblib

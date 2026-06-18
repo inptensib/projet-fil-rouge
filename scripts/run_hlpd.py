@@ -29,11 +29,8 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
 
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
-from rakuten.models.hlpd import HLPDConfig, HLPDTrainer  # noqa: E402
-from rakuten.common.data_loader import (                   # noqa: E402
+from rakuten.models.hlpd import HLPDConfig, HLPDTrainer
+from rakuten.common.data_loader import (
     prepare_hierarchical_data,
     prepare_hierarchical_data_from_splits,
 )

@@ -31,11 +31,10 @@ echo "=== FastText Softmax Title-only | $(hostname) | $(date) ==="
 echo "CPUs: $SLURM_CPUS_PER_TASK | RAM: $SLURM_MEM_PER_NODE MB"
 
 python - <<'PYEOF'
-import os, sys, time, json, tempfile, warnings
+import os, time, json, tempfile, warnings
 from pathlib import Path
 
 warnings.filterwarnings("ignore")
-sys.path.insert(0, str(Path(".").resolve()))
 
 import fasttext
 
