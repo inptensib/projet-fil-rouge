@@ -26,6 +26,11 @@ auto-explicative pour un nouveau venu.
 4. **`hybrid_system/`** : hors périmètre, reste un dossier séparé, documenté
    comme la contribution d'un coéquipier.
 5. **Configs YAML** : regroupées dans un `configs/` top-level (pas dans le package).
+6. **`03_distributed/` (pipeline DDP) EXCLU du livrable** : ~2000 lignes qui
+   n'ont produit aucun résultat publié (supplanté par le DataParallel single-node).
+   Préservé via un tag git avant suppression + noté dans `ARCHITECTURE.md`.
+   Conséquence : pas de `rakuten/distributed/`, plus de dépendance croisée, et
+   `hydra_imports.py` disparaît avec le dossier (sa seule raison d'être).
 
 ## Structure cible
 
@@ -43,8 +48,7 @@ rakuten-classification/
 │   │   │                     common, evaluate
 │   │   ├── hydra/          # models · losses · trainer · predict · config
 │   │   └── hlpd/           # models · losses · attention_bias · trainer
-│   └── distributed/        # main · trainer_ddp · ddp_utils · data_sharding ·
-│                             error_analysis · predict   (hydra_imports.py SUPPRIMÉ)
+│   └── (pas de distributed/ — pipeline DDP exclu du livrable, cf. décision 6)
 ├── configs/                # configs/{hydra,baselines,hlpd}/*.yaml
 ├── scripts/                # CLI + SLURM (imports propres)
 ├── notebooks/              # ex 00_eda + notebooks baselines (hors package)
@@ -72,7 +76,7 @@ from rakuten.models.hydra.models import HYDRALocal   # importé proprement par d
 | `02_hydra/src/` | `rakuten/models/hydra/` |
 | `01_baselines/src/` | `rakuten/models/baselines/` |
 | `02b_hlpd/src/` | `rakuten/models/hlpd/` |
-| `03_distributed/src/` | `rakuten/distributed/` |
+| `03_distributed/src/` | **exclu** (tag git d'archive + note ARCHITECTURE) |
 | `02_hydra/configs/` etc. | `configs/{hydra,baselines,hlpd}/` |
 | `00_eda/` | `notebooks/` + narration dans `docs/ARCHITECTURE.md` |
 
@@ -85,53 +89,54 @@ from rakuten.models.hydra.models import HYDRALocal   # importé proprement par d
 - **Règles de réécriture** (mécaniques) :
   - `from shared.X` → `from rakuten.common.X`
   - `from src.X` selon le dossier d'origine → `from rakuten.models.{hydra|baselines|hlpd}.X`
-    ou `from rakuten.distributed.X`
-  - imports relatifs intra-distributed (`.ddp_utils`) conservés
 - **Suppressions** :
-  - les 25 `sys.path.insert` (20 `.py` + 5 heredocs `.slurm`)
-  - `03_distributed/src/hydra_imports.py` (devenu inutile : `from
-    rakuten.models.hydra.models import HYDRALocal` fonctionne directement)
+  - tout `03_distributed/` (pipeline DDP exclu — cf. décision 6), avec
+    `hydra_imports.py`, `main.py` (`python -m src.main`), `trainer_ddp.py`, etc.,
+    et le test `tests/test_distributed.py`
+  - les `sys.path.insert` restants (ceux des `.py`/heredocs non-distributed)
   - la gymnastique de `tests/helpers.py` (`import_from_hydra/hlpd/distributed`,
     `_import_from`) → remplacée par de vrais imports
   - `conftest.py` : retirer les manipulations `sys.path` (gérées par
     `pip install -e .`)
 - **Points d'entrée** : `scripts/*.py` gardent leur rôle de CLI mais avec imports
-  propres ; SLURM `python -m src.main` → `python -m rakuten.distributed.main`.
-  (Pas de `console_scripts` pour l'instant — YAGNI.)
+  propres. Plus de `python -m src.main` (DDP exclu). Pas de `console_scripts`
+  pour l'instant (YAGNI).
 
 ## Séquence de migration (incrémentale, 1 commit vérifié par étape)
 
 Sur une branche neuve `restructure/package-rakuten`, créée **après** les prérequis :
 
+0. **Archiver puis exclure le DDP** : tag git `archive/distributed-pipeline` sur
+   le `main` consolidé, puis `git rm -r 03_distributed/` + `tests/test_distributed.py`.
 1. **Scaffold** : `rakuten/` + tous les `__init__.py`, `pyproject.toml`
    `[project]`/`[build-system]`, `pip install -e .`.
 2. **`common/`** (ex `shared/`) : déplacer, corriger les `from shared.` → tests.
 3. **`models/hydra/`** (ex `02_hydra/src/`) → tests.
 4. **`models/baselines/`** (ex `01_baselines/src/`) → tests.
 5. **`models/hlpd/`** (ex `02b_hlpd/src/`) → tests.
-6. **`distributed/`** (ex `03_distributed/src/`) : supprimer `hydra_imports.py`,
-   importer `rakuten.models.hydra.*` directement → tests.
-7. **`scripts/` + heredocs SLURM** : imports propres, `python -m rakuten...` →
-   `bash -n` + smoke training.
-8. **`tests/`** : simplifier `helpers.py` + `conftest.py` → suite complète verte.
-9. **`configs/`** : déplacer les YAML vers `configs/{hydra,baselines,hlpd}/`,
+6. **`scripts/` + heredocs SLURM** : imports propres, retrait des scripts DDP
+   (`launch_*.sh`) → `bash -n` + smoke training.
+7. **`tests/`** : simplifier `helpers.py` + `conftest.py` → suite complète verte.
+8. **`configs/`** : déplacer les YAML vers `configs/{hydra,baselines,hlpd}/`,
    mettre à jour les chemins dans scripts + docs.
-10. **`notebooks/`** : déplacer `00_eda` + notebooks baselines.
-11. **Docs** : créer `docs/ARCHITECTURE.md`, mettre à jour les chemins et noms
-    dans README/ONBOARDING/PIPELINE/METRICS/CLAUDE, **réconcilier les chiffres
-    v1→v2** (train 5 259 035, L2 5 777).
+9. **`notebooks/`** : déplacer `00_eda` + notebooks baselines.
+10. **Docs** : créer `docs/ARCHITECTURE.md` (dont la note « distribué exploré,
+    écarté du livrable »), mettre à jour les chemins et noms dans
+    README/ONBOARDING/PIPELINE/METRICS/CLAUDE, **réconcilier v1→v2**
+    (train 5 259 035, L2 5 777).
 
 ## Tests & vérification
 
-- **Invariant** : la suite de tests reste verte à **chaque** commit (309 tests
-  après le merge du kit v2 ; le compte ne doit pas baisser).
+- **Invariant** : la suite de tests reste verte à **chaque** commit. Référence :
+  309 tests après le merge du kit v2, **moins les ~10 tests DDP retirés
+  volontairement** (`test_distributed.py`) → ~299 attendus, et le compte ne
+  baisse plus ensuite.
 - **Vérification finale end-to-end** :
   - `pip install -e .` réussit
   - `python -c "from rakuten.models.hydra.trainer import HYDRATrainer"` depuis
     un dossier quelconque (hors repo)
   - `python -m pytest tests/ -q` → vert
   - smoke training : `python scripts/run_train.py --split-dir <v2> --n-samples 5000`
-  - `python -m rakuten.distributed.main --help`
   - `ruff check .` + pipeline `/pre-commit`
   - `grep -rn "sys.path.insert\|from src\.\|import_from_hydra" rakuten/ scripts/ tests/`
     → 0 occurrence
@@ -153,10 +158,12 @@ La branche `restructure/package-rakuten` part de ce `main` consolidé.
 - `hybrid_system/` : non touché, non intégré au package. Ajout d'un paragraphe
   dans README/ARCHITECTURE indiquant que c'est la contribution séparée d'un
   coéquipier (CamemBERT + XGBoost).
+- `03_distributed/` (pipeline DDP) : exclu du livrable, archivé via tag git
+  (cf. décision 6). Non détruit, récupérable depuis l'historique.
 - Aucun changement de logique de training/éval (refonte purement structurelle :
   déplacements + imports + packaging).
 - Pas de `console_scripts` (peut s'ajouter plus tard).
-- Pas de conversion DataParallel → DDP (sujet performance distinct).
+- Pas de conversion DataParallel → DDP (sans objet : le DDP est retiré).
 
 ## Risques & mitigations
 
