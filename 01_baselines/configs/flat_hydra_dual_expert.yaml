@@ -1,0 +1,121 @@
+# ==============================================================================
+# FlatHydra Dual-Expert — Configuration complète
+# ==============================================================================
+# Architecture : CamemBERT Flat HYDRA (Domain Expert) +
+#                Scoring hiérarchique + Top-K candidates +
+#                Router difficulté + LLM General Expert (optionnel)
+#
+# Tous les nouveaux paramètres sont backward-compatible :
+# mettre l2_loss_type=ce + label_path_aug_enabled=false reproduit
+# l'exacte baseline flat_hydra.yaml.
+# ==============================================================================
+
+# --- Encoder ---
+encoder: camembert-base
+max_length: 256
+freeze_encoder: false
+
+# --- Architecture ---
+project_embedding: true
+pooling: cls
+dropout: 0.2
+
+# --- Training ---
+batch_size: 64
+epochs: 10
+lr: 3.5e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+max_grad_norm: 1.0
+fp16: true
+num_workers: 4
+seed: 42
+
+# --- Early stopping ---
+early_stopping_patience: 2
+early_stopping_min_delta: 0.001
+
+# --- Loss (base, compatibilité) ---
+use_focal: false        # ignoré si l2_loss_type=focal_ce (dual-expert prend le relais)
+focal_gamma: 2.0
+level_weight_l1: 0.5
+
+# --- Dual-Expert: loss L2 ---
+# l2_loss_type: "ce"       → CrossEntropy standard (baseline identique)
+# l2_loss_type: "focal_ce" → Focal CE avec poids de classe effective-number
+l2_loss_type: focal_ce
+focal_gamma_l2: 2.0
+use_l2_class_weights: true
+# l2_class_weights_path: ""  # laisser vide → auto-construction ou save_dir/l2_class_weights.pt
+
+# --- Dual-Expert: label-path augmentation ---
+label_path_aug_enabled: false   # passer à true pour Expérience E
+label_path_aug_apply_to: rare_only   # "all" | "rare_only" | "none"
+label_path_aug_rare_threshold: 100
+label_path_aug_factor_rare: 3
+label_path_aug_factor_medium: 2
+label_path_aug_mask_prob: 0.3
+
+# --- Data ---
+use_description: true
+
+# --- Logging ---
+experiment_name: flat_hydra_dual_expert
+save_dir: models/flat_hydra_dual_expert
+
+# ==============================================================================
+# Paramètres d'inférence (non lus par FlatHydraConfig, utilisés par
+# DualExpertProductClassifier — voir dual_expert_classifier.py)
+# ==============================================================================
+
+hierarchy_scoring:
+  enabled: true
+  alpha: 0.5
+  eps: 1.0e-12
+
+candidate_generation:
+  top_k: 10
+  also_compute_top_20: true
+
+category_definitions:
+  enabled: true
+  output_path: data/category_definitions/category_definitions_v1.jsonl
+  examples_per_category: 20
+  representative_sampling: embedding_cluster   # random | popular | embedding_cluster
+  include_siblings: true
+  max_siblings: 20
+  language: fr
+  version: v1
+
+llm_reranker:
+  enabled: false                      # passer à true pour Expérience F/G
+  provider: none                      # none | local | mistral_api | openai_compatible
+  model_name: mixtral-8x7b-instruct
+  temperature: 0.0
+  max_new_tokens: 512
+  top_k: 10
+  prompt_path: prompts/llm_reranker_fr.txt
+  require_json: true
+  fallback_to_domain_expert: true
+  timeout_seconds: 15.0
+  retry_count: 1
+  api_base_url: http://localhost:8080/v1
+  api_key: none
+
+llm_routing:
+  enabled: true
+  max_llm_pass_through_rate: 0.25
+  thresholds:
+    min_l2_confidence: 0.75
+    min_l2_margin: 0.15
+    min_parent_l1_confidence: 0.50
+    rare_class_threshold: 100
+    rare_class_min_confidence: 0.90
+    min_text_chars: 30
+  rules:
+    send_if_hierarchy_inconsistent: true
+    send_if_low_l2_confidence: true
+    send_if_low_l2_margin: true
+    send_if_rare_and_not_very_confident: true
+    send_if_short_text: false
+    send_if_sibling_confusion: true

@@ -1,0 +1,36 @@
+Tu es un expert en taxonomie e-commerce française.
+
+Objectif : générer une définition claire, courte et opérationnelle pour une catégorie L2.
+Cette définition sera utilisée par un autre modèle pour choisir entre plusieurs catégories candidates.
+
+Contraintes :
+- Écris en français.
+- Ne copie pas les exemples produit mot à mot.
+- Décris la fonction principale et l'usage typique des produits.
+- Mentionne les produits inclus.
+- Mentionne les produits à exclure, surtout les catégories voisines.
+- Liste des signaux lexicaux positifs utiles (mots ou expressions fréquents dans cette catégorie).
+- Liste des signaux lexicaux négatifs / pièges fréquents.
+- Si les exemples sont insuffisants ou bruités, indique une définition prudente basée sur le chemin taxonomique.
+
+Catégorie :
+- L1: {l1_name}
+- L2: {l2_name}
+- Chemin: {l1_name} > {l2_name}
+
+Catégories voisines sous le même L1 :
+{siblings_l2_names}
+
+Exemples produits associés à cette L2 :
+{sampled_products}
+
+Réponds uniquement en JSON valide avec ce schéma :
+{
+  "definition_fr": "...",
+  "included_products": ["..."],
+  "excluded_products": ["..."],
+  "positive_signals": ["..."],
+  "negative_signals": ["..."],
+  "ambiguities": ["..."],
+  "confidence": "high|medium|low"
+}

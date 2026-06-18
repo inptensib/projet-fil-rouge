@@ -106,6 +106,18 @@ class FlatHydraConfig:
     freeze_encoder: bool = False
     use_description: bool = True
 
+    # --- Dual-Expert extensions (backward-compatible, all default to old behavior) ---
+    l2_loss_type: str = "ce"             # "ce" | "focal_ce" (with effective-number weights)
+    focal_gamma_l2: float = 2.0          # gamma for focal_ce mode
+    use_l2_class_weights: bool = False   # load effective-number weights for L2
+    l2_class_weights_path: str = ""      # path to l2_class_weights.pt (built by build_l2_class_weights.py)
+    label_path_aug_enabled: bool = False # enable label-path augmentation on training set
+    label_path_aug_apply_to: str = "rare_only"  # "all" | "rare_only" | "none"
+    label_path_aug_rare_threshold: int = 100
+    label_path_aug_factor_rare: int = 3
+    label_path_aug_factor_medium: int = 2
+    label_path_aug_mask_prob: float = 0.3
+
     def __post_init__(self) -> None:
         if self.lr <= 0:
             raise ValueError(f"lr must be positive, got {self.lr}")
@@ -115,6 +127,8 @@ class FlatHydraConfig:
             raise ValueError(f"epochs must be >= 1, got {self.epochs}")
         if self.pooling not in ("cls", "mean", "max", "last"):
             raise ValueError(f"Unknown pooling '{self.pooling}'")
+        if self.l2_loss_type not in ("ce", "focal_ce"):
+            raise ValueError(f"l2_loss_type must be 'ce' or 'focal_ce', got '{self.l2_loss_type}'")
 
     @classmethod
     def from_yaml(cls, path: str | Path, **overrides) -> "FlatHydraConfig":
@@ -198,6 +212,11 @@ class FlatHydraTrainer:
             print(f"[Trainer] DataParallel on {torch.cuda.device_count()} GPUs")
             self.model = nn.DataParallel(self.model)
 
+        # Build loss criterion — dual-expert mode uses focal CE with class weights
+        self._l2_class_weights: Optional[torch.Tensor] = None
+        if self.config.l2_loss_type == "focal_ce" or self.config.use_l2_class_weights:
+            self._l2_class_weights = self._load_or_build_class_weights()
+
         self.criterion = HYDRALoss(
             architecture="global",
             alpha=1.0,
@@ -207,6 +226,11 @@ class FlatHydraTrainer:
             focal_gamma=self.config.focal_gamma,
             use_focal=self.config.use_focal,
         )
+        # Override with dual-expert focal CE if configured
+        if self.config.l2_loss_type == "focal_ce":
+            self._use_dual_expert_loss = True
+        else:
+            self._use_dual_expert_loss = False
 
         self.optimizer = AdamW(
             self.model.parameters(),
@@ -216,10 +240,95 @@ class FlatHydraTrainer:
         self.fp16 = self.config.fp16 and self.device.type == "cuda"
         self.scaler = GradScaler("cuda", enabled=self.fp16)
 
-    def _make_loader(self, texts, labels_l1, labels_l2, shuffle: bool) -> DataLoader:
-        ds = HierarchicalProductDataset(
-            texts, labels_l1, labels_l2, self.tokenizer, self.config.max_length
+    def _load_or_build_class_weights(self) -> Optional[torch.Tensor]:
+        """Load L2 class weights from disk or build them from training labels."""
+        from pathlib import Path as _P
+
+        # Try explicit path first
+        if self.config.l2_class_weights_path:
+            p = _P(self.config.l2_class_weights_path)
+            if p.exists():
+                wt = torch.load(str(p), map_location="cpu", weights_only=True)
+                print(f"[DualExpert] L2 class weights loaded from {p}")
+                return wt.float()
+
+        # Fall back to save_dir
+        default_path = _P(self.config.save_dir) / "l2_class_weights.pt"
+        if default_path.exists():
+            wt = torch.load(str(default_path), map_location="cpu", weights_only=True)
+            print(f"[DualExpert] L2 class weights loaded from {default_path}")
+            return wt.float()
+
+        # Build from training labels if not found
+        print("[DualExpert] Building effective-number L2 class weights from train labels...")
+        try:
+            from .dual_expert.losses import build_effective_number_weights, save_class_weight_artifacts
+            labels = list(self.data.get("y_l2_train", []))
+            if hasattr(labels, "tolist"):
+                labels = labels.tolist()
+            wt = build_effective_number_weights(labels, self.num_classes_l2)
+            save_class_weight_artifacts(wt, labels, self.num_classes_l2, self.config.save_dir)
+            return wt
+        except Exception as e:
+            print(f"[DualExpert] Could not build class weights: {e}. Using uniform weights.")
+            return None
+
+    def _compute_dual_expert_loss(
+        self,
+        unified_output: torch.Tensor,
+        labels_l1: torch.Tensor,
+        labels_l2: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Compute loss using focal CE for L2 with class weights."""
+        from .dual_expert.losses import focal_cross_entropy
+
+        logits_l1 = unified_output[:, :self.num_classes_l1]
+        logits_l2 = unified_output[:, self.num_classes_l1:]
+
+        loss_l1 = torch.nn.functional.cross_entropy(logits_l1, labels_l1)
+        loss_l2 = focal_cross_entropy(
+            logits_l2, labels_l2,
+            class_weights=self._l2_class_weights,
+            gamma=self.config.focal_gamma_l2,
         )
+        total = self.config.level_weight_l1 * loss_l1 + loss_l2
+        return total, loss_l1, loss_l2
+
+    def _make_loader(
+        self,
+        texts,
+        labels_l1,
+        labels_l2,
+        shuffle: bool,
+        use_augmentation: bool = False,
+    ) -> DataLoader:
+        if use_augmentation and self.config.label_path_aug_enabled:
+            from .dual_expert.label_path_augmentation import (
+                AugmentedProductDataset,
+                LabelPathAugConfig,
+            )
+            aug_cfg = LabelPathAugConfig(
+                enabled=True,
+                apply_to=self.config.label_path_aug_apply_to,
+                rare_threshold=self.config.label_path_aug_rare_threshold,
+                augmentation_factor_rare=self.config.label_path_aug_factor_rare,
+                augmentation_factor_medium=self.config.label_path_aug_factor_medium,
+                mask_probability=self.config.label_path_aug_mask_prob,
+            )
+            ds = AugmentedProductDataset(
+                texts, labels_l1, labels_l2,
+                tokenizer=self.tokenizer,
+                max_length=self.config.max_length,
+                l1_encoder=self.l1_encoder,
+                l2_encoder=self.l2_encoder,
+                l2_to_l1_mapping=self.l2_to_l1_mapping,
+                config=aug_cfg,
+                seed=self.config.seed,
+            )
+        else:
+            ds = HierarchicalProductDataset(
+                texts, labels_l1, labels_l2, self.tokenizer, self.config.max_length
+            )
         return DataLoader(
             ds,
             batch_size=self.config.batch_size,
@@ -288,7 +397,8 @@ class FlatHydraTrainer:
         """
         d = self.data
         train_loader = self._make_loader(
-            d["X_train"], d["y_l1_train"], d["y_l2_train"], shuffle=True
+            d["X_train"], d["y_l1_train"], d["y_l2_train"],
+            shuffle=True, use_augmentation=True,
         )
         val_loader = self._make_loader(
             d["X_val"], d["y_l1_val"], d["y_l2_val"], shuffle=False
@@ -337,6 +447,10 @@ class FlatHydraTrainer:
                 "num_classes_l1": self.num_classes_l1,
                 "num_classes_l2": self.num_classes_l2,
                 "fp16": self.fp16,
+                "l2_loss_type": self.config.l2_loss_type,
+                "use_l2_class_weights": self.config.use_l2_class_weights,
+                "label_path_aug_enabled": self.config.label_path_aug_enabled,
+                "label_path_aug_apply_to": self.config.label_path_aug_apply_to,
             })
             mlflow_active = True
             print(f"[MLflow] Tracking active → {db_path}")
@@ -378,7 +492,10 @@ class FlatHydraTrainer:
                 self.optimizer.zero_grad()
                 with autocast("cuda", enabled=self.fp16):
                     level_outputs, unified_output = self.model(input_ids, mask)
-                    loss, _, _ = self.criterion(level_outputs, unified_output, l1, l2)
+                    if self._use_dual_expert_loss:
+                        loss, _, _ = self._compute_dual_expert_loss(unified_output, l1, l2)
+                    else:
+                        loss, _, _ = self.criterion(level_outputs, unified_output, l1, l2)
 
                 self.scaler.scale(loss).backward()
                 self.scaler.unscale_(self.optimizer)
