@@ -7,7 +7,7 @@ Usage:
 
     # Depuis un seul fichier JSONL (sample + split automatique)
     python scripts/run_flat_hydra.py \
-        --data shared/dataset/products.jsonl \
+        --data <chemin>/products.jsonl \
         --n-samples 1000 \
         --epochs 2 \
         --batch-size 16
@@ -19,7 +19,7 @@ Usage:
 
     # Reprendre un training interrompu
     python scripts/run_flat_hydra.py \
-        --data shared/dataset/products.jsonl \
+        --data <chemin>/products.jsonl \
         --resume models/flat_hydra_cpu/checkpoint_latest.pt
 """
 

@@ -1,7 +1,9 @@
 """Training loop for HYDRA models (single GPU version).
 
-This is the clean, single-GPU training loop. For distributed training
-with DDP, see 03_distributed/src/trainer_ddp.py.
+This is the clean, single-GPU training loop (DataParallel multi-GPU pris en
+charge via CUDA_VISIBLE_DEVICES). Le pipeline DDP multi-nœuds exploré pendant
+le projet a été écarté du livrable (cf. docs/ARCHITECTURE.md, archivé sous le
+tag git archive/distributed-pipeline).
 
 Features:
 - Linear warmup scheduler (from YAML warmup_ratio).

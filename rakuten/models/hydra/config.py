@@ -1,8 +1,8 @@
 """Mapping YAML config → kwargs du constructeur HYDRATrainer.
 
-Source unique partagée par scripts/run_train.py, scripts/eval_hierarchy.py
-et 03_distributed/src/main.py. Toute clé YAML supportée par le trainer doit
-être mappée ici — sinon elle est silencieusement ignorée.
+Source unique partagée par scripts/run_train.py et scripts/eval_hierarchy.py.
+Toute clé YAML supportée par le trainer doit être mappée ici — sinon elle est
+silencieusement ignorée.
 
 Les clés de CHARGEMENT (normalize_text, synthetic_policy, use_description)
 ne sont pas mappées : elles sont lues directement depuis le YAML par les

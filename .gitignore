@@ -37,10 +37,8 @@ ENV/
 *.pkl
 *.pickle
 shards/
-dataset/
-!shared/dataset/
-shared/dataset/*
-!shared/dataset/.gitkeep
+# Dossier de données téléchargé localement (racine uniquement, ancré)
+/dataset/
 
 # ==============================================================================
 # Models (weights only -- code IS tracked)

@@ -143,6 +143,15 @@ papier, ≠ 0.3 HYDRA) ; le batch varie selon le GPU — `flat_hydra.yaml`
 (64, CPU/debug), `flat_hydra_3090.yaml` (256), `flat_hydra_title_3090.yaml`
 (512), `flat_hydra_mbert.yaml` (128, mBERT plus lourd).
 
+> **Configs dataset v2** : `configs/hydra/v2_default.yaml` et
+> `configs/baselines/flat_hydra_v2.yaml` ciblent le **dataset v2 dé-fuité**
+> (5 777 L2) et activent le kit de rééquilibrage (`normalize_text`,
+> `synthetic_policy: drop_oversampled`, `class_weighting: inv_sqrt`,
+> `logit_adjustment_tau`). Elles s'invoquent comme les autres
+> (`--config configs/hydra/v2_default.yaml`) ; ce sont les configs de
+> référence pour reproduire les résultats v2. Les configs ci-dessus
+> (sans suffixe `v2`) correspondent aux entraînements v1 historiques.
+
 ## Scripts SLURM
 
 Conventions communes : job arrays `--array=0-9%1` (reprise automatique

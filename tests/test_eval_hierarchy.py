@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import functools
 import importlib.util
-import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -17,9 +16,6 @@ _ROOT = Path(__file__).resolve().parents[1]
 @functools.lru_cache(maxsize=None)
 def _eval_hierarchy():
     """Charge scripts/eval_hierarchy.py (import lourd : trainer HYDRA)."""
-    for k in list(sys.modules):
-        if k == "src" or k.startswith("src."):
-            del sys.modules[k]
     spec = importlib.util.spec_from_file_location(
         "eval_hierarchy", _ROOT / "scripts" / "eval_hierarchy.py"
     )
