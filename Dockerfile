@@ -9,8 +9,8 @@
 # embarque ses propres libs CUDA, l'execution reste correcte).
 FROM pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime
 
-LABEL maintainer="tandriam-25"
 LABEL project="rakuten-classification"
+LABEL org="Télécom Paris × Rakuten France"
 
 # --- System deps ---
 RUN apt-get update && apt-get install -y --no-install-recommends \

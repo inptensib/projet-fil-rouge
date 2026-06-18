@@ -41,7 +41,7 @@ from rakuten.common.training_utils import (             # noqa: E402
 from .losses import ZLPRLoss   # noqa: E402
 from .models import HLPD       # noqa: E402
 
-_CONFIG_PATH = Path(__file__).resolve().parents[1] / "configs" / "hlpd_3090.yaml"
+_CONFIG_PATH = Path(__file__).resolve().parents[3] / "configs" / "hlpd" / "hlpd_3090.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +343,7 @@ class HLPDTrainer:
         self._start_step_in_epoch = 0
 
         # MLflow (optional — graceful if not running)
-        db_path = Path(__file__).resolve().parents[2] / "mlflow.db"
+        db_path = Path(__file__).resolve().parents[3] / "mlflow.db"
         self._mlflow = MLflowSession(
             f"sqlite:///{db_path}", self.config.experiment_name
         )

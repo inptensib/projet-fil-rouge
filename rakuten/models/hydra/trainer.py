@@ -41,8 +41,8 @@ from rakuten.common.utils import ENCODERS, enforce_hierarchy, get_device, set_se
 from .losses import HYDRALoss
 from .models import create_hydra_model
 
-# Path to default config
-_CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "default.yaml"
+# Path to default config (configs/ vit à la racine du repo, hors package)
+_CONFIG_PATH = Path(__file__).resolve().parents[3] / "configs" / "hydra" / "default.yaml"
 
 
 def load_config(path: Path | str | None = None) -> dict:
@@ -353,7 +353,7 @@ class HYDRATrainer:
 
     def _setup_mlflow(self, model_key: str) -> None:
         """Open the MLflow run and log hyperparameters."""
-        db_path = Path(__file__).resolve().parents[2] / "mlflow.db"
+        db_path = Path(__file__).resolve().parents[3] / "mlflow.db"
         self._mlflow = MLflowSession(f"sqlite:///{db_path}", model_key)
         gpu_type = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
         self._mlflow.start(params={

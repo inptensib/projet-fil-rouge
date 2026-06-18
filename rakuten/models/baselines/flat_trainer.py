@@ -39,7 +39,7 @@ from rakuten.models.hydra.losses import HYDRALoss  # noqa: E402
 
 from .flat_model import FlatHydra                          # noqa: E402
 
-_CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "flat_hydra.yaml"
+_CONFIG_PATH = Path(__file__).resolve().parents[3] / "configs" / "baselines" / "flat_hydra.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ class FlatHydraTrainer:
 
     def _setup_mlflow(self) -> MLflowSession:
         """Open the optional MLflow run and log hyperparameters."""
-        db_path = Path(__file__).resolve().parents[2] / "mlflow.db"
+        db_path = Path(__file__).resolve().parents[3] / "mlflow.db"
         session = MLflowSession(f"sqlite:///{db_path}", self.config.experiment_name)
         session.start(params={
             "encoder": self.config.encoder,

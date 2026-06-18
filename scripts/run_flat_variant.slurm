@@ -31,7 +31,6 @@ source "$VENV_ACTIVATE"
 cd "$PROJECT_ROOT"
 
 export TRANSFORMERS_OFFLINE=1
-#export HF_HOME=/home/infres/boutrouft-25/.cache/huggingface
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
