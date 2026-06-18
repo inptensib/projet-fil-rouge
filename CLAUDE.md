@@ -2,11 +2,11 @@
 
 ## Contexte projet
 
-Classification hierarchique de **8M+ produits Rakuten** en **157 categories L1** et **6 126 categories L2**.
+Classification hierarchique de **8M+ produits Rakuten** en **157 categories L1** et **5 777 categories L2**.
 Architecture principale : **HYDRA** (multi-tete encoder-only, EMNLP 2025), 3 variantes : `local`, `global`, `nested`.
 Encodeur : `camembert-base`. Donnees : texte (designation + description) en francais.
 
-**Metriques cles** (toutes dans `shared/metrics.py`) :
+**Metriques cles** (toutes dans `rakuten/common/metrics.py`) :
 - `f1_l1_macro`, `f1_l2_macro` — metriques principales (macro = chaque classe pese egalement)
 - `constrained_f1` — F1 L2 valide uniquement si L1 parent correct
 - `hierarchical_consistency_rate` (HCR) — % de predictions ou L2 est enfant valide de L1
@@ -52,7 +52,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 ## Conventions techniques
 
 - Variantes HYDRA : `local`, `global`, `nested` (jamais `hybrid`)
-- Constantes : **157** classes L1, **6 126** classes L2, `max_length=256`
+- Constantes : **157** classes L1, **5 777** classes L2 (dataset v2), `max_length=256`
 - Encodeur : `camembert-base`
 - FocalLoss sans alpha : `-(1-p_t)^gamma * log(p_t)`, `gamma=2.0`
 - Source de verite pour les hyperparametres : `configs/hydra/default.yaml`
@@ -68,19 +68,21 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 ## Structure du projet
 
 ```
-00_eda/                Analyse exploratoire (EDA)
-01_baselines/src/      tfidf_pipeline.py, word2vec_pipeline.py, bert_flat_classifier.py, evaluate.py
-01_baselines/notebooks/ fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb
-02_hydra/src/          models.py, losses.py, trainer.py, predict.py, config.py (mapping YAML)
-configs/hydra/      default.yaml (source de verite), hierarchy.yaml, title_only*.yaml, mbert_default.yaml
-02b_hlpd/              HLPD (decodeur hierarchique — Mehdi Aithamma)
-03_distributed/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
-shared/                data_loader.py, metrics.py, training_utils.py, utils.py
+rakuten/               Package Python installable (pip install -e .)
+  common/              data_loader.py, metrics.py, training_utils.py, utils.py
+  models/baselines/    tfidf_pipeline.py, word2vec_pipeline.py, flat_model.py, flat_trainer.py
+  models/hydra/        models.py, losses.py, trainer.py, predict.py, config.py
+  models/hlpd/         HLPD (decodeur hierarchique — Mehdi Aithamma)
+configs/hydra/         default.yaml (source de verite), hierarchy.yaml, title_only*.yaml, mbert_default.yaml
+configs/baselines/     flat_hydra*.yaml
+configs/hlpd/          hlpd_3090.yaml
 scripts/               run_train.py, generate_comparison.py, generate_f1_per_class.py, eval_hierarchy.py
                        run_train_variant.slurm, run_train_array.slurm, chain_submit_array.sh
-docs/                  PIPELINE.md (matrice scripts), METRICS.md (provenance metriques)
+notebooks/eda/         analyse exploratoire
+notebooks/baselines/   fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb
+docs/                  ARCHITECTURE.md, PIPELINE.md (matrice scripts), METRICS.md (provenance metriques)
 results/               comparison.html, rapports HTML par modele, metriques JSON
-tests/                 192 tests pytest
+tests/                 301 tests pytest
 ONBOARDING.md          guide de prise en main pour nouveau developpeur
 docker-compose.yml     services : test, training, baselines, mlflow
 ```
@@ -95,9 +97,9 @@ docker-compose.yml     services : test, training, baselines, mlflow
 ## Donnees
 
 - **Format** : JSONL (`products.jsonl`), champs : `designation`, `description`, `typelabel` (L1), `producttype` (L2)
-- **Chargement** : `shared/data_loader.py` → `prepare_hierarchical_data_from_splits()` (splits pre-generes)
+- **Chargement** : `rakuten/common/data_loader.py` → `prepare_hierarchical_data_from_splits()` (splits pre-generes)
+- **Dataset v2** : train 5 259 035 lignes, 5 777 classes L2 (fuite de doublons purgee — voir docs/METRICS.md)
 - **Couverture L2** : `_ensure_l2_coverage()` duplique ~923 echantillons pour garantir que chaque classe L2 apparait dans chaque split
-- **Sharding DDP** : `03_distributed/src/data_sharding.py` → valider avec `/shard-check` avant tout training distribue
 - **Pas de data dans le repo** : les splits JSONL doivent etre places manuellement
 
 ## Experimentation & MLflow

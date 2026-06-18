@@ -22,7 +22,7 @@ Classification hiérarchique de **8M+ produits Rakuten France** à partir de
 leur texte (`designation` + `description`, en français) :
 
 - **Niveau 1 (L1)** : 157 catégories parentes
-- **Niveau 2 (L2)** : 6 126 catégories feuilles, chacune fille d'une L1
+- **Niveau 2 (L2)** : 5 777 catégories feuilles, chacune fille d'une L1
 
 Trois familles de modèles sont comparées :
 
@@ -34,8 +34,8 @@ Trois familles de modèles sont comparées :
 | HLPD       | Décodeur hiérarchique (ECIR 2025)         | 61.5 %         |
 
 Les métriques principales sont `f1_l1_macro`, `f1_l2_macro` et le **HCR**
-(taux de cohérence hiérarchique) — définies dans `shared/metrics.py` et
-documentées dans [docs/METRICS.md](docs/METRICS.md). Le livrable de
+(taux de cohérence hiérarchique) — définies dans `rakuten/common/metrics.py`
+et documentées dans [docs/METRICS.md](docs/METRICS.md). Le livrable de
 comparaison est `results/comparison.html`.
 
 ## Prérequis
@@ -53,13 +53,13 @@ cd rakuten-classification
 
 python -m venv ../venv
 source ../venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 
 # Smoke test : la suite complète passe sans données ni GPU
 python -m pytest tests/ -q
 ```
 
-Les 192 tests doivent passer. Alternative Docker :
+Les 301 tests doivent passer. Alternative Docker :
 
 ```bash
 docker compose run --rm --profile test test
@@ -74,9 +74,12 @@ sur le repo privé HuggingFace [`TahianaAndriambahoaka/rakuten-dataset`][hf-data
 
 | Fichier             | Lignes    |
 |:--------------------|:----------|
-| `train_split.jsonl` | 5 573 659 |
-| `val_split.jsonl`   | 1 194 355 |
-| `test_split.jsonl`  | 1 194 356 |
+| `train_split.jsonl` | 5 259 035 |
+| `val_split.jsonl`   | 1 124 793 |
+| `test_split.jsonl`  | 1 124 793 |
+
+> **Dataset v2** : fuite de doublons purgée (−448 359 lignes de train).
+> Voir [docs/METRICS.md](docs/METRICS.md) pour l'historique v1 → v2.
 
 ```bash
 export HF_TOKEN="hf_..."          # token read fourni par le propriétaire
@@ -177,17 +180,24 @@ La matrice complète « quel script pour quel modèle » est dans
 ## Carte du Dépôt
 
 ```text
-00_eda/                 Analyse exploratoire (notebook + rapport HTML)
-01_baselines/           TF-IDF, Word2Vec, fastText, FlatHydra (src + configs)
-02_hydra/               HYDRA : modèles, pertes, trainer, configs YAML
-02b_hlpd/               HLPD : décodeur hiérarchique (Mehdi Aithamma)
-03_distributed/         Entraînement DDP multi-nœuds (SLURM)
-shared/                 data_loader, métriques, training_utils, utilitaires communs
+rakuten/                Package Python installable (pip install -e .)
+  common/               data_loader, métriques, training_utils, utilitaires
+  models/baselines/     TF-IDF, Word2Vec, fastText, FlatHydra
+  models/hydra/         HYDRA (EMNLP 2025) : models, losses, trainer, config
+  models/hlpd/          HLPD (ECIR 2025) — Mehdi Aithamma
+configs/hydra/          default.yaml, hierarchy.yaml, title_only*.yaml, mbert_default.yaml
+configs/baselines/      flat_hydra*.yaml
+configs/hlpd/           hlpd_3090.yaml
 scripts/                CLI Python + scripts SLURM (voir docs/PIPELINE.md)
-tests/                  192 tests pytest (sans données ni GPU)
+notebooks/eda/          Analyse exploratoire
+notebooks/baselines/    fastText, TF-IDF, Word2Vec (notebooks)
+tests/                  301 tests pytest (sans données ni GPU)
 results/                Métriques JSON, rapports HTML, comparison.html
-docs/                   PIPELINE.md, METRICS.md, conception FlatHydra
+docs/                   ARCHITECTURE.md, PIPELINE.md, METRICS.md
+hybrid_system/          Contribution séparée (CamemBERT + XGBoost)
 ```
+
+Architecture détaillée et table de correspondance : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## Pièges Connus
 
@@ -198,27 +208,25 @@ docs/                   PIPELINE.md, METRICS.md, conception FlatHydra
 - **`TRANSFORMERS_OFFLINE=1`** dans les scripts SLURM : les nœuds GPU
   n'ont pas d'accès internet. Pré-télécharger les poids des encodeurs en
   local (`AutoModel.from_pretrained(...)` une fois) pour peupler le cache.
-- **Packages `src` homonymes** : `01_baselines/src`, `02_hydra/src`,
-  `02b_hlpd/src` et `03_distributed/src` entrent en collision. Utiliser
-  `tests/helpers.py::import_from_*` dans les tests et
-  `03_distributed/src/hydra_imports.py` côté DDP.
 - **`_ensure_l2_coverage()`** duplique ~923 échantillons (valeur
   indicative, recalculée à chaque chargement) pour garantir chaque classe
   L2 dans chaque split — comportement normal.
 - **Configs title-only** : `batch_size`/`lr` plus élevés que `default.yaml`
   (scaling en racine carrée, séquences plus courtes) — justifié dans
   [docs/PIPELINE.md](docs/PIPELINE.md).
+- **Dataset v1 vs v2** : les chiffres publiés avant le 12/06/2026 sont
+  gonflés de +1,5 à +3 pts (fuite de doublons) — voir [docs/METRICS.md](docs/METRICS.md).
 
 ## Pour Aller Plus Loin
 
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — narration du projet,
+  table de correspondance ancien → nouveau, imports cibles
 - [docs/PIPELINE.md](docs/PIPELINE.md) — matrice modèle × étape, configs,
   scripts SLURM, dettes techniques connues
 - [docs/METRICS.md](docs/METRICS.md) — définitions, modes d'évaluation,
   provenance de chaque chiffre publié
 - [docs/flat_hydra_conception.md](docs/flat_hydra_conception.md) —
   conception de la baseline FlatHydra
-- READMEs de modules : `01_baselines/`, `02_hydra/`, `02b_hlpd/`,
-  `03_distributed/`
 
 [hf-dataset]: https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset
 [hf-models]: https://huggingface.co/TahianaAndriambahoaka/rakuten-models

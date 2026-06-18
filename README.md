@@ -4,7 +4,7 @@
 
 # 🛒 Rakuten Hierarchical Product Classification
 
-**8M+ produits · 157 catégories · 6 126 sous-catégories · CamemBERT**
+**8M+ produits · 157 catégories · 5 777 sous-catégories · CamemBERT**
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
@@ -33,7 +33,7 @@ Un produit arrive avec un titre et une description en français. Le modèle pré
     └────┬────┘
     ┌────┴────┐
     ▼         ▼
- L1: 157   L2: 6 126
+ L1: 157   L2: 5 777
 Électronique  Coque téléphone
 ```
 
@@ -54,7 +54,7 @@ graph TD
     D --> E2
 
     E1["🏷️ Head L1<br/>Linear→LN→ReLU→Drop→Linear<br/><b>→ 157 classes</b>"]
-    E2["🏷️ Head L2<br/>Linear→LN→ReLU→Drop→Linear<br/><b>→ 6 126 classes</b>"]
+    E2["🏷️ Head L2<br/>Linear→LN→ReLU→Drop→Linear<br/><b>→ 5 777 classes</b>"]
 
     E1 --> F["🎯 Prédiction"]
     E2 --> F
@@ -94,7 +94,6 @@ graph TD
 **🔬 Training**
 - Fine-tuning complet (12 couches)
 - DataParallel multi-GPU automatique
-- DDP multi-nœud sur cluster SLURM
 - Checkpoint tous les 10K steps
 - Auto-resume après interruption SLURM
 - Early stopping sur `val_f1_l2_macro`
@@ -128,14 +127,15 @@ graph TD
 # Installation
 git clone <repo-url> && cd rakuten-classification
 python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+pip install -e .
 
 # Dataset (splits pré-générés sur HuggingFace Hub)
 export HF_TOKEN="hf_..."
 python scripts/download_dataset.py
 
 # Training
-python scripts/run_train.py --split-dir /path/to/splits --variant local
+python scripts/run_train.py --split-dir /path/to/splits --variant local \
+    --config configs/hydra/default.yaml
 
 # SLURM — job array par variante (10 tentatives, auto-resume)
 sbatch --job-name=hydra-local --array=0-9%1 scripts/run_train_variant.slurm local
@@ -162,9 +162,13 @@ python -m pytest tests/ -v
 
 | Split | Échantillons | % | Champs |
 |-------|-------------|---|--------|
-| Train | 5 573 659 | 70% | `designation`, `description`, `typelabel` (L1), `producttype` (L2) |
-| Val | 1 194 355 | 15% | Split stratifié par L2, seed=42 |
-| Test | 1 194 356 | 15% | |
+| Train | 5 259 035 | 70% | `designation`, `description`, `typelabel` (L1), `producttype` (L2) |
+| Val   | 1 124 793 | 15% | Split stratifié par L2, seed=42 |
+| Test  | 1 124 793 | 15% | |
+
+> **Note dataset v2** : les chiffres ci-dessus correspondent au dataset
+> redressé (v2, fuite de doublons purgée). Les benchmarks antérieurs (v1)
+> sont gonflés de +1,5 à +3 points — voir [docs/METRICS.md](docs/METRICS.md).
 
 ---
 
@@ -228,21 +232,30 @@ Variante hiérarchique : [`configs/hydra/hierarchy.yaml`](configs/hydra/hierarch
 
 ```
 rakuten-classification/
-├── 00_eda/                    Analyse exploratoire (EDA)
-├── 01_baselines/              FastText, TF-IDF+LinearSVC, Word2Vec+LinearSVC
-├── 02_hydra/
-│   ├── configs/               default.yaml, hierarchy.yaml
-│   └── src/                   models, losses, trainer, predict
-├── 02b_hlpd/                  HLPD (décodeur hiérarchique — Mehdi Aithamma)
-├── 03_distributed/             DDP multi-nœud, SLURM
-├── shared/                    data_loader, metrics, training_utils, utils
+├── rakuten/                   Package Python installable (pip install -e .)
+│   ├── common/                data_loader, metrics, training_utils, utils
+│   └── models/
+│       ├── baselines/         TF-IDF, Word2Vec, fastText, FlatHydra
+│       ├── hydra/             HYDRA (EMNLP 2025) : models, losses, trainer, config
+│       └── hlpd/              HLPD (ECIR 2025) — Mehdi Aithamma
+├── configs/                   YAML hors package
+│   ├── hydra/                 default.yaml, hierarchy.yaml, title_only*.yaml
+│   ├── baselines/             flat_hydra*.yaml
+│   └── hlpd/                  hlpd_3090.yaml
 ├── scripts/                   train, SLURM arrays, évaluation, comparaison
-├── docs/                      PIPELINE.md, METRICS.md, conception FlatHydra
+├── notebooks/
+│   ├── eda/                   Analyse exploratoire
+│   └── baselines/             fastText, TF-IDF, Word2Vec (notebooks)
+├── docs/                      ARCHITECTURE.md, PIPELINE.md, METRICS.md
 ├── results/                   Rapports HTML, métriques par modèle
-├── tests/                     192 tests pytest
+├── tests/                     301 tests pytest
+├── hybrid_system/             Contribution séparée (CamemBERT + XGBoost)
 ├── ONBOARDING.md              Guide de prise en main (nouveau dev)
 └── docker-compose.yml         MLflow, tests, training
 ```
+
+Architecture détaillée et table de correspondance ancien → nouveau :
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 

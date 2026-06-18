@@ -9,7 +9,6 @@ et publier chaque modèle du projet.
 1. [Matrice modèle × étape](#matrice-modèle--étape)
 1. [Configs YAML](#configs-yaml)
 1. [Scripts SLURM](#scripts-slurm)
-1. [Pipeline DDP multi-nœuds](#pipeline-ddp-multi-nœuds)
 1. [Génération des rapports](#génération-des-rapports)
 1. [Utilitaires](#utilitaires)
 1. [Dettes techniques connues](#dettes-techniques-connues)
@@ -103,7 +102,7 @@ sbatch scripts/run_eval_flat_hydra_title.slurm     # éval title-only
 
 ```bash
 sbatch --job-name=hlpd --array=0-9%1 scripts/run_hlpd_3090.slurm
-# Config : configs/hlpd/hlpd_3090.yaml — voir 02b_hlpd/README.md
+# Config : configs/hlpd/hlpd_3090.yaml
 ```
 
 ### Baselines
@@ -166,23 +165,6 @@ par tâche, partitions `P100` (2×16 Go) et `3090` (2-4×24 Go).
 > script de surveillance auto-resoumission (incident des 110 jobs,
 > avertissement admin). Les job arrays `%1` couvrent le besoin.
 
-## Pipeline DDP Multi-Nœuds
-
-Le module `03_distributed/` permet l'entraînement multi-GPU multi-nœuds
-(sharding par rank). Point d'entrée :
-
-```bash
-cd 03_distributed
-python -m src.main \
-    --config ../configs/hydra/default.yaml \
-    --split_dir "$DATA_DIR" \
-    --shard_dir shards
-```
-
-Priorité des hyperparamètres : flags CLI explicites > YAML (`--config`) >
-défauts du trainer. Valider les shards avant tout run
-(`03_distributed/src/data_sharding.py`).
-
 ## Génération des Rapports
 
 ```bash
@@ -215,13 +197,14 @@ La provenance de chaque JSON consommé est tracée dans
 
 ## Dettes Techniques Connues
 
-- **Duplication des trainers** : `02_hydra/src/trainer.py`,
-  `01_baselines/src/flat_trainer.py`, `03_distributed/src/trainer_ddp.py`
-  et le trainer HLPD partagent beaucoup de logique train/eval sans
-  factorisation. Refactor risqué tant que des checkpoints en production
-  dépendent des structures actuelles.
-- **Tests DDP** : `trainer_ddp.py` (~500 lignes) n'a pas de couverture
-  dédiée — nécessite une infra multi-GPU pour des tests significatifs.
+- **Duplication des trainers** : `rakuten/models/hydra/trainer.py`,
+  `rakuten/models/baselines/flat_trainer.py` et le trainer HLPD partagent
+  beaucoup de logique train/eval sans factorisation commune. La
+  `rakuten/common/training_utils.py` fournit les briques partagées
+  (EarlyStopping, compute_class_weights).
 - **Structures JSON hétérogènes dans `results/`** : trois formats
   coexistent selon la famille de modèle (voir [METRICS.md](METRICS.md)) ;
   harmoniser exigerait de régénérer toutes les évaluations.
+- **Pipeline DDP** : exploré pendant le projet mais écarté du livrable au
+  profit du DataParallel single-node. Disponible au tag git
+  `archive/distributed-pipeline` — voir [docs/ARCHITECTURE.md](ARCHITECTURE.md).
