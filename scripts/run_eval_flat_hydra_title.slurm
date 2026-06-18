@@ -28,17 +28,14 @@ echo "=== Évaluation FlatHydra Title-only | $(hostname) | $(date) ==="
 echo "GPU : $(python -c 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")')"
 
 python - <<'PYEOF'
+import json
 import os
-import sys, json, time
+import time
 from pathlib import Path
-
-_ROOT = Path(".").resolve()
-sys.path.insert(0, str(_ROOT))
-sys.path.insert(0, str(_ROOT / "01_baselines"))
 
 import torch
 from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
-from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer
+from rakuten.models.baselines.flat_trainer import FlatHydraConfig, FlatHydraTrainer
 
 CONFIG    = "01_baselines/configs/flat_hydra_title_3090.yaml"
 MODEL_PT  = "models/flat_hydra_title/best_model.pt"

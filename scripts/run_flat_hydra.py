@@ -26,24 +26,15 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parents[1]
-_BASELINES_ROOT = _ROOT / "01_baselines"
-
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-if str(_BASELINES_ROOT) not in sys.path:
-    sys.path.insert(0, str(_BASELINES_ROOT))
-
-from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer  # noqa: E402
-from rakuten.common.data_loader import (                                  # noqa: E402
+from rakuten.models.baselines.flat_trainer import FlatHydraConfig, FlatHydraTrainer
+from rakuten.common.data_loader import (
     prepare_hierarchical_data,
     prepare_hierarchical_data_from_splits,
 )
 
-_DEFAULT_CONFIG = _BASELINES_ROOT / "configs" / "flat_hydra.yaml"
+_DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "01_baselines" / "configs" / "flat_hydra.yaml"
 
 
 def main() -> None:

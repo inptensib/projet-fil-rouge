@@ -1,4 +1,4 @@
-"""Tests for 01_baselines/src/flat_model.py and flat_trainer.py.
+"""Tests for rakuten/models/baselines/flat_model.py and flat_trainer.py.
 
 Uses mocked HuggingFace models to avoid downloading weights.
 """
@@ -6,7 +6,6 @@ Uses mocked HuggingFace models to avoid downloading weights.
 from __future__ import annotations
 
 import json
-import sys
 import tempfile
 from pathlib import Path
 from unittest import mock
@@ -15,15 +14,8 @@ import pytest
 import torch
 import torch.nn as nn
 
-# Ensure project root and baselines root are importable
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-_BASELINES_ROOT = _PROJECT_ROOT / "01_baselines"
-for p in (_PROJECT_ROOT, _BASELINES_ROOT):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
-
-from src.flat_model import FlatHydra                             # noqa: E402
-from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer  # noqa: E402
+from rakuten.models.baselines.flat_model import FlatHydra
+from rakuten.models.baselines.flat_trainer import FlatHydraConfig, FlatHydraTrainer
 
 # ---------------------------------------------------------------------------
 # Constants
