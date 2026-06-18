@@ -51,10 +51,6 @@ Trois familles de modèles comparées :
 > sont gonflés de +1,5 à +3 pts (doublons train/test purgés). Les chiffres
 > ci-dessus sont les valeurs v2. Détail : [docs/METRICS.md](docs/METRICS.md).
 
-Deux approches de classification hiérarchique :
-- **HYDRA** (EMNLP 2025) — Multi-tête encoder-only
-- **HLPD** (ECIR 2025) — Décodeur non-autorégressif avec attention hiérarchique
-
 ---
 
 ## Architecture HYDRA
