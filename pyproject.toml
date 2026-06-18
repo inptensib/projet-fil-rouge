@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "rakuten-classification"
 version = "0.1.0"
 description = "Classification hiérarchique de produits Rakuten (HYDRA, HLPD, baselines)"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dynamic = ["dependencies"]
 
 [tool.setuptools.dynamic]
@@ -16,7 +16,7 @@ dependencies = {file = ["requirements.txt"]}
 include = ["rakuten*"]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]

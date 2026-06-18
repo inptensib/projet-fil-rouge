@@ -40,7 +40,8 @@ comparaison est `results/comparison.html`.
 
 ## Prérequis
 
-- Python 3.10+ (le projet tourne en 3.13)
+- Python 3.11+ (environnement validé : 3.13) — le plancher 3.11 est imposé par
+  les versions épinglées de `numpy` et `scikit-learn`
 - GPU optionnel en local (obligatoire pour le full training — cluster SLURM)
 - **Token HuggingFace en lecture** pour accéder aux repos privés
   (`TahianaAndriambahoaka/rakuten-dataset` et `TahianaAndriambahoaka/rakuten-models`) :
