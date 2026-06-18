@@ -35,7 +35,7 @@ from rakuten.common.data_loader import (
     prepare_hierarchical_data_from_splits,
 )
 
-_DEFAULT_CONFIG = _ROOT / "02b_hlpd" / "configs" / "hlpd_3090.yaml"
+_DEFAULT_CONFIG = _ROOT / "configs" / "hlpd" / "hlpd_3090.yaml"
 
 
 def main() -> None:

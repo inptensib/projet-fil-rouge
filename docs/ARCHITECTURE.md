@@ -24,7 +24,7 @@ vers des architectures plus expressives.
 ### Étape 1 — Analyse Exploratoire (EDA)
 
 Avant tout modèle, les notebooks `notebooks/eda/` ont caractérisé le dataset
-Rakuten France : distribution des 157 catégories L1, longue traîne des 6 126
+Rakuten France : distribution des 157 catégories L1, longue traîne des 5 777
 sous-catégories L2, longueur des textes (`designation` + `description`), et
 déséquilibre de classes. L'EDA a motivé plusieurs choix techniques : le
 macro-averaging des métriques (pour donner autant de poids aux classes rares),

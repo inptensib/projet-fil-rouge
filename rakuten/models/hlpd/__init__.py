@@ -1,4 +1,4 @@
-"""02b_hlpd — Hierarchical Label Prediction Decoder (HLPD).
+"""HLPD — Hierarchical Label Prediction Decoder (HLPD).
 
 Reference: Torba, Laclau et al. ECIR 2025.
 """

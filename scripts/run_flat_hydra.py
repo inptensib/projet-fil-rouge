@@ -34,7 +34,7 @@ from rakuten.common.data_loader import (
     prepare_hierarchical_data_from_splits,
 )
 
-_DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "01_baselines" / "configs" / "flat_hydra.yaml"
+_DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "configs" / "baselines" / "flat_hydra.yaml"
 
 
 def main() -> None:

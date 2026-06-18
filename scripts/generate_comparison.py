@@ -623,7 +623,7 @@ def discover_hydra_title_hierarchy_models() -> list[dict]:
         } if val_f1_l2 is not None else {}
 
         params: dict = {}
-        cfg_path = PROJECT_ROOT / "02_hydra" / "configs" / "title_only_hierarchy.yaml"
+        cfg_path = PROJECT_ROOT / "configs" / "hydra" / "title_only_hierarchy.yaml"
         if cfg_path.exists():
             import yaml as _yaml
             cfg = _yaml.safe_load(cfg_path.read_text())

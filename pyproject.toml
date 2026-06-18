@@ -36,4 +36,4 @@ ignore = [
 "__init__.py" = ["F401"]       # Re-exports in __init__.py
 
 [tool.ruff.lint.isort]
-known-first-party = ["shared"]
+known-first-party = ["rakuten"]
