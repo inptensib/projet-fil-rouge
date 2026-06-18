@@ -7,6 +7,15 @@ les paramètres d'apprentissage et les décisions d'implémentation.
 Référence officielle :
 [`modeling/baselines.py`](https://github.com/FKarl/HYDRA/blob/main/modeling/baselines.py)
 
+> **Note sur les dimensions.** Les shapes de tenseurs de ce document
+> (`L2 = 6 126`, sortie unifiée `6 283 = 157 + 6 126`) correspondent au
+> **dataset v1 d'origine**, sur lequel le modèle FlatHydra de référence a été
+> entraîné (F1 L2 = 71.7 %). Sur le **dataset v2 dé-fuité** (couramment livré),
+> `L2 = 5 777` et la sortie unifiée vaut `5 934 = 157 + 5 777`. L'architecture
+> est identique : la taille de la tête L2 est dérivée des données à l'exécution
+> (`len(l2_encoder.classes_)`), jamais codée en dur. Cf.
+> [METRICS.md](METRICS.md) pour le détail de la fuite v1 → v2.
+
 ---
 
 ## Table des matières

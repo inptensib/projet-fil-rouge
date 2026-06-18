@@ -125,7 +125,7 @@ class HYDRALoss(nn.Module):
 
         # L1 : toujours CrossEntropy (157 classes, F1~92%, calibré pour le masque hiérarchique)
         self.loss_fn_l1 = nn.CrossEntropyLoss(weight=class_weights_l1)
-        # L2 : FocalLoss si use_focal (6 126 classes déséquilibrées), CE sinon
+        # L2 : FocalLoss si use_focal (~5 777 classes L2 déséquilibrées), CE sinon
         self.loss_fn_l2 = (
             FocalLoss(gamma=focal_gamma, class_weights=class_weights_l2)
             if use_focal

@@ -40,9 +40,10 @@ implémentent trois familles de baselines classiques :
   forte (F1 L2 = 42.9 %).
 - **Word2Vec + LinearSVC** : embeddings Word2Vec pré-entraînés, SVM.
 - **fastText** : classification supervisée (mode supervised de fastText).
-- **FlatHydra** : CamemBERT avec une unique tête plate L1+L2 (6 283 classes).
-  C'est la meilleure baseline (F1 L2 = 71.7 %) et le point de départ naturel
-  pour HYDRA.
+- **FlatHydra** : CamemBERT avec une unique tête plate L1+L2 (5 934 sorties en
+  v2 = 157 + 5 777 ; 6 283 sur le dataset v1 d'origine). C'est la meilleure
+  baseline (F1 L2 = 71.7 %, mesuré en v1) et le point de départ naturel pour
+  HYDRA.
 
 ### Étape 3 — HYDRA (EMNLP 2025)
 

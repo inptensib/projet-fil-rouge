@@ -197,7 +197,7 @@ nav a:hover {{ text-decoration: underline; }}
 
 <h1>HYDRA {variant_title} — Rapport d'entraînement</h1>
 <p style="color:#6c757d">
-    CamemBERT — variante {variant} · 157 catégories L1 · 6 126 catégories L2<br>
+    CamemBERT — variante {variant} · 157 catégories L1 · 6 126 catégories L2 (dataset v1)<br>
     Télécom Paris × Rakuten France · Généré le {generated}
 </p>
 

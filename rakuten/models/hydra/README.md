@@ -53,11 +53,11 @@ from rakuten.models.hydra.losses import HYDRALoss
 
 model = create_hydra_model(
     variant="local", encoder_name="camembert-base",
-    num_classes_l1=157, num_classes_l2=6126,
+    num_classes_l1=157, num_classes_l2=5777,  # dataset v2 (dérivé des données à l'exécution)
 )
 
 criterion = HYDRALoss(
-    architecture="local", num_classes_l1=157, num_classes_l2=6126,
+    architecture="local", num_classes_l1=157, num_classes_l2=5777,  # dataset v2 (dérivé des données à l'exécution)
     use_focal=True, level_weight_l1=0.5,
 )
 

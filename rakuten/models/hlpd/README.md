@@ -1,7 +1,7 @@
-# 02b_hlpd — HLPD : Décodeur Hiérarchique Non-Autorégressif
+# HLPD : Décodeur Hiérarchique Non-Autorégressif
 
 Implémentation de **HLPD** (Torba, Laclau et al., ECIR 2025) pour la classification
-hiérarchique multi-label sur le dataset Rakuten (157 L1 × 6 126 L2).
+hiérarchique multi-label sur le dataset Rakuten (157 L1 × 5 777 L2 en v2).
 
 ## Idée clé
 
