@@ -47,7 +47,7 @@ comparaison est `results/comparison.html`.
   (`TahianaAndriambahoaka/rakuten-dataset` et `TahianaAndriambahoaka/rakuten-models`) :
   à demander au propriétaire (`TahianaAndriambahoaka`)
 
-> **Sans ce token** : le package s'installe et les 301 tests passent, mais il est
+> **Sans ce token** : le package s'installe et les 305 tests passent, mais il est
 > impossible de reproduire les entraînements ou évaluations (pas de données locales).
 > C'est la voie de repli recommandée pour une prise en main initiale du code.
 
@@ -65,7 +65,7 @@ pip install -e .
 python -m pytest tests/ -q
 ```
 
-Les 301 tests doivent passer. Alternative Docker :
+Les 305 tests doivent passer. Alternative Docker :
 
 ```bash
 docker compose run --rm --profile test test
@@ -202,7 +202,7 @@ configs/hlpd/           hlpd_3090.yaml
 scripts/                CLI Python + scripts SLURM (voir docs/PIPELINE.md)
 notebooks/eda/          Analyse exploratoire
 notebooks/baselines/    fastText, TF-IDF, Word2Vec (notebooks)
-tests/                  301 tests pytest (sans données ni GPU)
+tests/                  305 tests pytest (sans données ni GPU)
 results/                Métriques JSON, rapports HTML, comparison.html
 docs/                   ARCHITECTURE.md, PIPELINE.md, METRICS.md
 hybrid_system/          Contribution séparée (CamemBERT + XGBoost)
