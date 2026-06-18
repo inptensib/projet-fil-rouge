@@ -21,18 +21,22 @@ from typing import Optional
 import torch
 import torch.nn as nn
 import yaml
-from sklearn.metrics import f1_score
 from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from shared.data_loader import HierarchicalProductDataset  # noqa: E402
-from shared.metrics import compute_all_metrics              # noqa: E402
+from shared.metrics import compute_all_metrics, compute_f1_by_tranche  # noqa: E402
+from shared.training_utils import (  # noqa: E402
+    EarlyStopping,
+    MLflowSession,
+    get_linear_schedule_with_warmup as _get_linear_schedule_with_warmup,
+    make_hierarchical_loader,
+    resolve_rebalancing,
+)
 
 import importlib.util as _ilu  # noqa: E402
 _losses_path = Path(__file__).resolve().parents[2] / "02_hydra" / "src" / "losses.py"
@@ -80,6 +84,14 @@ class FlatHydraConfig:
         save_dir: Model artefacts directory.
         experiment_name: MLflow experiment name.
         freeze_encoder: Freeze encoder weights.
+        use_description: Concatenate the description to the designation.
+        normalize_text: Loader-side option: normalize designation/description.
+        synthetic_policy: Loader-side option: 'keep_all' or 'drop_oversampled'.
+        class_weighting: Per-class loss weights from the real (non synthetic)
+            train counts: 'none', 'inv_sqrt' or 'inv'. Requires
+            synthetic_policy='drop_oversampled'.
+        logit_adjustment_tau: Temperature of the logit-adjusted loss
+            (Menon et al., 2021). 0 disables. Same data requirement.
     """
 
     encoder: str = "camembert-base"
@@ -105,8 +117,13 @@ class FlatHydraConfig:
     experiment_name: str = "flat_hydra"
     freeze_encoder: bool = False
     use_description: bool = True
+    normalize_text: bool = False
+    synthetic_policy: str = "keep_all"
+    class_weighting: str = "none"
+    logit_adjustment_tau: float = 0.0
 
     def __post_init__(self) -> None:
+        """Validate hyperparameter ranges, raising ValueError on invalid values."""
         if self.lr <= 0:
             raise ValueError(f"lr must be positive, got {self.lr}")
         if not (0.0 <= self.dropout < 1.0):
@@ -115,6 +132,8 @@ class FlatHydraConfig:
             raise ValueError(f"epochs must be >= 1, got {self.epochs}")
         if self.pooling not in ("cls", "mean", "max", "last"):
             raise ValueError(f"Unknown pooling '{self.pooling}'")
+        if self.class_weighting not in ("none", "inv_sqrt", "inv"):
+            raise ValueError(f"Unknown class_weighting '{self.class_weighting}'")
 
     @classmethod
     def from_yaml(cls, path: str | Path, **overrides) -> "FlatHydraConfig":
@@ -128,20 +147,6 @@ class FlatHydraConfig:
         filtered = {k: v for k, v in raw.items() if k in known}
         filtered.update(overrides)
         return cls(**filtered)
-
-
-def _get_linear_schedule_with_warmup(
-    optimizer, num_warmup_steps: int, num_training_steps: int
-) -> LambdaLR:
-    def lr_lambda(step: int) -> float:
-        if step < num_warmup_steps:
-            return float(step) / float(max(1, num_warmup_steps))
-        return max(
-            0.0,
-            float(num_training_steps - step)
-            / float(max(1, num_training_steps - num_warmup_steps)),
-        )
-    return LambdaLR(optimizer, lr_lambda)
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +203,17 @@ class FlatHydraTrainer:
             print(f"[Trainer] DataParallel on {torch.cuda.device_count()} GPUs")
             self.model = nn.DataParallel(self.model)
 
+        # Rééquilibrage des pertes (None partout quand les options sont off)
+        rebalancing = resolve_rebalancing(
+            data, self.num_classes_l1, self.num_classes_l2,
+            class_weighting=self.config.class_weighting,
+            logit_adjustment_tau=self.config.logit_adjustment_tau,
+        )
+        rebalancing = {
+            key: tensor.to(self.device) if tensor is not None else None
+            for key, tensor in rebalancing.items()
+        }
+
         self.criterion = HYDRALoss(
             architecture="global",
             alpha=1.0,
@@ -206,6 +222,7 @@ class FlatHydraTrainer:
             level_weight_l1=self.config.level_weight_l1,
             focal_gamma=self.config.focal_gamma,
             use_focal=self.config.use_focal,
+            **rebalancing,
         )
 
         self.optimizer = AdamW(
@@ -217,11 +234,13 @@ class FlatHydraTrainer:
         self.scaler = GradScaler("cuda", enabled=self.fp16)
 
     def _make_loader(self, texts, labels_l1, labels_l2, shuffle: bool) -> DataLoader:
-        ds = HierarchicalProductDataset(
-            texts, labels_l1, labels_l2, self.tokenizer, self.config.max_length
-        )
-        return DataLoader(
-            ds,
+        """Build a DataLoader with config settings; drops the last batch when shuffling."""
+        return make_hierarchical_loader(
+            texts,
+            labels_l1,
+            labels_l2,
+            tokenizer=self.tokenizer,
+            max_length=self.config.max_length,
             batch_size=self.config.batch_size,
             shuffle=shuffle,
             num_workers=self.config.num_workers,
@@ -272,6 +291,11 @@ class FlatHydraTrainer:
             all_labels_l2, all_preds_l2,
             self.l2_to_l1_mapping,
         )
+        real_counts_l2 = self.data.get("real_class_counts_l2")
+        if real_counts_l2 is not None:
+            metrics["f1_l2_by_tranche"] = compute_f1_by_tranche(
+                all_labels_l2, all_preds_l2, real_counts_l2
+            )
         metrics["_preds_l1"] = all_preds_l1
         metrics["_preds_l2"] = all_preds_l2
         metrics["_labels_l1"] = all_labels_l1
@@ -279,6 +303,207 @@ class FlatHydraTrainer:
         metrics["_confs_l1"] = all_confs_l1
         metrics["_confs_l2"] = all_confs_l2
         return metrics
+
+    def _setup_mlflow(self) -> MLflowSession:
+        """Open the optional MLflow run and log hyperparameters."""
+        db_path = Path(__file__).resolve().parents[2] / "mlflow.db"
+        session = MLflowSession(f"sqlite:///{db_path}", self.config.experiment_name)
+        session.start(params={
+            "encoder": self.config.encoder,
+            "pooling": self.config.pooling,
+            "project_embedding": self.config.project_embedding,
+            "dropout": self.config.dropout,
+            "batch_size": self.config.batch_size,
+            "epochs": self.config.epochs,
+            "lr": self.config.lr,
+            "warmup_ratio": self.config.warmup_ratio,
+            "use_focal": self.config.use_focal,
+            "level_weight_l1": self.config.level_weight_l1,
+            "num_classes_l1": self.num_classes_l1,
+            "num_classes_l2": self.num_classes_l2,
+            "class_weighting": self.config.class_weighting,
+            "logit_adjustment_tau": self.config.logit_adjustment_tau,
+            "fp16": self.fp16,
+        })
+        return session
+
+    def _resume_from_checkpoint(self, history: dict) -> tuple[int, dict]:
+        """Restore model/optimizer/scheduler/scaler state from checkpoint_latest.pt."""
+        start_epoch = 0
+        if self.resume_from and Path(self.resume_from).exists():
+            print(f"[Resume] Loading {self.resume_from}")
+            ckpt = torch.load(self.resume_from, map_location=self.device, weights_only=False)
+            self._base_model.load_state_dict(ckpt["model_state_dict"])
+            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+            self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+            self.scaler.load_state_dict(ckpt["scaler_state_dict"])
+            start_epoch = ckpt["epoch"]
+            self._early_stopping.best = ckpt["best_val_f1"]
+            self._early_stopping.counter = ckpt["epochs_no_improve"]
+            history = ckpt.get("history", history)
+            print(f"[Resume] Epoch {start_epoch}, best F1 L2={self._early_stopping.best:.4f}")
+        return start_epoch, history
+
+    def _train_epoch(self, train_loader: DataLoader, epoch: int) -> float:
+        """Run one training epoch and return the average loss."""
+        self.model.train()
+        epoch_loss, n_batches = 0.0, 0
+
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{self.config.epochs}")
+        for batch in pbar:
+            input_ids = batch["input_ids"].to(self.device)
+            mask = batch["attention_mask"].to(self.device)
+            l1 = batch["label_l1"].to(self.device)
+            l2 = batch["label_l2"].to(self.device)
+
+            self.optimizer.zero_grad()
+            with autocast("cuda", enabled=self.fp16):
+                level_outputs, unified_output = self.model(input_ids, mask)
+                loss, _, _ = self.criterion(level_outputs, unified_output, l1, l2)
+
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), self.config.max_grad_norm
+            )
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+            self.scheduler.step()
+
+            epoch_loss += loss.item()
+            n_batches += 1
+            pbar.set_postfix({"loss": f"{epoch_loss / n_batches:.4f}"})
+
+        return epoch_loss / max(n_batches, 1)
+
+    def _log_epoch_mlflow(
+        self, epoch: int, avg_loss: float, val_metrics: dict, history: dict
+    ) -> None:
+        """Log epoch metrics and figures to MLflow."""
+        if not self._mlflow.active:
+            return
+        try:
+            import matplotlib.pyplot as plt
+            from shared.metrics import (
+                compute_per_class_f1,
+                plot_confusion_matrix,
+                plot_per_class_f1,
+                plot_training_curves,
+            )
+            self._mlflow.log_metrics({
+                "train_loss": avg_loss,
+                "val_f1_l1_macro": val_metrics["f1_l1_macro"],
+                "val_f1_l2_macro": val_metrics["f1_l2_macro"],
+                "val_hcr": val_metrics.get("hcr", 0.0),
+                "val_constrained_f1_macro": val_metrics.get("constrained_f1_macro", 0.0),
+            }, step=epoch + 1)
+
+            v_labels_l1 = val_metrics["_labels_l1"]
+            v_preds_l1 = val_metrics["_preds_l1"]
+            v_labels_l2 = val_metrics["_labels_l2"]
+            v_preds_l2 = val_metrics["_preds_l2"]
+
+            if v_labels_l1:
+                fig = plot_confusion_matrix(
+                    v_labels_l1, v_preds_l1, self.l1_encoder,
+                    title=f"Confusion L1 — epoch {epoch + 1}",
+                )
+                self._mlflow.log_figure(fig, "confusion_matrix_l1.png")
+                plt.close(fig)
+
+                fig = plot_confusion_matrix(
+                    v_labels_l2, v_preds_l2, self.l2_encoder,
+                    title=f"Confusion L2 (top 50) — epoch {epoch + 1}",
+                    top_n=50,
+                )
+                self._mlflow.log_figure(fig, "confusion_matrix_l2.png")
+                plt.close(fig)
+
+                f1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
+                fig = plot_per_class_f1(f1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
+                self._mlflow.log_figure(fig, "per_class_f1_l1.png")
+                plt.close(fig)
+
+            fig = plot_training_curves(history)
+            self._mlflow.log_figure(fig, "training_curves.png")
+            plt.close(fig)
+        except Exception as e:
+            print(f"  [MLflow] Artefacts failed ({e})")
+
+    def _evaluate_and_checkpoint(
+        self,
+        val_loader: DataLoader,
+        epoch: int,
+        avg_loss: float,
+        history: dict,
+        model_dir: Path,
+        start_time: float,
+    ) -> bool:
+        """Validate, log, save best/resume checkpoints. Returns True to stop early."""
+        val_metrics = self.evaluate(val_loader)
+        val_f1_l2 = val_metrics["f1_l2_macro"]
+
+        history["epoch"].append(epoch + 1)
+        history["train_loss"].append(avg_loss)
+        history["val_f1_l1_macro"].append(val_metrics["f1_l1_macro"])
+        history["val_f1_l2_macro"].append(val_f1_l2)
+        history["val_hcr"].append(val_metrics.get("hcr", 0.0))
+        history["val_constrained_f1_macro"].append(
+            val_metrics.get("constrained_f1_macro", 0.0)
+        )
+
+        elapsed = time.time() - start_time
+        print(
+            f"  [{epoch + 1}/{self.config.epochs}] "
+            f"loss={avg_loss:.4f} | "
+            f"F1 L1={val_metrics['f1_l1_macro']:.4f} | "
+            f"F1 L2={val_f1_l2:.4f} | "
+            f"HCR={val_metrics.get('hcr', 0):.4f} | "
+            f"{elapsed:.0f}s"
+        )
+
+        # Persist metrics locally (fallback sans MLflow)
+        with open(model_dir / "metrics.json", "w") as f:
+            json.dump(history, f, indent=2)
+
+        self._log_epoch_mlflow(epoch, avg_loss, val_metrics, history)
+
+        # Early stopping & checkpointing
+        if self._early_stopping.update(val_f1_l2):
+            torch.save(
+                {
+                    "model_state_dict": self._base_model.state_dict(),
+                    "config": asdict(self.config),
+                    "num_classes_l1": self.num_classes_l1,
+                    "num_classes_l2": self.num_classes_l2,
+                    "best_val_f1_l2": self._early_stopping.best,
+                    "epoch": epoch + 1,
+                },
+                model_dir / "best_model.pt",
+            )
+            print(f"  -> Best model saved (F1 L2: {self._early_stopping.best:.4f})")
+        elif self._early_stopping.should_stop:
+            print(
+                f"  [Early stopping] No improvement for "
+                f"{self.config.early_stopping_patience} epochs. Stopping."
+            )
+            return True
+
+        # Checkpoint for resume
+        torch.save(
+            {
+                "model_state_dict": self._base_model.state_dict(),
+                "optimizer_state_dict": self.optimizer.state_dict(),
+                "scheduler_state_dict": self.scheduler.state_dict(),
+                "scaler_state_dict": self.scaler.state_dict(),
+                "epoch": epoch + 1,
+                "best_val_f1": self._early_stopping.best,
+                "epochs_no_improve": self._early_stopping.counter,
+                "history": history,
+            },
+            model_dir / "checkpoint_latest.pt",
+        )
+        return False
 
     def train(self) -> dict:
         """Run the full training loop.
@@ -311,51 +536,14 @@ class FlatHydraTrainer:
             "val_hcr": [],
             "val_constrained_f1_macro": [],
         }
-        best_val_f1 = 0.0
-        epochs_no_improve = 0
-        start_epoch = 0
+        self._early_stopping = EarlyStopping(
+            patience=self.config.early_stopping_patience,
+            min_delta=self.config.early_stopping_min_delta,
+        )
 
-        # MLflow (optional)
-        mlflow_active = False
-        try:
-            import mlflow
-            db_path = Path(__file__).resolve().parents[2] / "mlflow.db"
-            mlflow.set_tracking_uri(f"sqlite:///{db_path}")
-            mlflow.set_experiment(self.config.experiment_name)
-            mlflow.start_run()
-            mlflow.log_params({
-                "encoder": self.config.encoder,
-                "pooling": self.config.pooling,
-                "project_embedding": self.config.project_embedding,
-                "dropout": self.config.dropout,
-                "batch_size": self.config.batch_size,
-                "epochs": self.config.epochs,
-                "lr": self.config.lr,
-                "warmup_ratio": self.config.warmup_ratio,
-                "use_focal": self.config.use_focal,
-                "level_weight_l1": self.config.level_weight_l1,
-                "num_classes_l1": self.num_classes_l1,
-                "num_classes_l2": self.num_classes_l2,
-                "fp16": self.fp16,
-            })
-            mlflow_active = True
-            print(f"[MLflow] Tracking active → {db_path}")
-        except Exception as e:
-            print(f"[MLflow] Disabled ({e})")
+        self._mlflow = self._setup_mlflow()
 
-        # Resume from checkpoint
-        if self.resume_from and Path(self.resume_from).exists():
-            print(f"[Resume] Loading {self.resume_from}")
-            ckpt = torch.load(self.resume_from, map_location=self.device, weights_only=False)
-            self._base_model.load_state_dict(ckpt["model_state_dict"])
-            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
-            self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
-            self.scaler.load_state_dict(ckpt["scaler_state_dict"])
-            start_epoch = ckpt["epoch"]
-            best_val_f1 = ckpt["best_val_f1"]
-            epochs_no_improve = ckpt["epochs_no_improve"]
-            history = ckpt.get("history", history)
-            print(f"[Resume] Epoch {start_epoch}, best F1 L2={best_val_f1:.4f}")
+        start_epoch, history = self._resume_from_checkpoint(history)
 
         print(f"\n{'=' * 60}")
         print(f"FlatHydra — {self.config.encoder}")
@@ -365,160 +553,15 @@ class FlatHydraTrainer:
         start_time = time.time()
 
         for epoch in range(start_epoch, self.config.epochs):
-            self.model.train()
-            epoch_loss, n_batches = 0.0, 0
+            avg_loss = self._train_epoch(train_loader, epoch)
+            if self._evaluate_and_checkpoint(
+                val_loader, epoch, avg_loss, history, model_dir, start_time
+            ):
+                break
 
-            pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1}/{self.config.epochs}")
-            for batch in pbar:
-                input_ids = batch["input_ids"].to(self.device)
-                mask = batch["attention_mask"].to(self.device)
-                l1 = batch["label_l1"].to(self.device)
-                l2 = batch["label_l2"].to(self.device)
+        self._mlflow.end()
 
-                self.optimizer.zero_grad()
-                with autocast("cuda", enabled=self.fp16):
-                    level_outputs, unified_output = self.model(input_ids, mask)
-                    loss, _, _ = self.criterion(level_outputs, unified_output, l1, l2)
-
-                self.scaler.scale(loss).backward()
-                self.scaler.unscale_(self.optimizer)
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(), self.config.max_grad_norm
-                )
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
-                self.scheduler.step()
-
-                epoch_loss += loss.item()
-                n_batches += 1
-                pbar.set_postfix({"loss": f"{epoch_loss / n_batches:.4f}"})
-
-            avg_loss = epoch_loss / max(n_batches, 1)
-
-            # Validation
-            val_metrics = self.evaluate(val_loader)
-            val_f1_l2 = val_metrics["f1_l2_macro"]
-
-            history["epoch"].append(epoch + 1)
-            history["train_loss"].append(avg_loss)
-            history["val_f1_l1_macro"].append(val_metrics["f1_l1_macro"])
-            history["val_f1_l2_macro"].append(val_f1_l2)
-            history["val_hcr"].append(val_metrics.get("hcr", 0.0))
-            history["val_constrained_f1_macro"].append(
-                val_metrics.get("constrained_f1_macro", 0.0)
-            )
-
-            elapsed = time.time() - start_time
-            print(
-                f"  [{epoch + 1}/{self.config.epochs}] "
-                f"loss={avg_loss:.4f} | "
-                f"F1 L1={val_metrics['f1_l1_macro']:.4f} | "
-                f"F1 L2={val_f1_l2:.4f} | "
-                f"HCR={val_metrics.get('hcr', 0):.4f} | "
-                f"{elapsed:.0f}s"
-            )
-
-            # Persist metrics locally (fallback sans MLflow)
-            with open(model_dir / "metrics.json", "w") as f:
-                json.dump(history, f, indent=2)
-
-            # MLflow logging
-            if mlflow_active:
-                try:
-                    import matplotlib.pyplot as plt
-                    from shared.metrics import (
-                        compute_per_class_f1,
-                        plot_confusion_matrix,
-                        plot_per_class_f1,
-                        plot_training_curves,
-                    )
-                    mlflow.log_metrics({
-                        "train_loss": avg_loss,
-                        "val_f1_l1_macro": val_metrics["f1_l1_macro"],
-                        "val_f1_l2_macro": val_f1_l2,
-                        "val_hcr": val_metrics.get("hcr", 0.0),
-                        "val_constrained_f1_macro": val_metrics.get("constrained_f1_macro", 0.0),
-                    }, step=epoch + 1)
-
-                    v_labels_l1 = val_metrics["_labels_l1"]
-                    v_preds_l1 = val_metrics["_preds_l1"]
-                    v_labels_l2 = val_metrics["_labels_l2"]
-                    v_preds_l2 = val_metrics["_preds_l2"]
-
-                    if v_labels_l1:
-                        fig = plot_confusion_matrix(
-                            v_labels_l1, v_preds_l1, self.l1_encoder,
-                            title=f"Confusion L1 — epoch {epoch + 1}",
-                        )
-                        mlflow.log_figure(fig, "confusion_matrix_l1.png")
-                        plt.close(fig)
-
-                        fig = plot_confusion_matrix(
-                            v_labels_l2, v_preds_l2, self.l2_encoder,
-                            title=f"Confusion L2 (top 50) — epoch {epoch + 1}",
-                            top_n=50,
-                        )
-                        mlflow.log_figure(fig, "confusion_matrix_l2.png")
-                        plt.close(fig)
-
-                        f1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
-                        fig = plot_per_class_f1(f1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
-                        mlflow.log_figure(fig, "per_class_f1_l1.png")
-                        plt.close(fig)
-
-                    fig = plot_training_curves(history)
-                    mlflow.log_figure(fig, "training_curves.png")
-                    plt.close(fig)
-                except Exception as e:
-                    print(f"  [MLflow] Artefacts failed ({e})")
-
-            # Early stopping & checkpointing
-            if val_f1_l2 > best_val_f1 + self.config.early_stopping_min_delta:
-                best_val_f1 = val_f1_l2
-                epochs_no_improve = 0
-                torch.save(
-                    {
-                        "model_state_dict": self._base_model.state_dict(),
-                        "config": asdict(self.config),
-                        "num_classes_l1": self.num_classes_l1,
-                        "num_classes_l2": self.num_classes_l2,
-                        "best_val_f1_l2": best_val_f1,
-                        "epoch": epoch + 1,
-                    },
-                    model_dir / "best_model.pt",
-                )
-                print(f"  -> Best model saved (F1 L2: {best_val_f1:.4f})")
-            else:
-                epochs_no_improve += 1
-                if epochs_no_improve >= self.config.early_stopping_patience:
-                    print(
-                        f"  [Early stopping] No improvement for "
-                        f"{self.config.early_stopping_patience} epochs. Stopping."
-                    )
-                    break
-
-            # Checkpoint for resume
-            torch.save(
-                {
-                    "model_state_dict": self._base_model.state_dict(),
-                    "optimizer_state_dict": self.optimizer.state_dict(),
-                    "scheduler_state_dict": self.scheduler.state_dict(),
-                    "scaler_state_dict": self.scaler.state_dict(),
-                    "epoch": epoch + 1,
-                    "best_val_f1": best_val_f1,
-                    "epochs_no_improve": epochs_no_improve,
-                    "history": history,
-                },
-                model_dir / "checkpoint_latest.pt",
-            )
-
-        if mlflow_active:
-            try:
-                import mlflow
-                mlflow.end_run()
-            except Exception:
-                pass
-
+        best_val_f1 = self._early_stopping.best
         (model_dir / "training_complete.txt").write_text(
             f"best_val_f1_l2={best_val_f1:.4f}\n"
             f"epochs_trained={history['epoch'][-1] if history['epoch'] else 0}\n"

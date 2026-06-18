@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import pytest
+from sklearn.metrics import f1_score
 
 from shared.metrics import (
     compute_all_metrics,
+    compute_f1_by_tranche,
     compute_f1_metrics,
     constrained_f1,
     hierarchical_consistency_rate,
@@ -109,3 +111,65 @@ class TestComputeAllMetrics:
         assert "constrained_f1_macro" in metrics
         assert "hcr" in metrics
         assert metrics["hcr"] == 1.0
+
+
+class TestComputeF1ByTranche:
+    def test_three_tranches(self):
+        class_counts = {0: 500, 1: 50, 2: 5}
+        y_true = [0, 0, 1, 1, 2, 2]
+        y_pred = [0, 0, 1, 0, 2, 1]
+        result = compute_f1_by_tranche(y_true, y_pred, class_counts)
+
+        assert set(result) == {"many", "medium", "few"}
+        assert result["many"]["n_classes"] == 1
+        assert result["many"]["support"] == 2
+        assert result["many"]["f1_macro"] == pytest.approx(0.8)
+        assert result["medium"]["n_classes"] == 1
+        assert result["medium"]["support"] == 2
+        assert result["medium"]["f1_macro"] == pytest.approx(0.5)
+        assert result["few"]["n_classes"] == 1
+        assert result["few"]["support"] == 2
+        assert result["few"]["f1_macro"] == pytest.approx(2 / 3)
+
+    def test_threshold_boundaries(self):
+        class_counts = {0: 100, 1: 99, 2: 20, 3: 19}
+        y_true = [0, 1, 2, 3]
+        y_pred = [0, 1, 2, 3]
+        result = compute_f1_by_tranche(y_true, y_pred, class_counts)
+
+        assert result["many"]["n_classes"] == 1
+        assert result["medium"]["n_classes"] == 2
+        assert result["few"]["n_classes"] == 1
+
+    def test_empty_tranche(self):
+        class_counts = {0: 200, 1: 150}
+        y_true = [0, 1, 0]
+        y_pred = [0, 1, 1]
+        result = compute_f1_by_tranche(y_true, y_pred, class_counts)
+
+        for tranche in ("medium", "few"):
+            assert result[tranche]["f1_macro"] is None
+            assert result[tranche]["n_classes"] == 0
+            assert result[tranche]["support"] == 0
+        assert result["many"]["n_classes"] == 2
+        assert result["many"]["support"] == 3
+
+    def test_unknown_label_counts_as_few(self):
+        class_counts = {0: 200}
+        y_true = [0, 9]
+        y_pred = [0, 9]
+        result = compute_f1_by_tranche(y_true, y_pred, class_counts)
+
+        assert result["few"]["n_classes"] == 1
+        assert result["few"]["support"] == 1
+        assert result["few"]["f1_macro"] == 1.0
+
+    def test_single_tranche_matches_global_f1(self):
+        class_counts = {0: 300, 1: 250, 2: 400}
+        y_true = [0, 1, 2, 0, 1, 2]
+        y_pred = [0, 1, 1, 0, 2, 2]
+        result = compute_f1_by_tranche(y_true, y_pred, class_counts)
+
+        expected = f1_score(y_true, y_pred, average="macro", zero_division=0)
+        assert result["many"]["f1_macro"] == pytest.approx(expected)
+        assert result["many"]["support"] == len(y_true)

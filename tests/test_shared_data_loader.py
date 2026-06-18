@@ -142,8 +142,11 @@ class TestPrepareFromSplits:
             "y_l2_train", "y_l2_val", "y_l2_test",
             "l1_encoder", "l2_encoder", "l2_to_l1_mapping",
             "num_classes_l1", "num_classes_l2",
+            "train_is_synthetic", "real_class_counts_l1", "real_class_counts_l2",
+            "synthetic_policy",
         }
         assert set(result.keys()) == expected_keys
+        assert result["synthetic_policy"] == "keep_all"
 
     def test_split_sizes(self, tmp_path):
         train_p, val_p, test_p = self._create_split_files(tmp_path)
@@ -181,3 +184,225 @@ class TestPrepareFromSplits:
                 str(tmp_path / "nonexistent2.jsonl"),
                 str(tmp_path / "nonexistent3.jsonl"),
             )
+
+
+def _expected_text(designation):
+    return f"{designation}. Description de {designation}"
+
+
+class TestSyntheticPolicy:
+    """Tests for synthetic-row tracking and synthetic_policy (dataset v2)."""
+
+    REAL_TRAIN = ["Tel A", "Tel B", "Roman A"]
+    SYNTH_TRAIN = {
+        "SYNTH-OVS-001": "Tel OVS",
+        "SYNTH-OVL-001": "Tel OVL",
+        "SYNTH-ORPH-001": "Roman ORPH",
+        "SYNTH-GEN-001": "Tel GEN",
+    }
+
+    def _create_split_files(self, tmp_path):
+        """Every L2 class is in every split: _ensure_l2_coverage adds nothing."""
+        train = [
+            _make_record("1", "Tel A", "Électronique", "Téléphone"),
+            _make_record("2", "Tel B", "Électronique", "Téléphone"),
+            _make_record("SYNTH-OVS-001", "Tel OVS", "Électronique", "Téléphone"),
+            _make_record("SYNTH-OVL-001", "Tel OVL", "Électronique", "Téléphone"),
+            _make_record("SYNTH-ORPH-001", "Roman ORPH", "Livres", "Roman"),
+            _make_record("SYNTH-GEN-001", "Tel GEN", "Électronique", "Téléphone"),
+            _make_record("3", "Roman A", "Livres", "Roman"),
+        ]
+        val = [
+            _make_record("4", "Tel V", "Électronique", "Téléphone"),
+            _make_record("SYNTH-OVS-100", "Roman OVS val", "Livres", "Roman"),
+        ]
+        test = [
+            _make_record("5", "Tel T", "Électronique", "Téléphone"),
+            _make_record("SYNTH-OVL-100", "Roman OVL test", "Livres", "Roman"),
+        ]
+        train_path = str(tmp_path / "train_split.jsonl")
+        val_path = str(tmp_path / "val_split.jsonl")
+        test_path = str(tmp_path / "test_split.jsonl")
+        _write_jsonl(train_path, train)
+        _write_jsonl(val_path, val)
+        _write_jsonl(test_path, test)
+        return train_path, val_path, test_path
+
+    def test_keep_all_is_default_and_unchanged(self, tmp_path):
+        """keep_all reproduces the previous behavior exactly: same X/y, in order."""
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        result = prepare_hierarchical_data_from_splits(train_p, val_p, test_p)
+        explicit = prepare_hierarchical_data_from_splits(
+            train_p, val_p, test_p, synthetic_policy="keep_all"
+        )
+        expected_train = [
+            _expected_text(d)
+            for d in ["Tel A", "Tel B", "Tel OVS", "Tel OVL", "Roman ORPH", "Tel GEN", "Roman A"]
+        ]
+        assert result["X_train"] == expected_train
+        assert result["X_train"] == explicit["X_train"]
+        assert list(result["y_l1_train"]) == list(explicit["y_l1_train"])
+        assert list(result["y_l2_train"]) == list(explicit["y_l2_train"])
+        assert result["X_val"] == explicit["X_val"]
+        assert result["X_test"] == explicit["X_test"]
+
+    def test_drop_oversampled_excludes_ovs_ovl_keeps_orph_gen(self, tmp_path):
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        result = prepare_hierarchical_data_from_splits(
+            train_p, val_p, test_p, synthetic_policy="drop_oversampled"
+        )
+        assert _expected_text("Tel OVS") not in result["X_train"]
+        assert _expected_text("Tel OVL") not in result["X_train"]
+        assert _expected_text("Roman ORPH") in result["X_train"]
+        assert _expected_text("Tel GEN") in result["X_train"]
+        assert len(result["X_train"]) == 5
+        assert result["synthetic_policy"] == "drop_oversampled"
+
+    def test_val_test_never_filtered(self, tmp_path):
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        result = prepare_hierarchical_data_from_splits(
+            train_p, val_p, test_p, synthetic_policy="drop_oversampled"
+        )
+        assert _expected_text("Roman OVS val") in result["X_val"]
+        assert _expected_text("Roman OVL test") in result["X_test"]
+        assert len(result["X_val"]) == 2
+        assert len(result["X_test"]) == 2
+
+    def test_train_is_synthetic_aligned(self, tmp_path):
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        for policy in ("keep_all", "drop_oversampled"):
+            result = prepare_hierarchical_data_from_splits(
+                train_p, val_p, test_p, synthetic_policy=policy
+            )
+            flags = result["train_is_synthetic"]
+            assert len(flags) == len(result["X_train"])
+            synth_texts = {_expected_text(d) for d in self.SYNTH_TRAIN.values()}
+            for text, flag in zip(result["X_train"], flags):
+                assert isinstance(flag, bool)
+                assert flag == (text in synth_texts)
+
+    def test_real_class_counts_ignore_synthetic(self, tmp_path):
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        result = prepare_hierarchical_data_from_splits(train_p, val_p, test_p)
+        tel_idx = int(result["l2_encoder"].transform(["Téléphone"])[0])
+        roman_idx = int(result["l2_encoder"].transform(["Roman"])[0])
+        # Train keep_all: Téléphone = 2 real + 3 SYNTH, Roman = 1 real + 1 SYNTH
+        assert result["real_class_counts_l2"][tel_idx] == 2
+        assert result["real_class_counts_l2"][roman_idx] == 1
+        elec_idx = int(result["l1_encoder"].transform(["Électronique"])[0])
+        livres_idx = int(result["l1_encoder"].transform(["Livres"])[0])
+        assert result["real_class_counts_l1"][elec_idx] == 2
+        assert result["real_class_counts_l1"][livres_idx] == 1
+        assert sum(result["real_class_counts_l2"].values()) == len(self.REAL_TRAIN)
+
+    def test_real_class_counts_invariant_under_policy(self, tmp_path):
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        kept = prepare_hierarchical_data_from_splits(train_p, val_p, test_p)
+        dropped = prepare_hierarchical_data_from_splits(
+            train_p, val_p, test_p, synthetic_policy="drop_oversampled"
+        )
+        assert kept["real_class_counts_l1"] == dropped["real_class_counts_l1"]
+        assert kept["real_class_counts_l2"] == dropped["real_class_counts_l2"]
+
+    def test_drop_oversampled_pandas_branch(self, tmp_path):
+        """n_samples routes through load_random_sample (pandas DataFrames)."""
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        result = prepare_hierarchical_data_from_splits(
+            train_p, val_p, test_p, n_samples=100, synthetic_policy="drop_oversampled"
+        )
+        assert _expected_text("Tel OVS") not in result["X_train"]
+        assert _expected_text("Tel OVL") not in result["X_train"]
+        assert _expected_text("Roman ORPH") in result["X_train"]
+        assert len(result["train_is_synthetic"]) == len(result["X_train"])
+        tel_idx = int(result["l2_encoder"].transform(["Téléphone"])[0])
+        assert result["real_class_counts_l2"][tel_idx] == 2
+
+    def test_invalid_policy_raises(self, tmp_path):
+        import pytest
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        with pytest.raises(ValueError, match="synthetic_policy"):
+            prepare_hierarchical_data_from_splits(
+                train_p, val_p, test_p, synthetic_policy="drop_all"
+            )
+
+    def test_coverage_duplicates_keep_origin_flag(self, tmp_path):
+        """A coverage copy of a real row stays real; of a synthetic row stays synthetic."""
+        train = [
+            _make_record("1", "Tel A", "Électronique", "Téléphone"),
+            _make_record("SYNTH-GEN-001", "Poème GEN", "Livres", "Poésie"),
+        ]
+        val = [
+            _make_record("2", "Tel V", "Électronique", "Téléphone"),
+            _make_record("3", "Casque V", "Électronique", "Casque"),
+        ]
+        test = [_make_record("4", "Tel T", "Électronique", "Téléphone")]
+        train_p = str(tmp_path / "train_split.jsonl")
+        val_p = str(tmp_path / "val_split.jsonl")
+        test_p = str(tmp_path / "test_split.jsonl")
+        _write_jsonl(train_p, train)
+        _write_jsonl(val_p, val)
+        _write_jsonl(test_p, test)
+
+        result = prepare_hierarchical_data_from_splits(train_p, val_p, test_p)
+        flags = dict(zip(result["X_train"], result["train_is_synthetic"]))
+        # "Casque V" copied from val into train: real
+        assert flags[_expected_text("Casque V")] is False
+        # "Poème GEN" stays synthetic in train
+        assert flags[_expected_text("Poème GEN")] is True
+        # The synthetic-only class still counts 0 real samples
+        poesie_idx = int(result["l2_encoder"].transform(["Poésie"])[0])
+        assert result["real_class_counts_l2"][poesie_idx] == 0
+
+
+class TestNormalize:
+    """Tests for the normalize parameter (applied to the 3 splits)."""
+
+    RAW = "Caf&eacute; <b>Premium</b>"
+    CLEAN = "Café Premium"
+
+    def _create_split_files(self, tmp_path):
+        train = [
+            _make_record("1", self.RAW, "Épicerie", "Café"),
+            _make_record("2", self.RAW, "Épicerie", "Café"),
+        ]
+        val = [_make_record("3", self.RAW, "Épicerie", "Café")]
+        test = [_make_record("4", self.RAW, "Épicerie", "Café")]
+        train_p = str(tmp_path / "train_split.jsonl")
+        val_p = str(tmp_path / "val_split.jsonl")
+        test_p = str(tmp_path / "test_split.jsonl")
+        _write_jsonl(train_p, train)
+        _write_jsonl(val_p, val)
+        _write_jsonl(test_p, test)
+        return train_p, val_p, test_p
+
+    def test_normalize_applied_to_all_splits(self, tmp_path):
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        result = prepare_hierarchical_data_from_splits(
+            train_p, val_p, test_p, normalize=True
+        )
+        for key in ("X_train", "X_val", "X_test"):
+            for text in result[key]:
+                assert self.CLEAN in text
+                assert "&eacute;" not in text
+                assert "<b>" not in text
+
+    def test_normalize_off_by_default(self, tmp_path):
+        train_p, val_p, test_p = self._create_split_files(tmp_path)
+        result = prepare_hierarchical_data_from_splits(train_p, val_p, test_p)
+        for key in ("X_train", "X_val", "X_test"):
+            assert all("&eacute;" in text for text in result[key])
+
+    def test_single_file_path_normalize(self, tmp_path):
+        from shared.data_loader import prepare_hierarchical_data
+
+        records = [
+            _make_record(str(i), f"{self.RAW} {i}", "Épicerie", "Café" if i % 2 else "Thé")
+            for i in range(12)
+        ]
+        path = str(tmp_path / "products.jsonl")
+        _write_jsonl(path, records)
+        result = prepare_hierarchical_data(path, n_samples=100, normalize=True)
+        for key in ("X_train", "X_val", "X_test"):
+            for text in result[key]:
+                assert "&eacute;" not in text
+                assert "<b>" not in text

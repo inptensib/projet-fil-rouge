@@ -93,6 +93,8 @@ def main():
             n_samples=args.n_samples if args.n_samples != 10_000 else None,
             seed=seed,
             use_description=cfg.get("use_description", True),
+            synthetic_policy=cfg.get("synthetic_policy", "keep_all"),
+            normalize=cfg.get("normalize_text", False),
         )
     else:
         data_path = Path(args.data)
@@ -105,6 +107,7 @@ def main():
             n_samples=args.n_samples,
             seed=seed,
             use_description=cfg.get("use_description", True),
+            normalize=cfg.get("normalize_text", False),
         )
 
     trainer_kwargs = map_config(cfg)

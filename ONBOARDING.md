@@ -59,7 +59,7 @@ pip install -r requirements.txt
 python -m pytest tests/ -q
 ```
 
-Les 164 tests doivent passer. Alternative Docker :
+Les 192 tests doivent passer. Alternative Docker :
 
 ```bash
 docker compose run --rm --profile test test
@@ -182,9 +182,9 @@ La matrice complète « quel script pour quel modèle » est dans
 02_hydra/               HYDRA : modèles, pertes, trainer, configs YAML
 02b_hlpd/               HLPD : décodeur hiérarchique (Mehdi Aithamma)
 03_distributed/         Entraînement DDP multi-nœuds (SLURM)
-shared/                 data_loader, métriques, utilitaires communs
+shared/                 data_loader, métriques, training_utils, utilitaires communs
 scripts/                CLI Python + scripts SLURM (voir docs/PIPELINE.md)
-tests/                  164 tests pytest (sans données ni GPU)
+tests/                  192 tests pytest (sans données ni GPU)
 results/                Métriques JSON, rapports HTML, comparison.html
 docs/                   PIPELINE.md, METRICS.md, conception FlatHydra
 ```

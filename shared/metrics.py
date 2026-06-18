@@ -143,6 +143,66 @@ def compute_all_metrics(
     return metrics
 
 
+def compute_f1_by_tranche(
+    y_true: list,
+    y_pred: list,
+    class_counts: dict,
+    thresholds: tuple[int, int] = (100, 20),
+) -> dict[str, dict]:
+    """Compute macro F1 per class-frequency tranche (many/medium/few).
+
+    12% of L2 classes have fewer than 5 eval samples: the global macro F1
+    hides the head/tail gap. Reporting per frequency tranche is the
+    standard protocol in the long-tail literature.
+
+    Tranches are defined from training-set counts:
+    many (count >= thresholds[0]), medium (thresholds[1] <= count <
+    thresholds[0]), few (count < thresholds[1]). Labels absent from
+    class_counts are treated as few (count 0). Classes considered are
+    those appearing in y_true or y_pred, so a single non-empty tranche
+    matches the global macro F1.
+
+    Args:
+        y_true: Ground truth labels.
+        y_pred: Predicted labels.
+        class_counts: Mapping label -> training sample count.
+        thresholds: (many_min, medium_min) frequency cutoffs.
+
+    Returns:
+        Dict with keys 'many', 'medium', 'few'; each value is
+        {'f1_macro': float | None, 'n_classes': int, 'support': int},
+        with f1_macro None when the tranche is empty.
+    """
+    many_min, medium_min = thresholds
+    tranche_labels: dict[str, list] = {"many": [], "medium": [], "few": []}
+    for label in sorted(set(y_true) | set(y_pred)):
+        count = class_counts.get(label, 0)
+        if count >= many_min:
+            tranche_labels["many"].append(label)
+        elif count >= medium_min:
+            tranche_labels["medium"].append(label)
+        else:
+            tranche_labels["few"].append(label)
+
+    y_true_arr = np.asarray(y_true)
+    result = {}
+    for tranche, labels in tranche_labels.items():
+        if labels:
+            f1 = float(
+                f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0)
+            )
+            support = int(np.isin(y_true_arr, labels).sum())
+        else:
+            f1 = None
+            support = 0
+        result[tranche] = {
+            "f1_macro": f1,
+            "n_classes": len(labels),
+            "support": support,
+        }
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Audit visualizations (MLflow-ready)
 # ---------------------------------------------------------------------------

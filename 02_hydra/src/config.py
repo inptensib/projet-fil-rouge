@@ -3,6 +3,10 @@
 Source unique partagée par scripts/run_train.py, scripts/eval_hierarchy.py
 et 03_distributed/src/main.py. Toute clé YAML supportée par le trainer doit
 être mappée ici — sinon elle est silencieusement ignorée.
+
+Les clés de CHARGEMENT (normalize_text, synthetic_policy, use_description)
+ne sont pas mappées : elles sont lues directement depuis le YAML par les
+scripts et passées au data_loader, pas au trainer.
 """
 from __future__ import annotations
 
@@ -39,6 +43,8 @@ _DIRECT_KEYS = (
     "freeze_encoder",
     "early_stopping_patience",
     "early_stopping_min_delta",
+    "class_weighting",
+    "logit_adjustment_tau",
 )
 
 

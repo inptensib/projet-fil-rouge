@@ -26,19 +26,41 @@ class FocalLoss(nn.Module):
     Args:
         gamma: Focusing parameter. Higher values focus more on hard examples.
         reduction: 'mean', 'sum', or 'none'.
+        class_weights: Optional per-class weights [num_classes]. Same
+            semantics as CrossEntropyLoss(weight=...): 'mean' divides by the
+            sum of the sample weights. None keeps the loss unchanged.
+        logit_adjustment: Optional tau * log(prior) tensor [num_classes],
+            added to the logits before the loss (logit-adjusted loss,
+            Menon et al., 2021). None keeps the loss unchanged.
     """
 
-    def __init__(self, gamma: float = 2.0, reduction: str = "mean"):
+    def __init__(
+        self,
+        gamma: float = 2.0,
+        reduction: str = "mean",
+        class_weights: torch.Tensor | None = None,
+        logit_adjustment: torch.Tensor | None = None,
+    ):
         super().__init__()
         self.gamma = gamma
         self.reduction = reduction
+        self.class_weights = class_weights
+        self.logit_adjustment = logit_adjustment
 
     def forward(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        if self.logit_adjustment is not None:
+            logits = logits + self.logit_adjustment
         log_probs = F.log_softmax(logits, dim=-1)
         log_p_t = log_probs.gather(1, labels.unsqueeze(1)).squeeze(1)
         p_t = log_p_t.exp()
         focal_weight = (1.0 - p_t) ** self.gamma
         loss = -focal_weight * log_p_t
+
+        if self.class_weights is not None:
+            sample_weights = self.class_weights[labels]
+            loss = loss * sample_weights
+            if self.reduction == "mean":
+                return loss.sum() / sample_weights.sum()
 
         if self.reduction == "mean":
             return loss.mean()
@@ -61,6 +83,14 @@ class HYDRALoss(nn.Module):
         level_weight_l1: Weight for L1 loss relative to L2.
         focal_gamma: Gamma parameter for Focal Loss.
         use_focal: If True, use Focal Loss for L2 head only; L1 always uses CrossEntropy.
+        class_weights_l1: Optional per-class weights for the L1 loss.
+        class_weights_l2: Optional per-class weights for the L2 loss.
+        logit_adjustment_l1: Optional tau * log(prior) tensor added to the L1
+            logits before the loss (logit-adjusted loss, Menon et al., 2021).
+        logit_adjustment_l2: Same for the L2 logits.
+
+    All four rebalancing tensors default to None, which leaves the loss
+    strictly identical to the unweighted version.
     """
 
     def __init__(
@@ -72,6 +102,10 @@ class HYDRALoss(nn.Module):
         level_weight_l1: float = 0.5,
         focal_gamma: float = 2.0,
         use_focal: bool = False,
+        class_weights_l1: torch.Tensor | None = None,
+        class_weights_l2: torch.Tensor | None = None,
+        logit_adjustment_l1: torch.Tensor | None = None,
+        logit_adjustment_l2: torch.Tensor | None = None,
     ):
         super().__init__()
         if architecture in ("global", "nested"):
@@ -85,11 +119,23 @@ class HYDRALoss(nn.Module):
         self.num_classes_l1 = num_classes_l1
         self.num_classes_l2 = num_classes_l2
         self.level_weight_l1 = level_weight_l1
+        # Appliqués aux logits dans forward (couvre les têtes locales ET unified)
+        self.logit_adjustment_l1 = logit_adjustment_l1
+        self.logit_adjustment_l2 = logit_adjustment_l2
 
         # L1 : toujours CrossEntropy (157 classes, F1~92%, calibré pour le masque hiérarchique)
-        self.loss_fn_l1 = nn.CrossEntropyLoss()
+        self.loss_fn_l1 = nn.CrossEntropyLoss(weight=class_weights_l1)
         # L2 : FocalLoss si use_focal (6 126 classes déséquilibrées), CE sinon
-        self.loss_fn_l2 = FocalLoss(gamma=focal_gamma) if use_focal else nn.CrossEntropyLoss()
+        self.loss_fn_l2 = (
+            FocalLoss(gamma=focal_gamma, class_weights=class_weights_l2)
+            if use_focal
+            else nn.CrossEntropyLoss(weight=class_weights_l2)
+        )
+
+    @staticmethod
+    def _adjust(logits: torch.Tensor, adjustment: torch.Tensor | None) -> torch.Tensor:
+        """Add the logit adjustment before the loss; no-op when None."""
+        return logits if adjustment is None else logits + adjustment
 
     def forward(
         self,
@@ -112,22 +158,30 @@ class HYDRALoss(nn.Module):
         # FlatHydra path: level_outputs est vide, toute la loss vient de unified_output
         if len(level_outputs) == 0:
             assert unified_output is not None and self.num_classes_l1 is not None
-            unified_l1_logits = unified_output[:, :self.num_classes_l1]
-            unified_l2_logits = unified_output[:, self.num_classes_l1:]
+            unified_l1_logits = self._adjust(
+                unified_output[:, :self.num_classes_l1], self.logit_adjustment_l1
+            )
+            unified_l2_logits = self._adjust(
+                unified_output[:, self.num_classes_l1:], self.logit_adjustment_l2
+            )
             loss_l1 = self.loss_fn_l1(unified_l1_logits, labels_l1)
             loss_l2 = self.loss_fn_l2(unified_l2_logits, labels_l2)
             total_loss = self.alpha * (self.level_weight_l1 * loss_l1 + loss_l2)
             return total_loss, loss_l1, loss_l2
 
         logits_l1, logits_l2 = level_outputs
-        loss_l1 = self.loss_fn_l1(logits_l1, labels_l1)
-        loss_l2 = self.loss_fn_l2(logits_l2, labels_l2)
+        loss_l1 = self.loss_fn_l1(self._adjust(logits_l1, self.logit_adjustment_l1), labels_l1)
+        loss_l2 = self.loss_fn_l2(self._adjust(logits_l2, self.logit_adjustment_l2), labels_l2)
         level_loss = self.level_weight_l1 * loss_l1 + loss_l2
         total_loss = level_loss
 
         if self.architecture in ("global", "nested") and unified_output is not None:
-            unified_l1_logits = unified_output[:, :self.num_classes_l1]
-            unified_l2_logits = unified_output[:, self.num_classes_l1:]
+            unified_l1_logits = self._adjust(
+                unified_output[:, :self.num_classes_l1], self.logit_adjustment_l1
+            )
+            unified_l2_logits = self._adjust(
+                unified_output[:, self.num_classes_l1:], self.logit_adjustment_l2
+            )
             unified_loss_l1 = self.loss_fn_l1(unified_l1_logits, labels_l1)
             unified_loss_l2 = self.loss_fn_l2(unified_l2_logits, labels_l2)
             unified_loss = self.level_weight_l1 * unified_loss_l1 + unified_loss_l2

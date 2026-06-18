@@ -109,3 +109,19 @@ def test_unknown_yaml_keys_ignored():
     config_mod, _, _ = _hydra_modules()
     mapped = config_mod.map_config({"num_levels": 2, "scheduler": "linear", "device": "auto"})
     assert mapped == {}
+
+
+def test_v2_rebalancing_and_loader_keys():
+    """class_weighting / logit_adjustment_tau vont au trainer ;
+    normalize_text / synthetic_policy sont des clés de chargement, jamais mappées."""
+    config_mod, _, _ = _hydra_modules()
+    mapped = config_mod.map_config({
+        "class_weighting": "inv_sqrt",
+        "logit_adjustment_tau": 1.0,
+        "normalize_text": True,
+        "synthetic_policy": "drop_oversampled",
+    })
+    assert mapped["class_weighting"] == "inv_sqrt"
+    assert mapped["logit_adjustment_tau"] == 1.0
+    assert "normalize_text" not in mapped
+    assert "synthetic_policy" not in mapped

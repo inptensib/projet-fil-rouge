@@ -7,6 +7,7 @@ import sys
 from unittest import mock
 
 import pytest
+import torch
 from helpers import import_from_distributed
 
 
@@ -92,3 +93,83 @@ class TestDDPUtils:
              mock.patch("torch.distributed.destroy_process_group") as mock_destroy:
             ddp_utils.cleanup_ddp()
             mock_destroy.assert_not_called()
+
+
+class TestCheckEarlyStopping:
+    """_check_early_stopping isolé : pas de GPU, mlflow mocké, dist mocké."""
+
+    CONFIG_ATTRS = dict(
+        num_classes_l1=157, num_classes_l2=6126, pooling="cls",
+        project_embedding=True, dropout=0.3, hidden_dim=256,
+    )
+
+    def _make_rank0_trainer(self, trainer_ddp, patience=2, min_delta=0.001):
+        trainer = trainer_ddp.HYDRATrainerDDP.__new__(trainer_ddp.HYDRATrainerDDP)
+        trainer.rank = 0
+        trainer.device = torch.device("cpu")
+        trainer._global_step = 42
+        trainer._early_stopper = trainer_ddp.EarlyStopping(patience, min_delta)
+        for attr, value in self.CONFIG_ATTRS.items():
+            setattr(trainer, attr, value)
+        return trainer
+
+    def test_improvement_saves_checkpoint_with_frozen_keys(self, tmp_path):
+        trainer_ddp = import_from_distributed("trainer_ddp")
+        trainer = self._make_rank0_trainer(trainer_ddp)
+        model = torch.nn.Linear(2, 2)
+        fake_mlflow = mock.MagicMock()
+
+        with mock.patch.object(trainer_ddp, "mlflow", fake_mlflow):
+            stop = trainer._check_early_stopping(
+                model, 0.8, "local", "CamemBERT", str(tmp_path)
+            )
+
+        assert stop is False
+        fake_mlflow.pytorch.log_model.assert_called_once()
+        checkpoint = torch.load(tmp_path / "hydra_model.pt", weights_only=False)
+        assert set(checkpoint) == {
+            "model_state_dict", "global_step", "best_val_f1", "config",
+        }
+        assert checkpoint["global_step"] == 42
+        assert checkpoint["best_val_f1"] == 0.8
+        assert checkpoint["config"] == {
+            "num_classes_l1": 157, "num_classes_l2": 6126,
+            "variant": "local", "encoder_name": "CamemBERT",
+            "pooling": "cls", "project_embedding": True,
+            "dropout": 0.3, "hidden_dim": 256,
+        }
+
+    def test_no_improvement_stops_after_patience(self, tmp_path):
+        trainer_ddp = import_from_distributed("trainer_ddp")
+        trainer = self._make_rank0_trainer(trainer_ddp, patience=2)
+        trainer._early_stopper.best = 0.9
+        model = torch.nn.Linear(2, 2)
+
+        with mock.patch.object(trainer_ddp, "mlflow", mock.MagicMock()):
+            assert trainer._check_early_stopping(
+                model, 0.5, "local", "CamemBERT", str(tmp_path)
+            ) is False
+            assert trainer._check_early_stopping(
+                model, 0.5, "local", "CamemBERT", str(tmp_path)
+            ) is True
+
+        assert not (tmp_path / "hydra_model.pt").exists()
+
+    def test_non_rank0_only_participates_in_broadcast(self, tmp_path):
+        trainer_ddp = import_from_distributed("trainer_ddp")
+        trainer = trainer_ddp.HYDRATrainerDDP.__new__(trainer_ddp.HYDRATrainerDDP)
+        trainer.rank = 1
+        trainer.device = torch.device("cpu")
+        fake_dist = mock.MagicMock()
+        fake_dist.is_initialized.return_value = True
+
+        with mock.patch.object(trainer_ddp, "dist", fake_dist):
+            stop = trainer._check_early_stopping(
+                torch.nn.Linear(2, 2), None, "local", "CamemBERT", str(tmp_path)
+            )
+
+        assert stop is False
+        fake_dist.broadcast.assert_called_once()
+        assert fake_dist.broadcast.call_args.kwargs["src"] == 0
+        fake_dist.barrier.assert_called_once()
+        assert not (tmp_path / "hydra_model.pt").exists()
