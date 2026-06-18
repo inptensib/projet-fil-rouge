@@ -19,7 +19,7 @@ Generation de diagrammes techniques professionnels en Mermaid (markdown) et draw
 Exemples :
 - `/diagram mermaid arch` — architecture en Mermaid, affiche dans le chat
 - `/diagram drawio flow pipeline.drawio` — flowchart draw.io, ecrit dans le fichier
-- `/diagram mermaid class 02_hydra/docs/classes.md` — diagramme de classes dans un fichier
+- `/diagram mermaid class rakuten/models/hydra/docs/classes.md` — diagramme de classes dans un fichier
 
 ## Taches
 
@@ -360,7 +360,7 @@ block-beta
     subgraph heads["Classification Heads"]
         columns 1
         h1["Head L1\n157 classes"]
-        h2["Head L2\n6100 classes"]
+        h2["Head L2\n5777 classes"]
     end
 
     encoder --> heads
@@ -575,7 +575,7 @@ edgeStyle=orthogonalEdgeStyle;rounded=1;strokeWidth=2;startArrow=blockThin;start
         </mxCell>
 
         <!-- Head L2 -->
-        <mxCell id="h2" value="&lt;b&gt;Head L2&lt;/b&gt;&lt;br&gt;6100+ classes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#27AE60;strokeColor=#1E8449;fontColor=#FFFFFF;fontSize=12;" vertex="1" parent="1">
+        <mxCell id="h2" value="&lt;b&gt;Head L2&lt;/b&gt;&lt;br&gt;5 777 classes (v2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#27AE60;strokeColor=#1E8449;fontColor=#FFFFFF;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="700" y="260" width="140" height="60" as="geometry"/>
         </mxCell>
 

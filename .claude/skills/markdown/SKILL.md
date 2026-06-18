@@ -126,7 +126,7 @@ graph LR
 ```
 Input --> [Encoder] --> +-- [Head L1] --> 157 classes
                         |
-                        +-- [Head L2] --> 6100 classes
+                        +-- [Head L2] --> 5777 classes
 ```
 
 **Tableaux comme diagrammes** pour les architectures simples :
@@ -137,7 +137,7 @@ Input --> [Encoder] --> +-- [Head L1] --> 157 classes
 | 1     | Tokenizer          | `(B, 128)` tokens  |
 | 2     | CamemBERT encoder  | `(B, 768)` hidden  |
 | 3     | Head L1            | `(B, 157)` logits  |
-| 4     | Head L2            | `(B, 6100)` logits |
+| 4     | Head L2            | `(B, 5777)` logits |
 ```
 
 ### Sections speciales

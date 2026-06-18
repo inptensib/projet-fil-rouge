@@ -8,6 +8,12 @@ argument-hint: [shard_dir]
 
 # Shard Check
 
+> **⚠️ Concerne le pipeline DDP archivé (hors livrable).** Ce skill valide les
+> shards du pipeline distribue, archive via le tag git
+> `archive/distributed-pipeline`. Le code source (`03_distributed/`) n'est pas
+> present dans le livrable courant. N'invoquer ce skill que si vous travaillez
+> explicitement avec l'archive DDP.
+
 Valide l'integrite des shards de donnees pour le training DDP.
 
 ## Arguments
@@ -20,7 +26,7 @@ Valide l'integrite des shards de donnees pour le training DDP.
 2. **Coverage** : compter le nombre total de samples across all shards, comparer au dataset complet
 3. **Overlap** : verifier qu'aucun produit (par ID) n'apparait dans plusieurs shards
 4. **Distribution L1** : pour chaque shard, compter les samples par categorie L1 (157 classes). Alerter si un shard a 0 samples pour une classe L1
-5. **Distribution L2** : meme verification pour les 6100+ sous-categories L2
+5. **Distribution L2** : meme verification pour les 5 777 sous-categories L2 (dataset v2)
 6. **Equilibrage** : verifier que les shards ont des tailles similaires (ecart max 5% par rapport a la moyenne)
 7. **Integrite** : tenter de charger chaque shard, verifier que les colonnes attendues existent (product_id, title, description, label_l1, label_l2)
 
