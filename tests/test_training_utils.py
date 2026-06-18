@@ -74,25 +74,18 @@ class TestLinearScheduleWithWarmup:
 
     def test_parity_with_trainer_implementations(self):
         """The shared copy must match the per-trainer implementations."""
-        from helpers import (
-            DISTRIBUTED_ROOT,
-            HLPD_ROOT,
-            HYDRA_ROOT,
-            _import_from,
-            import_from_hlpd,
-            import_from_hydra,
-        )
+        from helpers import import_from_hlpd, _import_from, HYDRA_ROOT, HLPD_ROOT, DISTRIBUTED_ROOT
+        from rakuten.models.hydra.trainer import get_linear_schedule_with_warmup as hydra_sched
 
         flat_trainer = _import_from(
             str(_PROJECT_ROOT / "01_baselines"),
             "flat_trainer",
             exclude_roots=[HYDRA_ROOT, HLPD_ROOT, DISTRIBUTED_ROOT],
         )
-        hydra_trainer = import_from_hydra("trainer")
         hlpd_trainer = import_from_hlpd("trainer")
 
         variants = [
-            hydra_trainer.get_linear_schedule_with_warmup,
+            hydra_sched,
             flat_trainer._get_linear_schedule_with_warmup,
             hlpd_trainer._get_linear_schedule_with_warmup,
         ]

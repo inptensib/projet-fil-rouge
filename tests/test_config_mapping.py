@@ -1,14 +1,10 @@
-"""Tests du mapping YAML → HYDRATrainer (02_hydra/src/config.py).
+"""Tests du mapping YAML → HYDRATrainer (rakuten/models/hydra/config.py).
 
 Invariant de sécurité : pour chaque config YAML du repo, les hyperparamètres
 d'architecture (dropout, hidden_dim, pooling, project_embedding, freeze_encoder)
 mappés doivent être égaux aux défauts Python du modèle — garantit que la
 correction de transmission (config historiquement inerte) ne change aucun
 comportement, y compris pour les reprises de checkpoints en cours.
-
-Note : imports via import_from_hydra() à l'intérieur des tests (pas au niveau
-module) — convention du repo pour éviter la collision des packages `src` entre
-01_baselines, 02_hydra, 02b_hlpd et 03_distributed à la collecte pytest.
 """
 from __future__ import annotations
 
@@ -18,7 +14,9 @@ from pathlib import Path
 
 import pytest
 import yaml
-from helpers import import_from_hydra
+import rakuten.models.hydra.config as _config_mod
+import rakuten.models.hydra.models as _models_mod
+import rakuten.models.hydra.trainer as _trainer_mod
 
 _ROOT = Path(__file__).resolve().parents[1]
 HYDRA_CONFIGS = sorted((_ROOT / "02_hydra" / "configs").glob("*.yaml"))
@@ -28,11 +26,8 @@ ARCH_KEYS = ("dropout", "hidden_dim", "pooling", "project_embedding", "freeze_en
 
 @functools.lru_cache(maxsize=None)
 def _hydra_modules():
-    """Charge config/models/trainer une seule fois (imports lourds)."""
-    config_mod = import_from_hydra("config")
-    models_mod = import_from_hydra("models")
-    trainer_mod = import_from_hydra("trainer")
-    return config_mod, models_mod, trainer_mod
+    """Retourne les modules hydra (mis en cache)."""
+    return _config_mod, _models_mod, _trainer_mod
 
 
 def _load(path: Path) -> dict:

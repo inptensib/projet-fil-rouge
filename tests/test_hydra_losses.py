@@ -1,15 +1,10 @@
-"""Tests for 02_hydra/src/losses.py."""
+"""Tests for rakuten/models/hydra/losses.py."""
 
 from __future__ import annotations
 
 import pytest
 import torch
-from helpers import import_from_hydra
-
-# Import at module level using helper
-_losses_mod = import_from_hydra("losses")
-FocalLoss = _losses_mod.FocalLoss
-HYDRALoss = _losses_mod.HYDRALoss
+from rakuten.models.hydra.losses import FocalLoss, HYDRALoss
 
 
 class TestFocalLoss:

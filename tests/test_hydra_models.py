@@ -1,4 +1,4 @@
-"""Tests for 02_hydra/src/models.py.
+"""Tests for rakuten/models/hydra/models.py.
 
 Uses mocked HuggingFace models to avoid downloading weights.
 """
@@ -10,10 +10,9 @@ from unittest import mock
 import pytest
 import torch
 import torch.nn as nn
-from helpers import import_from_hydra
-
-_losses_mod = import_from_hydra("losses")
-HYDRALoss = _losses_mod.HYDRALoss
+from rakuten.models.hydra.losses import HYDRALoss
+from rakuten.models.hydra.models import HYDRALocal, HYDRAGlobal, HYDRANested, create_hydra_model
+import rakuten.models.hydra.predict as _predict_mod
 
 _HIDDEN_SIZE = 64
 _BATCH_SIZE = 2
@@ -38,14 +37,6 @@ def _make_mock_encoder():
 
     encoder.side_effect = fake_forward
     return encoder
-
-
-# Import models module from HYDRA using the helper
-_models_mod = import_from_hydra("models")
-HYDRALocal = _models_mod.HYDRALocal
-HYDRAGlobal = _models_mod.HYDRAGlobal
-HYDRANested = _models_mod.HYDRANested
-create_hydra_model = _models_mod.create_hydra_model
 
 
 @pytest.fixture(autouse=True)
@@ -277,7 +268,6 @@ class TestCheckpointRoundTrip:
         }, ckpt_path)
 
         # Reload using load_model from predict.py
-        _predict_mod = import_from_hydra("predict")
         loaded_model, loaded_config = _predict_mod.load_model(
             str(ckpt_path), device=torch.device("cpu")
         )
@@ -296,7 +286,6 @@ class TestPredictFunctions:
         """predict() returns correct structure on synthetic input."""
         import numpy as np
         from sklearn.preprocessing import LabelEncoder
-        _predict_mod = import_from_hydra("predict")
 
         model = HYDRALocal(
             encoder_name="mock-model",
@@ -337,7 +326,6 @@ class TestPredictFunctions:
         """predict_batch() returns one result per input text."""
         import numpy as np
         from sklearn.preprocessing import LabelEncoder
-        _predict_mod = import_from_hydra("predict")
 
         model = HYDRALocal(
             encoder_name="mock-model",
@@ -370,8 +358,6 @@ class TestPredictFunctions:
 class TestEnforceHierarchy:
     def test_enforce_hierarchy(self):
         """_enforce_hierarchy must return a valid L2 child of predicted L1."""
-        _predict_mod = import_from_hydra("predict")
-
         num_l1, num_l2 = 3, 6
         # L1=0 -> L2={0,1}, L1=1 -> L2={2,3}, L1=2 -> L2={4,5}
         parent_child_matrix = torch.zeros(num_l1, num_l2)

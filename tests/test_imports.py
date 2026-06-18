@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from helpers import import_from_hydra
-
 
 class TestSharedImports:
     def test_import_shared_utils(self):
@@ -22,13 +20,13 @@ class TestSharedImports:
 
 class TestHydraImports:
     def test_import_hydra_models(self):
-        models = import_from_hydra("models")
+        import rakuten.models.hydra.models as models
         assert hasattr(models, "HYDRALocal")
         assert hasattr(models, "HYDRAGlobal")
         assert hasattr(models, "HYDRANested")
         assert hasattr(models, "create_hydra_model")
 
     def test_import_hydra_losses(self):
-        losses = import_from_hydra("losses")
+        import rakuten.models.hydra.losses as losses
         assert hasattr(losses, "FocalLoss")
         assert hasattr(losses, "HYDRALoss")

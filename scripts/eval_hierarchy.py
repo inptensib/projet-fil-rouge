@@ -21,21 +21,17 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
-import sys
 import time
 from pathlib import Path
 
 import torch
 import yaml
 
-_ROOT = str(Path(__file__).resolve().parents[1])
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
-sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
-
-from src.config import map_config
-from src.trainer import HYDRATrainer
+from rakuten.models.hydra.config import map_config
+from rakuten.models.hydra.trainer import HYDRATrainer
 from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
+
+_ROOT = Path(__file__).resolve().parents[1]
 
 
 VARIANTS = ["local", "nested", "global"]

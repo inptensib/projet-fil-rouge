@@ -1,4 +1,4 @@
-"""Tests for 02_hydra/src/trainer.py (HYDRATrainer).
+"""Tests for rakuten/models/hydra/trainer.py (HYDRATrainer).
 
 Mini-training (2 epochs) with a mocked encoder/tokenizer and a disabled
 mlflow module. Freezes the on-disk checkpoint formats (checkpoint_latest.pt,
@@ -15,10 +15,7 @@ from unittest import mock
 import pytest
 import torch
 
-from helpers import import_from_hydra
-
-_trainer_mod = import_from_hydra("trainer")
-HYDRATrainer = _trainer_mod.HYDRATrainer
+from rakuten.models.hydra.trainer import HYDRATrainer
 
 # ---------------------------------------------------------------------------
 # Constants

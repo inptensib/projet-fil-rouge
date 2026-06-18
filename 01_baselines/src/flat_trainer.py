@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import pickle
-import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -27,8 +26,6 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
 from rakuten.common.metrics import compute_all_metrics, compute_f1_by_tranche  # noqa: E402
 from rakuten.common.training_utils import (  # noqa: E402
     EarlyStopping,
@@ -38,12 +35,7 @@ from rakuten.common.training_utils import (  # noqa: E402
     resolve_rebalancing,
 )
 
-import importlib.util as _ilu  # noqa: E402
-_losses_path = Path(__file__).resolve().parents[2] / "02_hydra" / "src" / "losses.py"
-_spec = _ilu.spec_from_file_location("hydra_losses", _losses_path)
-_mod = _ilu.module_from_spec(_spec)
-_spec.loader.exec_module(_mod)
-HYDRALoss = _mod.HYDRALoss
+from rakuten.models.hydra.losses import HYDRALoss  # noqa: E402
 
 from .flat_model import FlatHydra                          # noqa: E402
 
