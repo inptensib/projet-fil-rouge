@@ -113,3 +113,4 @@ logs_*.out
 
 # Résultats générés par les notebooks baselines
 01_baselines/notebooks/results/
+models_v2/

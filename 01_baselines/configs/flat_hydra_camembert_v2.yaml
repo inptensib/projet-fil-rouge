@@ -38,7 +38,7 @@ focal_gamma: 2.0
 level_weight_l1: 0.5
 
 # --- Data ---
-num_workers: 4
+num_workers: 2            # réduit (4→2) pour tenir dans 26 Go RAM sur 3090
 
 # --- Logging ---
 experiment_name: flat_hydra_v2
