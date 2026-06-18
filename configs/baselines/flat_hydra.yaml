@@ -2,7 +2,7 @@
 # FlatHydra Baseline — Configuration
 # ==============================================================================
 # Reproduction fidèle de la baseline Flat du papier HYDRA (EMNLP 2025).
-# Source de vérité pour FlatHydraConfig (01_baselines/src/flat_trainer.py).
+# Source de vérité pour FlatHydraConfig (rakuten/models/baselines/flat_trainer.py).
 # ==============================================================================
 
 # --- Encoder ---

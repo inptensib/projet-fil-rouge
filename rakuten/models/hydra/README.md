@@ -1,4 +1,4 @@
-# 02_hydra -- HYDRA : Classification Hiérarchique Multi-tête
+# HYDRA — Classification Hiérarchique Multi-tête (`rakuten.models.hydra`)
 
 Implémentation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hiérarchique de produits Rakuten.
 
@@ -69,14 +69,13 @@ loss, loss_l1, loss_l2 = criterion(level_outputs, unified_output, labels_l1, lab
 ## Structure
 
 ```
-02_hydra/
-  configs/default.yaml    # Hyperparamètres
-  src/
-    models.py             # HYDRABase, HYDRALocal, HYDRAGlobal, HYDRANested
-    losses.py             # FocalLoss, HYDRALoss
-    trainer.py            # Boucle d'entraînement single-GPU
-    predict.py            # Inférence et évaluation
-    config.py             # Mapping YAML → kwargs HYDRATrainer (source unique)
+rakuten/models/hydra/       # code (package installable)
+    models.py               # HYDRABase, HYDRALocal, HYDRAGlobal, HYDRANested
+    losses.py               # FocalLoss, HYDRALoss
+    trainer.py              # Boucle d'entraînement single-GPU
+    predict.py              # Inférence et évaluation
+    config.py               # Mapping YAML → kwargs HYDRATrainer (source unique)
+configs/hydra/default.yaml  # Hyperparamètres (source de vérité, hors package)
 ```
 
 ## Références

@@ -57,22 +57,21 @@ BCE multiclass pour L=6283 classes.
 > | `batch_size` | — | **16** (8/GPU) | Throughput maximal |
 >
 > L'architecture essentielle est préservée : biais hiérarchique, tied weights, ZLPR,
-> même encodeur (CamemBERT), même espace de labels (L=6 283).
+> même encodeur (CamemBERT), même espace de labels L1+L2
+> (L = 157 + L2 ; 6 283 en v1, 5 934 en v2).
 > La comparaison avec HYDRA reste valide dans ce cadre.
 
 ## Structure
 
 ```
-02b_hlpd/
-├── src/
-│   ├── __init__.py          # Exports publics
-│   ├── attention_bias.py    # build_M_hiera() — matrice binaire L×L
-│   ├── losses.py            # ZLPRLoss
-│   ├── models.py            # HLPD, HLPDDecoderLayer
-│   └── trainer.py           # HLPDConfig, HLPDTrainer
-├── configs/
-│   └── hlpd_3090.yaml       # Config 2× RTX 3090
+rakuten/models/hlpd/          # code (package installable)
+├── __init__.py               # Exports publics
+├── attention_bias.py         # build_M_hiera() — matrice binaire L×L
+├── losses.py                 # ZLPRLoss
+├── models.py                 # HLPD, HLPDDecoderLayer
+├── trainer.py                # HLPDConfig, HLPDTrainer
 └── README.md
+configs/hlpd/hlpd_3090.yaml   # Config 2× RTX 3090 (hors package)
 ```
 
 ## Comparaison HYDRA vs HLPD
@@ -82,7 +81,7 @@ BCE multiclass pour L=6283 classes.
 | Paradigme | Multi-tête discriminatif | Encoder-Decoder |
 | Cohérence hiérarchique | Post-hoc (variante Nested) | Par construction (masque d'attention) |
 | Perte | FocalLoss / CrossEntropy | ZLPR (pairwise ranking) |
-| Complexité | O(L) | O(L²) — coûteux pour L=6 283 |
+| Complexité | O(L) | O(L²) — coûteux pour L grand (≈ 6 000) |
 | Tied weights | Non | Oui |
 
 ## Références

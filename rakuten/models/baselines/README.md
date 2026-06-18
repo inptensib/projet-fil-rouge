@@ -1,4 +1,4 @@
-# 01_baselines -- Flat Classification Baselines
+# Baselines — Flat Classification (`rakuten.models.baselines`)
 
 Classification "à plat" (non-hiérarchique) sur les **157 catégories L1** du catalogue Rakuten. Sert de référence pour évaluer les gains de l'approche hiérarchique HYDRA sur le niveau 1.
 
@@ -28,9 +28,9 @@ Classification "à plat" (non-hiérarchique) sur les **157 catégories L1** du c
 Commandes à lancer depuis la racine du repo :
 
 ```bash
-python 01_baselines/src/tfidf_pipeline.py --data_path shared/dataset/products.jsonl --n_samples 50000
-python 01_baselines/src/word2vec_pipeline.py --data_path shared/dataset/products.jsonl --n_samples 50000
-python 01_baselines/src/bert_flat_classifier.py --data_path shared/dataset/products.jsonl --backbone camembert --mode fine_tuning
+python -m rakuten.models.baselines.tfidf_pipeline --data_path <chemin>/products.jsonl --n_samples 50000
+python -m rakuten.models.baselines.word2vec_pipeline --data_path <chemin>/products.jsonl --n_samples 50000
+python -m rakuten.models.baselines.bert_flat_classifier --data_path <chemin>/products.jsonl --backbone camembert --mode fine_tuning
 ```
 
 ## Configurations FlatHydra
@@ -46,14 +46,13 @@ python 01_baselines/src/bert_flat_classifier.py --data_path shared/dataset/produ
 ## Structure
 
 ```
-01_baselines/
-  configs/                    # Configurations FlatHydra (flat_hydra*.yaml)
-  src/
-    tfidf_pipeline.py        # TF-IDF + classifieurs linéaires
-    word2vec_pipeline.py      # Word2Vec + classifieurs linéaires
-    bert_flat_classifier.py   # BERT feature extraction / fine-tuning
-    flat_model.py             # FlatHydra : tête unique L1+L2, projection avant pooling
-    flat_trainer.py           # FlatHydraConfig + FlatHydraTrainer (train, eval, resume)
-    common.py                 # Utilitaires partagés (stopwords, filtrage classes rares)
-    evaluate.py               # Comparaison cross-méthodes
+rakuten/models/baselines/     # code (package installable)
+  tfidf_pipeline.py           # TF-IDF + classifieurs linéaires
+  word2vec_pipeline.py        # Word2Vec + classifieurs linéaires
+  bert_flat_classifier.py     # BERT feature extraction / fine-tuning
+  flat_model.py               # FlatHydra : tête unique L1+L2, projection avant pooling
+  flat_trainer.py             # FlatHydraConfig + FlatHydraTrainer (train, eval, resume)
+  common.py                   # Utilitaires partagés (stopwords, filtrage classes rares)
+  evaluate.py                 # Comparaison cross-méthodes
+configs/baselines/            # Configurations FlatHydra (flat_hydra*.yaml, hors package)
 ```
