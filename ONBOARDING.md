@@ -136,11 +136,11 @@ Smoke test local sur un sous-échantillon (CPU ou GPU, ~10 min) :
 python scripts/run_train.py \
     --split-dir dataset/ \
     --n-samples 5000 \
-    --config 02_hydra/configs/default.yaml
+    --config configs/hydra/default.yaml
 ```
 
 Les hyperparamètres viennent du YAML (source de vérité :
-`02_hydra/configs/default.yaml`). Le suivi des runs est dans MLflow
+`configs/hydra/default.yaml`). Le suivi des runs est dans MLflow
 (`mlflow.db` à la racine, interface via `docker compose up mlflow -d`).
 
 ## Travailler sur le Cluster SLURM
@@ -159,7 +159,7 @@ Lancement type d'un entraînement HYDRA (job array avec auto-reprise) :
 
 ```bash
 sbatch --job-name=hydra-local --array=0-9%1 \
-    scripts/run_train_variant.slurm local 02_hydra/configs/default.yaml
+    scripts/run_train_variant.slurm local configs/hydra/default.yaml
 ```
 
 Le motif `--array=0-9%1` enchaîne jusqu'à 10 tâches de 36 h maximum,

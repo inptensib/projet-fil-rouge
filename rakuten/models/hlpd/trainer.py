@@ -56,7 +56,7 @@ _CONFIG_PATH = Path(__file__).resolve().parents[1] / "configs" / "hlpd_3090.yaml
 class HLPDConfig:
     """Typed hyperparameters for HLPD.
 
-    Canonical values live in ``02b_hlpd/configs/hlpd_3090.yaml``.
+    Canonical values live in ``configs/hlpd/hlpd_3090.yaml``.
     """
 
     # Encoder

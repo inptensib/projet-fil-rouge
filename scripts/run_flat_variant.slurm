@@ -20,7 +20,7 @@
 #   Run complet (8M produits) :
 #     sbatch --job-name=flat-hydra --array=0-9%1 scripts/run_flat_variant.slurm
 #   Smoke test sur 5 000 samples stratifiés :
-#     sbatch --job-name=flat-hydra-smoke --array=0-2%1 scripts/run_flat_variant.slurm 01_baselines/configs/flat_hydra.yaml 5000
+#     sbatch --job-name=flat-hydra-smoke --array=0-2%1 scripts/run_flat_variant.slurm configs/baselines/flat_hydra.yaml 5000
 
 # --- Chemins (surcharger via export avant sbatch si besoin) ---
 PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
@@ -35,7 +35,7 @@ export TRANSFORMERS_OFFLINE=1
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
-CONFIG="${1:-01_baselines/configs/flat_hydra.yaml}"
+CONFIG="${1:-configs/baselines/flat_hydra.yaml}"
 N_SAMPLES="${2:-}"  # optionnel — si vide, charge le dataset complet
 
 SAVE_DIR=$(python -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/flat_hydra'))" 2>/dev/null || echo "models/flat_hydra")

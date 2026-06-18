@@ -4,12 +4,12 @@
 #
 # Usage:
 #   ./scripts/chain_submit_array.sh [n_chains] [config]
-#   ./scripts/chain_submit_array.sh 3 02_hydra/configs/hierarchy.yaml
+#   ./scripts/chain_submit_array.sh 3 configs/hydra/hierarchy.yaml
 
 set -euo pipefail
 
 N_CHAINS=${1:-3}
-CONFIG=${2:-02_hydra/configs/default.yaml}
+CONFIG=${2:-configs/hydra/default.yaml}
 
 echo "Soumission de $N_CHAINS job arrays (3 variantes chacun, config: $CONFIG)"
 echo "=============================================="

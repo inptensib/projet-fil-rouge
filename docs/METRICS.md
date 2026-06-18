@@ -73,7 +73,7 @@ Depuis, le script choisit le bon mode automatiquement :
 
 ```bash
 python scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
-    --config 02_hydra/configs/mbert_default.yaml \
+    --config configs/hydra/mbert_default.yaml \
     --output-json results/eval.json
 # → mode "base" car la config n'a ni check_hierarchy ni condition_l2_on_l1
 ```

@@ -15,7 +15,7 @@ Usage:
     # Depuis des splits pré-générés (recommandé pour le dataset complet)
     python scripts/run_flat_hydra.py \
         --split-dir /path/to/dataset/ \
-        --config 01_baselines/configs/flat_hydra.yaml
+        --config configs/baselines/flat_hydra.yaml
 
     # Reprendre un training interrompu
     python scripts/run_flat_hydra.py \

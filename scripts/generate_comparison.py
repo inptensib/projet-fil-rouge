@@ -806,7 +806,7 @@ def discover_hlpd_model() -> list[dict]:
     val_path = HLPD_RESULTS_DIR / "val_metrics.json"
     val_m = json.loads(val_path.read_text()) if val_path.exists() else {}
 
-    cfg_path = Path("02b_hlpd/configs/hlpd_3090.yaml")
+    cfg_path = Path("configs/hlpd/hlpd_3090.yaml")
     cfg = yaml.safe_load(cfg_path.read_text()) if cfg_path.exists() else {}
 
     images = {}

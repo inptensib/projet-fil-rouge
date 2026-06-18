@@ -5,7 +5,7 @@ Maps the YAML config keys to HYDRATrainer constructor parameters.
 Usage:
     python scripts/run_train.py --data shared/dataset/products.jsonl
     python scripts/run_train.py --data shared/dataset/products.jsonl --n-samples 50000
-    python scripts/run_train.py --config 02_hydra/configs/default.yaml --data shared/dataset/products.jsonl
+    python scripts/run_train.py --config configs/hydra/default.yaml --data shared/dataset/products.jsonl
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def main():
     parser = argparse.ArgumentParser(description="HYDRA single-GPU training")
     parser.add_argument(
         "--config",
-        default="02_hydra/configs/default.yaml",
+        default="configs/hydra/default.yaml",
         help="Path to YAML config file",
     )
     parser.add_argument(

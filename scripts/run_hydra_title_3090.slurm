@@ -32,7 +32,7 @@ export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
 VARIANT="${1:?Erreur : variante manquante. Usage: sbatch ... run_hydra_title_3090.slurm <local|global|nested>}"
-CONFIG="02_hydra/configs/title_only.yaml"
+CONFIG="configs/hydra/title_only.yaml"
 
 SAVE_DIR=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models_title'))" 2>/dev/null || echo "models_title")
 SUFFIX=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('experiment_suffix', ''))" 2>/dev/null || echo "_title")

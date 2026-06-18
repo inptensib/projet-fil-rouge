@@ -45,10 +45,10 @@ Commandes depuis la racine du repo.
 ```bash
 # Entraîner (une variante, job array auto-reprise)
 sbatch --job-name=hydra-local --array=0-9%1 \
-    scripts/run_train_variant.slurm local 02_hydra/configs/default.yaml
+    scripts/run_train_variant.slurm local configs/hydra/default.yaml
 
 # Ou les 3 variantes en parallèle (1 GPU chacune)
-sbatch scripts/run_train_array.slurm 02_hydra/configs/default.yaml
+sbatch scripts/run_train_array.slurm configs/hydra/default.yaml
 
 # Évaluer (3 variantes, avec/sans masque)
 sbatch scripts/run_eval.slurm
@@ -61,7 +61,7 @@ sbatch scripts/run_f1_perclass.slurm
 
 ```bash
 # Entraîner — chaînage de N arrays si > 36 h
-./scripts/chain_submit_array.sh 3 02_hydra/configs/hierarchy.yaml
+./scripts/chain_submit_array.sh 3 configs/hydra/hierarchy.yaml
 
 # Évaluer (les modèles sont dans models_hierarchy/)
 sbatch scripts/run_eval.slurm models_hierarchy
@@ -74,7 +74,7 @@ sbatch scripts/run_f1_perclass_hierarchy.slurm
 
 ```bash
 sbatch --job-name=hydra-local-mbert --array=0-9%1 \
-    scripts/run_train_variant.slurm local 02_hydra/configs/mbert_default.yaml
+    scripts/run_train_variant.slurm local configs/hydra/mbert_default.yaml
 sbatch scripts/run_eval_hydra_mbert.slurm
 sbatch scripts/run_f1_perclass_mbert.slurm
 ```
@@ -103,7 +103,7 @@ sbatch scripts/run_eval_flat_hydra_title.slurm     # éval title-only
 
 ```bash
 sbatch --job-name=hlpd --array=0-9%1 scripts/run_hlpd_3090.slurm
-# Config : 02b_hlpd/configs/hlpd_3090.yaml — voir 02b_hlpd/README.md
+# Config : configs/hlpd/hlpd_3090.yaml — voir 02b_hlpd/README.md
 ```
 
 ### Baselines
@@ -122,7 +122,7 @@ bash scripts/run_fasttext_eval.sh
 
 ## Configs YAML
 
-`02_hydra/configs/default.yaml` est la **source de vérité**. Divergences
+`configs/hydra/default.yaml` est la **source de vérité**. Divergences
 des autres configs :
 
 | Config                       | Batch | LR        | Divergences clés                          |
@@ -139,7 +139,7 @@ des autres configs :
 > (1.12e-4). Les configs title-only supportent de gros batches car les
 > séquences (titre seul) sont bien plus courtes.
 
-Configs FlatHydra (`01_baselines/configs/`) : `dropout: 0.2` (fidélité au
+Configs FlatHydra (`configs/baselines/`) : `dropout: 0.2` (fidélité au
 papier, ≠ 0.3 HYDRA) ; le batch varie selon le GPU — `flat_hydra.yaml`
 (64, CPU/debug), `flat_hydra_3090.yaml` (256), `flat_hydra_title_3090.yaml`
 (512), `flat_hydra_mbert.yaml` (128, mBERT plus lourd).
@@ -174,7 +174,7 @@ Le module `03_distributed/` permet l'entraînement multi-GPU multi-nœuds
 ```bash
 cd 03_distributed
 python -m src.main \
-    --config ../02_hydra/configs/default.yaml \
+    --config ../configs/hydra/default.yaml \
     --split_dir "$DATA_DIR" \
     --shard_dir shards
 ```
@@ -191,7 +191,7 @@ python scripts/generate_comparison.py        # → results/comparison.html
 
 # F1 par classe d'un modèle déjà entraîné
 python scripts/generate_f1_per_class.py \
-    --split-dir "$DATA_DIR" --config 02_hydra/configs/default.yaml \
+    --split-dir "$DATA_DIR" --config configs/hydra/default.yaml \
     --variant local --results-dir hydra-local-camembert
 
 # Rapports HTML par modèle (confusion, courbes)

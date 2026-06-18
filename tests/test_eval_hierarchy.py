@@ -82,9 +82,9 @@ class TestSerializeResults:
 
     def test_metadata_keys_present_and_prefixed(self):
         mod = _eval_hierarchy()
-        out = mod._serialize_results(self._RESULTS, "base", "02_hydra/configs/default.yaml")
+        out = mod._serialize_results(self._RESULTS, "base", "configs/hydra/default.yaml")
         assert out["_mode"] == "base"
-        assert out["_config"] == "02_hydra/configs/default.yaml"
+        assert out["_config"] == "configs/hydra/default.yaml"
         assert "_date" in out
         # Contrat generate_comparison.py : les variantes restent des clés plates
         non_meta = [k for k in out if not k.startswith("_")]

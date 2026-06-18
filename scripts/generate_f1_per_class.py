@@ -18,7 +18,7 @@ Usage:
 
     # HYDRA mBERT
     python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
-        --config 02_hydra/configs/mbert_default.yaml --results-tag ''
+        --config configs/hydra/mbert_default.yaml --results-tag ''
 
     # FlatHydra Title+Description
     python scripts/generate_f1_per_class.py --split-dir /path/to/splits --flat-hydra
@@ -190,7 +190,7 @@ def evaluate_flat_hydra_and_save(
 def main():
     parser = argparse.ArgumentParser(description="Génère f1_per_class L1/L2 en JSON")
     parser.add_argument("--split-dir", required=True, help="Répertoire des splits")
-    parser.add_argument("--config", default="02_hydra/configs/default.yaml")
+    parser.add_argument("--config", default="configs/hydra/default.yaml")
     parser.add_argument("--variant", default=None, choices=VARIANTS)
     parser.add_argument("--batch-size", type=int, default=None,
                         help="Batch size pour l'évaluation (défaut: config YAML)")

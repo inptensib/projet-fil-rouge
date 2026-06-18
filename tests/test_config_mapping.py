@@ -19,7 +19,7 @@ import rakuten.models.hydra.models as _models_mod
 import rakuten.models.hydra.trainer as _trainer_mod
 
 _ROOT = Path(__file__).resolve().parents[1]
-HYDRA_CONFIGS = sorted((_ROOT / "02_hydra" / "configs").glob("*.yaml"))
+HYDRA_CONFIGS = sorted((_ROOT / "configs" / "hydra").glob("*.yaml"))
 
 ARCH_KEYS = ("dropout", "hidden_dim", "pooling", "project_embedding", "freeze_encoder")
 

@@ -220,7 +220,7 @@ confs_l2, preds_l2 = probs_l2.max(dim=-1)
 ## Paramètres d'apprentissage
 
 Tous les paramètres canoniques sont définis dans
-`01_baselines/configs/flat_hydra.yaml`.
+`configs/baselines/flat_hydra.yaml`.
 
 ### Encodeur
 
@@ -442,7 +442,7 @@ Chaque slot vérifie :
 sbatch --job-name=flat-hydra --array=0-9%1 scripts/run_flat_variant.slurm
 # Smoke test :
 sbatch --job-name=flat-hydra-smoke --array=0-2%1 \
-  scripts/run_flat_variant.slurm 01_baselines/configs/flat_hydra.yaml 5000
+  scripts/run_flat_variant.slurm configs/baselines/flat_hydra.yaml 5000
 ```
 
 ---

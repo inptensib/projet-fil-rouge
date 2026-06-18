@@ -77,7 +77,7 @@ from rakuten.models.hydra.models import HYDRALocal   # importé proprement par d
 | `01_baselines/src/` | `rakuten/models/baselines/` |
 | `02b_hlpd/src/` | `rakuten/models/hlpd/` |
 | `03_distributed/src/` | **exclu** (tag git d'archive + note ARCHITECTURE) |
-| `02_hydra/configs/` etc. | `configs/{hydra,baselines,hlpd}/` |
+| `configs/hydra/` etc. | `configs/{hydra,baselines,hlpd}/` |
 | `00_eda/` | `notebooks/` + narration dans `docs/ARCHITECTURE.md` |
 
 ## Packaging & imports

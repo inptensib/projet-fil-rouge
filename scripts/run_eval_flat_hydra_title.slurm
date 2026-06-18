@@ -37,7 +37,7 @@ import torch
 from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
 from rakuten.models.baselines.flat_trainer import FlatHydraConfig, FlatHydraTrainer
 
-CONFIG    = "01_baselines/configs/flat_hydra_title_3090.yaml"
+CONFIG    = "configs/baselines/flat_hydra_title_3090.yaml"
 MODEL_PT  = "models/flat_hydra_title/best_model.pt"
 SPLIT_DIR = Path(os.environ.get("DATA_DIR", str(Path.home() / "fil_rouge" / "dataset")))
 RESULTS_DIR = Path("results/flat_hydra_title")

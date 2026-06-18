@@ -55,9 +55,9 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 - Constantes : **157** classes L1, **6 126** classes L2, `max_length=256`
 - Encodeur : `camembert-base`
 - FocalLoss sans alpha : `-(1-p_t)^gamma * log(p_t)`, `gamma=2.0`
-- Source de verite pour les hyperparametres : `02_hydra/configs/default.yaml`
+- Source de verite pour les hyperparametres : `configs/hydra/default.yaml`
   - `dropout=0.3`, `lr=3.5e-5`, `batch_size=64`, `hidden_dim=256`, `epochs=10`, `level_weight_l1=0.5`
-- Variante hierarchique : `02_hydra/configs/hierarchy.yaml`
+- Variante hierarchique : `configs/hydra/hierarchy.yaml`
   - `condition_l2_on_l1: true` — teacher forcing (L1 ground truth pendant le training)
   - `check_hierarchy: true` — masque hierarchique a l'inference
   - `use_focal: true` — Perte asymetrique : L1 → CrossEntropy (stable, calibre pour le masque hierarchique),
@@ -72,7 +72,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 01_baselines/src/      tfidf_pipeline.py, word2vec_pipeline.py, bert_flat_classifier.py, evaluate.py
 01_baselines/notebooks/ fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb
 02_hydra/src/          models.py, losses.py, trainer.py, predict.py, config.py (mapping YAML)
-02_hydra/configs/      default.yaml (source de verite), hierarchy.yaml, title_only*.yaml, mbert_default.yaml
+configs/hydra/      default.yaml (source de verite), hierarchy.yaml, title_only*.yaml, mbert_default.yaml
 02b_hlpd/              HLPD (decodeur hierarchique — Mehdi Aithamma)
 03_distributed/src/     main.py, trainer_ddp.py, ddp_utils.py, data_sharding.py, error_analysis.py, predict.py
 shared/                data_loader.py, metrics.py, training_utils.py, utils.py

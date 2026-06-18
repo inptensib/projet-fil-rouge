@@ -51,7 +51,7 @@ _CONFIG_PATH = Path(__file__).resolve().parent.parent / "configs" / "flat_hydra.
 class FlatHydraConfig:
     """Typed hyperparameters for the FlatHydra baseline.
 
-    Canonical values live in ``01_baselines/configs/flat_hydra.yaml``.
+    Canonical values live in ``configs/baselines/flat_hydra.yaml``.
 
     Attributes:
         encoder: HuggingFace model name.

@@ -4,22 +4,22 @@ Usage:
     # Depuis les splits pré-générés (recommandé pour le dataset complet)
     python scripts/run_hlpd.py \\
         --split-dir /path/to/dataset/ \\
-        --config 02b_hlpd/configs/hlpd_3090.yaml
+        --config configs/hlpd/hlpd_3090.yaml
 
     # Smoke test local (N=1000 samples, 1 epoch)
     python scripts/run_hlpd.py \\
         --split-dir /path/to/dataset/ \\
-        --config 02b_hlpd/configs/hlpd_3090.yaml \\
+        --config configs/hlpd/hlpd_3090.yaml \\
         --n-samples 1000 \\
         --epochs 1
 
     # Reprendre un training interrompu
     python scripts/run_hlpd.py \\
         --split-dir /path/to/dataset/ \\
-        --config 02b_hlpd/configs/hlpd_3090.yaml \\
+        --config configs/hlpd/hlpd_3090.yaml \\
         --resume models/hlpd/checkpoint_latest.pt
 """
-# NOTE : les configs YAML restent dans 02b_hlpd/configs/ (non migré).
+# NOTE : les configs YAML restent dans configs/hlpd/ (non migré).
 
 from __future__ import annotations
 

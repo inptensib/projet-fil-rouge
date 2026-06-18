@@ -27,7 +27,7 @@ export TRANSFORMERS_OFFLINE=1
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
-CONFIG="01_baselines/configs/flat_hydra_camembert_v2.yaml"
+CONFIG="configs/baselines/flat_hydra_camembert_v2.yaml"
 SAVE_DIR=$(python -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models_v2/flat_hydra'))" 2>/dev/null || echo "models_v2/flat_hydra")
 CKPT="${SAVE_DIR}/checkpoint_latest.pt"
 COMPLETE="${SAVE_DIR}/training_complete.txt"

@@ -210,7 +210,7 @@ L2 — Vrai: Coque téléphone | Prédit: Coque téléphone (91%) ✔
 
 ## ⚙️ Configuration
 
-Source de vérité : [`02_hydra/configs/default.yaml`](02_hydra/configs/default.yaml)
+Source de vérité : [`configs/hydra/default.yaml`](configs/hydra/default.yaml)
 
 | Paramètre | Valeur | | Paramètre | Valeur |
 |-----------|--------|-|-----------|--------|
@@ -220,7 +220,7 @@ Source de vérité : [`02_hydra/configs/default.yaml`](02_hydra/configs/default.
 | Gradient clip | 1.0 | | Early stop | patience 2 |
 | `dropout` | 0.3 | | `hidden_dim` | 256 |
 
-Variante hiérarchique : [`02_hydra/configs/hierarchy.yaml`](02_hydra/configs/hierarchy.yaml) — active `condition_l2_on_l1` (teacher forcing) et `check_hierarchy` (masque à l'inférence)
+Variante hiérarchique : [`configs/hydra/hierarchy.yaml`](configs/hydra/hierarchy.yaml) — active `condition_l2_on_l1` (teacher forcing) et `check_hierarchy` (masque à l'inférence)
 
 ---
 

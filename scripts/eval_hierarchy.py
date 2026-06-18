@@ -197,7 +197,7 @@ def print_results(all_results: dict):
 def main():
     parser = argparse.ArgumentParser(description="Évaluation HYDRA avec/sans conditioning hiérarchique")
     parser.add_argument("--split-dir", required=True, help="Répertoire des splits train/val/test")
-    parser.add_argument("--config", default="02_hydra/configs/default.yaml")
+    parser.add_argument("--config", default="configs/hydra/default.yaml")
     parser.add_argument("--variant", default=None, choices=VARIANTS, help="Une seule variante (défaut: toutes)")
     parser.add_argument(
         "--eval-batch-size", type=int, default=2048,

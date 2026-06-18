@@ -33,6 +33,6 @@ echo "GPUs disponibles : $(python3 -c 'import torch; print(torch.cuda.device_cou
 
 python scripts/eval_hierarchy.py \
     --split-dir "$DATA_DIR/" \
-    --config 02_hydra/configs/default.yaml \
+    --config configs/hydra/default.yaml \
     --model-dir "$MODEL_DIR" \
     --eval-batch-size 2048
