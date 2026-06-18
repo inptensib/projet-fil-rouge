@@ -152,6 +152,8 @@ def main() -> None:
             n_samples=args.n_samples,
             seed=config.seed,
             use_description=config.use_description,
+            synthetic_policy=config.synthetic_policy,
+            normalize=config.normalize_text,
         )
     else:
         data_path = Path(args.data)
@@ -165,6 +167,7 @@ def main() -> None:
             n_samples=n,
             seed=config.seed,
             use_description=config.use_description,
+            normalize=config.normalize_text,
         )
 
     print(

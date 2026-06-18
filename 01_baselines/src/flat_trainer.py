@@ -29,12 +29,13 @@ from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from shared.metrics import compute_all_metrics              # noqa: E402
+from shared.metrics import compute_all_metrics, compute_f1_by_tranche  # noqa: E402
 from shared.training_utils import (  # noqa: E402
     EarlyStopping,
     MLflowSession,
     get_linear_schedule_with_warmup as _get_linear_schedule_with_warmup,
     make_hierarchical_loader,
+    resolve_rebalancing,
 )
 
 import importlib.util as _ilu  # noqa: E402
@@ -83,6 +84,14 @@ class FlatHydraConfig:
         save_dir: Model artefacts directory.
         experiment_name: MLflow experiment name.
         freeze_encoder: Freeze encoder weights.
+        use_description: Concatenate the description to the designation.
+        normalize_text: Loader-side option: normalize designation/description.
+        synthetic_policy: Loader-side option: 'keep_all' or 'drop_oversampled'.
+        class_weighting: Per-class loss weights from the real (non synthetic)
+            train counts: 'none', 'inv_sqrt' or 'inv'. Requires
+            synthetic_policy='drop_oversampled'.
+        logit_adjustment_tau: Temperature of the logit-adjusted loss
+            (Menon et al., 2021). 0 disables. Same data requirement.
     """
 
     encoder: str = "camembert-base"
@@ -108,6 +117,10 @@ class FlatHydraConfig:
     experiment_name: str = "flat_hydra"
     freeze_encoder: bool = False
     use_description: bool = True
+    normalize_text: bool = False
+    synthetic_policy: str = "keep_all"
+    class_weighting: str = "none"
+    logit_adjustment_tau: float = 0.0
 
     def __post_init__(self) -> None:
         """Validate hyperparameter ranges, raising ValueError on invalid values."""
@@ -119,6 +132,8 @@ class FlatHydraConfig:
             raise ValueError(f"epochs must be >= 1, got {self.epochs}")
         if self.pooling not in ("cls", "mean", "max", "last"):
             raise ValueError(f"Unknown pooling '{self.pooling}'")
+        if self.class_weighting not in ("none", "inv_sqrt", "inv"):
+            raise ValueError(f"Unknown class_weighting '{self.class_weighting}'")
 
     @classmethod
     def from_yaml(cls, path: str | Path, **overrides) -> "FlatHydraConfig":
@@ -188,6 +203,17 @@ class FlatHydraTrainer:
             print(f"[Trainer] DataParallel on {torch.cuda.device_count()} GPUs")
             self.model = nn.DataParallel(self.model)
 
+        # Rééquilibrage des pertes (None partout quand les options sont off)
+        rebalancing = resolve_rebalancing(
+            data, self.num_classes_l1, self.num_classes_l2,
+            class_weighting=self.config.class_weighting,
+            logit_adjustment_tau=self.config.logit_adjustment_tau,
+        )
+        rebalancing = {
+            key: tensor.to(self.device) if tensor is not None else None
+            for key, tensor in rebalancing.items()
+        }
+
         self.criterion = HYDRALoss(
             architecture="global",
             alpha=1.0,
@@ -196,6 +222,7 @@ class FlatHydraTrainer:
             level_weight_l1=self.config.level_weight_l1,
             focal_gamma=self.config.focal_gamma,
             use_focal=self.config.use_focal,
+            **rebalancing,
         )
 
         self.optimizer = AdamW(
@@ -264,6 +291,11 @@ class FlatHydraTrainer:
             all_labels_l2, all_preds_l2,
             self.l2_to_l1_mapping,
         )
+        real_counts_l2 = self.data.get("real_class_counts_l2")
+        if real_counts_l2 is not None:
+            metrics["f1_l2_by_tranche"] = compute_f1_by_tranche(
+                all_labels_l2, all_preds_l2, real_counts_l2
+            )
         metrics["_preds_l1"] = all_preds_l1
         metrics["_preds_l2"] = all_preds_l2
         metrics["_labels_l1"] = all_labels_l1
@@ -289,6 +321,8 @@ class FlatHydraTrainer:
             "level_weight_l1": self.config.level_weight_l1,
             "num_classes_l1": self.num_classes_l1,
             "num_classes_l2": self.num_classes_l2,
+            "class_weighting": self.config.class_weighting,
+            "logit_adjustment_tau": self.config.logit_adjustment_tau,
             "fp16": self.fp16,
         })
         return session

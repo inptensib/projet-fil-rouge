@@ -48,6 +48,8 @@ _EVAL_IRRELEVANT_KEYS = (
     "save_dir",
     "experiment_suffix",
     "condition_l2_on_l1",
+    "class_weighting",
+    "logit_adjustment_tau",
 )
 
 
@@ -243,6 +245,7 @@ def main():
         test_path=str(split_dir / "test_split.jsonl"),
         seed=cfg.get("seed", 42),
         use_description=not args.no_description,
+        normalize=cfg.get("normalize_text", False),
     )
     print(f"  Test: {len(data['X_test']):,} samples, L1: {data['num_classes_l1']}, L2: {data['num_classes_l2']}")
 

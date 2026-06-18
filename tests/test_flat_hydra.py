@@ -189,6 +189,14 @@ class TestFlatHydraConfig:
         assert cfg.project_embedding is True
         assert cfg.use_focal is False
         assert cfg.level_weight_l1 == 0.5
+        assert cfg.normalize_text is False
+        assert cfg.synthetic_policy == "keep_all"
+        assert cfg.class_weighting == "none"
+        assert cfg.logit_adjustment_tau == 0.0
+
+    def test_invalid_class_weighting_raises(self):
+        with pytest.raises(ValueError, match="class_weighting"):
+            FlatHydraConfig(class_weighting="sqrt")
 
     def test_invalid_lr_raises(self):
         with pytest.raises(ValueError, match="lr"):
@@ -324,6 +332,64 @@ class TestFlatHydraTrainer:
             hist = json.load(f)
         assert "val_f1_l2_macro" in hist
         assert len(hist["epoch"]) >= 1
+
+    @mock.patch("transformers.AutoTokenizer.from_pretrained")
+    def test_rebalancing_guard_raises(self, mock_tok, mock_auto_model):
+        """class_weighting without drop_oversampled data: explicit ValueError."""
+        mock_tok.return_value = mock.MagicMock()
+        with pytest.raises(ValueError, match="drop_oversampled"):
+            FlatHydraTrainer(
+                data=_make_data(),
+                config=self._config(class_weighting="inv_sqrt"),
+            )
+
+    @mock.patch("transformers.AutoTokenizer.from_pretrained")
+    def test_rebalancing_tensors_reach_criterion(self, mock_tok, mock_auto_model):
+        from collections import Counter
+
+        mock_tok.return_value = mock.MagicMock()
+        data = _make_data()
+        data["synthetic_policy"] = "drop_oversampled"
+        data["real_class_counts_l1"] = Counter(data["y_l1_train"])
+        data["real_class_counts_l2"] = Counter(data["y_l2_train"])
+        trainer = FlatHydraTrainer(
+            data=data,
+            config=self._config(class_weighting="inv_sqrt", logit_adjustment_tau=1.0),
+        )
+        assert trainer.criterion.loss_fn_l1.weight.shape == (_L1,)
+        assert trainer.criterion.logit_adjustment_l2.shape == (_L2,)
+
+    @mock.patch("transformers.AutoTokenizer.from_pretrained")
+    def test_evaluate_tranche_with_real_counts(self, mock_tok, mock_auto_model):
+        """v2 data: evaluate() adds f1_l2_by_tranche."""
+        from collections import Counter
+
+        tok = mock.MagicMock()
+
+        def _tokenize(text, **kwargs):
+            return {
+                "input_ids": torch.randint(0, 100, (1, 8)),
+                "attention_mask": torch.ones(1, 8, dtype=torch.long),
+            }
+
+        tok.side_effect = _tokenize
+        mock_tok.return_value = tok
+
+        data = _make_data()
+        data["real_class_counts_l2"] = Counter(data["y_l2_train"])
+        trainer = FlatHydraTrainer(data=data, config=self._config())
+
+        from shared.data_loader import HierarchicalProductDataset
+        from torch.utils.data import DataLoader
+
+        ds = HierarchicalProductDataset(
+            data["X_val"], data["y_l1_val"], data["y_l2_val"], tok, max_length=8,
+        )
+        metrics = trainer.evaluate(DataLoader(ds, batch_size=4))
+
+        tranche = metrics["f1_l2_by_tranche"]
+        assert set(tranche) == {"many", "medium", "few"}
+        assert tranche["many"]["f1_macro"] is None  # all counts < 20
 
     @mock.patch("transformers.AutoTokenizer.from_pretrained")
     def test_save_artefacts(self, mock_tok, mock_auto_model, tmp_path):

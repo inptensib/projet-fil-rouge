@@ -10,11 +10,14 @@ import gc
 import json
 import logging
 import random
+from collections import Counter
 from typing import Optional
 
 import numpy as np
 import pandas as pd
 import torch
+
+from shared.text_normalization import normalize_text
 
 def _cpu_has_avx2() -> bool:
     """Check if CPU supports AVX2 (required by Polars)."""
@@ -132,20 +135,42 @@ def load_jsonl_full(file_path: str):
     return df
 
 
-def _preprocess_df(df, use_description: bool = True):
-    """Extract hierarchical labels and text from a raw JSONL DataFrame.
+_SYNTH_PREFIX = "SYNTH-"
+_SYNTH_KIND_PATTERN = r"^SYNTH-([A-Z]+)"
+_OVERSAMPLED_KINDS = ("OVS", "OVL")
 
-    Supports both Polars and pandas DataFrames.
-    Returns DataFrame with columns: text, level_1, level_2.
+
+def _preprocess_df(df, use_description: bool = True, normalize: bool = False):
+    """Extract hierarchical labels, text and synthetic flags from a raw JSONL DataFrame.
+
+    Supports both Polars and pandas DataFrames. Rows whose productid starts
+    with "SYNTH-" are flagged with their generation kind (ORPH, OVS, OVL, GEN).
+    If normalize is True, normalize_text is applied to designation and
+    description before building the text field.
+    Returns DataFrame with columns: text, level_1, level_2, is_synthetic, synth_kind.
     """
     if _HAS_POLARS and isinstance(df, pl.DataFrame):
         invalid_l2 = ["", "none", "nan", "unknown"]
+        designation = pl.col("designation").fill_null("")
+        description = pl.col("description").fill_null("")
+        if normalize:
+            designation = designation.map_elements(normalize_text, return_dtype=pl.Utf8)
+            description = description.map_elements(normalize_text, return_dtype=pl.Utf8)
+        if "productid" in df.columns:
+            pid = pl.col("productid").cast(pl.Utf8).fill_null("")
+            is_synthetic = pid.str.starts_with(_SYNTH_PREFIX)
+            synth_kind = pid.str.extract(_SYNTH_KIND_PATTERN, 1)
+        else:
+            is_synthetic = pl.lit(False)
+            synth_kind = pl.lit(None, dtype=pl.Utf8)
         return (
             df.with_columns(
                 pl.col("typelabel").fill_null("Unknown").alias("level_1"),
-                pl.col("designation").fill_null(""),
-                pl.col("description").fill_null(""),
+                designation,
+                description,
                 pl.col("producttype").list.first().cast(pl.Utf8).alias("level_2_raw"),
+                is_synthetic.alias("is_synthetic"),
+                synth_kind.alias("synth_kind"),
             )
             .filter(
                 pl.col("level_2_raw").is_not_null()
@@ -159,7 +184,7 @@ def _preprocess_df(df, use_description: bool = True):
                 ).alias("text"),
                 pl.col("level_2_raw").str.strip_chars().alias("level_2"),
             )
-            .select("text", "level_1", "level_2")
+            .select("text", "level_1", "level_2", "is_synthetic", "synth_kind")
         )
     else:
         # Pandas fallback
@@ -169,11 +194,37 @@ def _preprocess_df(df, use_description: bool = True):
         df["level_2"] = df["level_2_raw"]
         df["designation"] = df["designation"].fillna("")
         df["description"] = df["description"].fillna("")
+        if normalize:
+            df["designation"] = df["designation"].map(normalize_text)
+            df["description"] = df["description"].map(normalize_text)
+        if "productid" in df.columns:
+            pid = df["productid"].fillna("").astype(str)
+            df["is_synthetic"] = pid.str.startswith(_SYNTH_PREFIX)
+            df["synth_kind"] = pid.str.extract(_SYNTH_KIND_PATTERN, expand=False)
+        else:
+            df["is_synthetic"] = False
+            df["synth_kind"] = None
         if use_description:
             df["text"] = df["designation"] + ". " + df["description"]
         else:
             df["text"] = df["designation"]
-        return df[["text", "level_1", "level_2"]]
+        return df[["text", "level_1", "level_2", "is_synthetic", "synth_kind"]]
+
+
+def _drop_oversampled_rows(df_train):
+    """Remove oversampled synthetic rows (SYNTH-OVS, SYNTH-OVL) from the train split."""
+    n_before = len(df_train)
+    if _HAS_POLARS and isinstance(df_train, pl.DataFrame):
+        df_train = df_train.filter(
+            ~pl.col("synth_kind").fill_null("").is_in(list(_OVERSAMPLED_KINDS))
+        )
+    else:
+        df_train = df_train[~df_train["synth_kind"].isin(_OVERSAMPLED_KINDS)].copy()
+    print(
+        f"[Data] synthetic_policy=drop_oversampled: "
+        f"{n_before - len(df_train):,} lignes SYNTH-OVS/OVL retirées du train"
+    )
+    return df_train
 
 
 def prepare_hierarchical_data(
@@ -183,8 +234,13 @@ def prepare_hierarchical_data(
     val_ratio: float = 0.125,
     seed: int = 42,
     use_description: bool = True,
+    normalize: bool = False,
 ) -> dict:
     """Load JSONL data and prepare hierarchical labels with train/val/test splits.
+
+    synthetic_policy is not supported on this single-file path (the split
+    happens after loading); use prepare_hierarchical_data_from_splits for
+    the v2 dataset.
 
     Args:
         file_path: Path to the JSONL dataset.
@@ -192,6 +248,7 @@ def prepare_hierarchical_data(
         test_size: Fraction for test set (from total).
         val_ratio: Fraction for val set (from remaining after test).
         seed: Random seed.
+        normalize: If True, apply normalize_text to designation and description.
 
     Returns:
         Dictionary with keys: X_train, X_val, X_test, y_l1_train, y_l1_val,
@@ -199,7 +256,7 @@ def prepare_hierarchical_data(
         l2_to_l1_mapping, num_classes_l1, num_classes_l2.
     """
     df = load_random_sample(file_path, n_samples=n_samples, seed=seed)
-    df = _preprocess_df(df, use_description=use_description)
+    df = _preprocess_df(df, use_description=use_description, normalize=normalize)
 
     print(f"[Data] Valid hierarchical samples: {len(df):,}")
 
@@ -307,10 +364,13 @@ def prepare_hierarchical_data_from_splits(
     n_samples: Optional[int] = None,
     seed: int = 42,
     use_description: bool = True,
+    synthetic_policy: str = "keep_all",
+    normalize: bool = False,
 ) -> dict:
     """Load pre-split JSONL files and prepare hierarchical labels.
 
-    Returns the same dict format as prepare_hierarchical_data().
+    Returns the same dict format as prepare_hierarchical_data(), plus
+    synthetic-data tracking keys (dataset v2: productid prefixed SYNTH-).
     LabelEncoders are fitted on the union of labels from all 3 splits.
 
     Args:
@@ -320,31 +380,49 @@ def prepare_hierarchical_data_from_splits(
         n_samples: If set, sample this many total (proportional per split).
                    If None, load all data.
         seed: Random seed for optional sampling.
+        synthetic_policy: "keep_all" keeps every row; "drop_oversampled"
+            removes SYNTH-OVS and SYNTH-OVL rows from the train split only
+            (SYNTH-ORPH and SYNTH-GEN are kept, val/test are never filtered).
+        normalize: If True, apply normalize_text to designation and
+            description of the 3 splits at load time.
 
     Returns:
         Dictionary with keys: X_train, X_val, X_test, y_l1_train, y_l1_val,
         y_l1_test, y_l2_train, y_l2_val, y_l2_test, l1_encoder, l2_encoder,
-        l2_to_l1_mapping, num_classes_l1, num_classes_l2.
+        l2_to_l1_mapping, num_classes_l1, num_classes_l2, train_is_synthetic
+        (list of bool aligned with X_train), real_class_counts_l1 and
+        real_class_counts_l2 (Counter of encoded train labels on real rows
+        only, the basis for class weights), and synthetic_policy (the policy
+        applied, checked by the trainers before enabling class weighting).
     """
+    if synthetic_policy not in ("keep_all", "drop_oversampled"):
+        raise ValueError(
+            f"synthetic_policy invalide: {synthetic_policy!r} "
+            "(attendu: 'keep_all' ou 'drop_oversampled')"
+        )
+
     if n_samples is not None:
         n_train = int(n_samples * 0.70)
         n_val = int(n_samples * 0.15)
         n_test = n_samples - n_train - n_val
-        df_train = _preprocess_df(load_random_sample(train_path, n_train, seed), use_description=use_description)
-        df_val = _preprocess_df(load_random_sample(val_path, n_val, seed), use_description=use_description)
-        df_test = _preprocess_df(load_random_sample(test_path, n_test, seed), use_description=use_description)
+        df_train = _preprocess_df(load_random_sample(train_path, n_train, seed), use_description=use_description, normalize=normalize)
+        df_val = _preprocess_df(load_random_sample(val_path, n_val, seed), use_description=use_description, normalize=normalize)
+        df_test = _preprocess_df(load_random_sample(test_path, n_test, seed), use_description=use_description, normalize=normalize)
     else:
-        df_train = _preprocess_df(load_jsonl_full(train_path), use_description=use_description)
+        df_train = _preprocess_df(load_jsonl_full(train_path), use_description=use_description, normalize=normalize)
         gc.collect()
-        df_val = _preprocess_df(load_jsonl_full(val_path), use_description=use_description)
+        df_val = _preprocess_df(load_jsonl_full(val_path), use_description=use_description, normalize=normalize)
         gc.collect()
-        df_test = _preprocess_df(load_jsonl_full(test_path), use_description=use_description)
+        df_test = _preprocess_df(load_jsonl_full(test_path), use_description=use_description, normalize=normalize)
         gc.collect()
 
     print(
         f"[Data] Pre-split loaded: "
         f"{len(df_train):,} train / {len(df_val):,} val / {len(df_test):,} test"
     )
+
+    if synthetic_policy == "drop_oversampled":
+        df_train = _drop_oversampled_rows(df_train)
 
     # Garantir que chaque classe L2 a au moins 1 échantillon dans chaque split
     df_train, df_val, df_test = _ensure_l2_coverage(df_train, df_val, df_test)
@@ -391,6 +469,11 @@ def prepare_hierarchical_data_from_splits(
     X_val = df_val["text"].to_list()
     X_test = df_test["text"].to_list()
 
+    train_is_synthetic = [bool(v) for v in _to_list(df_train["is_synthetic"])]
+    real_mask = ~np.asarray(train_is_synthetic, dtype=bool)
+    real_class_counts_l1 = Counter(int(v) for v in y_l1_train[real_mask])
+    real_class_counts_l2 = Counter(int(v) for v in y_l2_train[real_mask])
+
     del df_train, df_val, df_test
     gc.collect()
 
@@ -402,6 +485,10 @@ def prepare_hierarchical_data_from_splits(
         "l2_to_l1_mapping": l2_to_l1,
         "num_classes_l1": len(l1_encoder.classes_),
         "num_classes_l2": len(l2_encoder.classes_),
+        "train_is_synthetic": train_is_synthetic,
+        "real_class_counts_l1": real_class_counts_l1,
+        "real_class_counts_l2": real_class_counts_l2,
+        "synthetic_policy": synthetic_policy,
     }
 
 

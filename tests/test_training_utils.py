@@ -5,7 +5,9 @@ Uses mocked tokenizer and mocked mlflow module to stay offline.
 
 from __future__ import annotations
 
+import math
 import sys
+from collections import Counter
 from pathlib import Path
 from unittest import mock
 
@@ -20,8 +22,11 @@ if str(_PROJECT_ROOT) not in sys.path:
 from shared.training_utils import (  # noqa: E402
     EarlyStopping,
     MLflowSession,
+    compute_class_weights,
+    compute_logit_adjustment,
     get_linear_schedule_with_warmup,
     make_hierarchical_loader,
+    resolve_rebalancing,
 )
 
 
@@ -100,6 +105,150 @@ class TestLinearScheduleWithWarmup:
             lam = factory(_make_optimizer(), 7, 53).lr_lambdas[0]
             for step in range(0, 60):
                 assert lam(step) == pytest.approx(ref(step))
+
+
+# ---------------------------------------------------------------------------
+# compute_class_weights
+# ---------------------------------------------------------------------------
+
+class TestComputeClassWeights:
+    def test_scheme_none_returns_none(self):
+        assert compute_class_weights(Counter({0: 4}), [0], "none") is None
+
+    def test_inv_sqrt_values(self):
+        weights = compute_class_weights(
+            Counter({0: 4, 1: 1}), [0, 1], "inv_sqrt", normalize=False
+        )
+        assert torch.allclose(weights, torch.tensor([0.5, 1.0]))
+
+    def test_inv_values(self):
+        weights = compute_class_weights(
+            Counter({0: 4, 1: 1}), [0, 1], "inv", normalize=False
+        )
+        assert torch.allclose(weights, torch.tensor([0.25, 1.0]))
+
+    def test_normalized_mean_is_one(self):
+        weights = compute_class_weights(
+            Counter({0: 4, 1: 1}), [0, 1], "inv_sqrt"
+        )
+        assert torch.allclose(weights, torch.tensor([2 / 3, 4 / 3]))
+        assert weights.mean().item() == pytest.approx(1.0)
+
+    def test_zero_count_class_gets_min_nonzero_weight(self):
+        """100% synthetic classes (ORPH): weight of the smallest real count."""
+        weights = compute_class_weights(
+            Counter({0: 4, 2: 16}), [0, 1, 2], "inv_sqrt", normalize=False
+        )
+        assert torch.allclose(weights, torch.tensor([0.5, 0.5, 0.25]))
+
+    def test_classes_order_defines_tensor_order(self):
+        weights = compute_class_weights(
+            Counter({0: 1, 1: 4}), [1, 0], "inv_sqrt", normalize=False
+        )
+        assert torch.allclose(weights, torch.tensor([0.5, 1.0]))
+
+    def test_invalid_scheme_raises(self):
+        with pytest.raises(ValueError, match="scheme"):
+            compute_class_weights(Counter({0: 4}), [0], "sqrt")
+
+    def test_all_zero_counts_raises(self):
+        with pytest.raises(ValueError, match="non nul"):
+            compute_class_weights(Counter(), [0, 1], "inv_sqrt")
+
+
+# ---------------------------------------------------------------------------
+# compute_logit_adjustment
+# ---------------------------------------------------------------------------
+
+class TestComputeLogitAdjustment:
+    def test_tau_zero_returns_none(self):
+        assert compute_logit_adjustment(Counter({0: 9}), [0], tau=0.0) is None
+
+    def test_smoothed_log_priors(self):
+        adj = compute_logit_adjustment(Counter({0: 9, 1: 4}), [0, 1], tau=1.0)
+        expected = torch.tensor([math.log(10 / 15), math.log(5 / 15)])
+        assert torch.allclose(adj, expected)
+
+    def test_tau_scales_linearly(self):
+        counts = Counter({0: 9, 1: 4})
+        adj1 = compute_logit_adjustment(counts, [0, 1], tau=1.0)
+        adj2 = compute_logit_adjustment(counts, [0, 1], tau=2.0)
+        assert torch.allclose(adj2, 2.0 * adj1)
+
+    def test_zero_count_class_is_finite(self):
+        """Add-one smoothing: a class with no real sample keeps a finite prior."""
+        adj = compute_logit_adjustment(Counter({0: 3}), [0, 1], tau=1.0)
+        assert torch.isfinite(adj).all()
+        assert torch.allclose(adj, torch.tensor([math.log(0.8), math.log(0.2)]))
+
+    def test_rare_class_gets_lower_offset(self):
+        """The rare-class offset is more negative: its training logit must
+        compensate more (logit-adjusted loss)."""
+        adj = compute_logit_adjustment(Counter({0: 100, 1: 1}), [0, 1], tau=1.0)
+        assert adj[1] < adj[0]
+
+
+# ---------------------------------------------------------------------------
+# resolve_rebalancing
+# ---------------------------------------------------------------------------
+
+class TestResolveRebalancing:
+    _KEYS = (
+        "class_weights_l1", "class_weights_l2",
+        "logit_adjustment_l1", "logit_adjustment_l2",
+    )
+
+    def _data(self) -> dict:
+        return {
+            "synthetic_policy": "drop_oversampled",
+            "real_class_counts_l1": Counter({0: 6, 1: 3}),
+            "real_class_counts_l2": Counter({0: 4, 1: 2, 2: 3}),
+        }
+
+    def test_disabled_returns_all_none_without_guard(self):
+        """Options off: no tensor and no guard, even on a bare data dict."""
+        tensors = resolve_rebalancing({}, 2, 3)
+        assert set(tensors) == set(self._KEYS)
+        assert all(tensors[k] is None for k in self._KEYS)
+
+    def test_guard_requires_drop_oversampled(self):
+        data = self._data()
+        data["synthetic_policy"] = "keep_all"
+        with pytest.raises(ValueError, match="drop_oversampled"):
+            resolve_rebalancing(data, 2, 3, class_weighting="inv_sqrt")
+
+    def test_guard_missing_policy_flag(self):
+        with pytest.raises(ValueError, match="drop_oversampled"):
+            resolve_rebalancing({}, 2, 3, logit_adjustment_tau=1.0)
+
+    def test_guard_missing_counts(self):
+        with pytest.raises(ValueError, match="real_class_counts"):
+            resolve_rebalancing(
+                {"synthetic_policy": "drop_oversampled"}, 2, 3,
+                class_weighting="inv_sqrt",
+            )
+
+    def test_full_resolution_shapes(self):
+        tensors = resolve_rebalancing(
+            self._data(), 2, 3,
+            class_weighting="inv_sqrt", logit_adjustment_tau=1.0,
+        )
+        assert tensors["class_weights_l1"].shape == (2,)
+        assert tensors["class_weights_l2"].shape == (3,)
+        assert tensors["logit_adjustment_l1"].shape == (2,)
+        assert tensors["logit_adjustment_l2"].shape == (3,)
+
+    def test_partial_activation(self):
+        tensors = resolve_rebalancing(
+            self._data(), 2, 3, class_weighting="inv_sqrt",
+        )
+        assert tensors["class_weights_l1"] is not None
+        assert tensors["logit_adjustment_l1"] is None
+        tensors = resolve_rebalancing(
+            self._data(), 2, 3, logit_adjustment_tau=1.0,
+        )
+        assert tensors["class_weights_l1"] is None
+        assert tensors["logit_adjustment_l1"] is not None
 
 
 # ---------------------------------------------------------------------------

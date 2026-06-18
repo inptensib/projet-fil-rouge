@@ -294,3 +294,95 @@ class TestEvaluate:
             "_labels_l2", "_confs_l1", "_confs_l2",
         ):
             assert len(metrics[key]) == _N_EVAL
+
+    def test_no_tranche_without_real_counts(self, trained):
+        """v1 data (no real_class_counts_l2): no f1_l2_by_tranche key."""
+        trainer, _, _ = trained
+        data = trainer.data
+        loader = trainer._create_dataloader(
+            data["X_val"], data["y_l1_val"], data["y_l2_val"], shuffle=False,
+        )
+        assert "f1_l2_by_tranche" not in trainer.evaluate(loader)
+
+    def test_tranche_with_real_counts(self, tmp_path):
+        """v2 data: f1_l2_by_tranche is added, consistent with f1_l2_macro."""
+        from collections import Counter
+
+        data = _make_data()
+        data["real_class_counts_l2"] = Counter(data["y_l2_train"])
+        with _patched_environment():
+            trainer = _make_trainer(tmp_path, data=data)
+            loader = trainer._create_dataloader(
+                data["X_val"], data["y_l1_val"], data["y_l2_val"], shuffle=False,
+            )
+            metrics = trainer.evaluate(loader)
+
+        tranche = metrics["f1_l2_by_tranche"]
+        assert set(tranche) == {"many", "medium", "few"}
+        # All counts < 20: every class is in the 'few' tranche
+        assert tranche["few"]["n_classes"] == _L2
+        assert tranche["few"]["support"] == _N_EVAL
+        assert tranche["few"]["f1_macro"] == pytest.approx(metrics["f1_l2_macro"])
+        assert tranche["many"]["f1_macro"] is None
+
+
+# ---------------------------------------------------------------------------
+# Rebalancing (class_weighting / logit_adjustment_tau)
+# ---------------------------------------------------------------------------
+
+def _make_v2_data() -> dict:
+    from collections import Counter
+
+    data = _make_data()
+    data["synthetic_policy"] = "drop_oversampled"
+    data["real_class_counts_l1"] = Counter(data["y_l1_train"])
+    data["real_class_counts_l2"] = Counter(data["y_l2_train"])
+    return data
+
+
+class TestRebalancing:
+    def test_guard_without_drop_oversampled(self, tmp_path):
+        with _patched_environment():
+            with pytest.raises(ValueError, match="drop_oversampled"):
+                _make_trainer(tmp_path, class_weighting="inv_sqrt")
+
+    def test_guard_tau_without_drop_oversampled(self, tmp_path):
+        with _patched_environment():
+            with pytest.raises(ValueError, match="drop_oversampled"):
+                _make_trainer(tmp_path, logit_adjustment_tau=1.0)
+
+    def test_guard_missing_real_counts(self, tmp_path):
+        data = _make_v2_data()
+        del data["real_class_counts_l1"]
+        with _patched_environment():
+            with pytest.raises(ValueError, match="real_class_counts"):
+                _make_trainer(tmp_path, data=data, class_weighting="inv_sqrt")
+
+    def test_rebalancing_tensors_reach_criterion(self, tmp_path):
+        with _patched_environment():
+            trainer = _make_trainer(
+                tmp_path, data=_make_v2_data(),
+                class_weighting="inv_sqrt", logit_adjustment_tau=1.0,
+            )
+        assert trainer.criterion.loss_fn_l1.weight.shape == (_L1,)
+        assert trainer.criterion.logit_adjustment_l2.shape == (_L2,)
+        assert trainer.criterion.loss_fn_l1.weight.device == trainer.device
+        assert trainer.criterion.logit_adjustment_l2.device == trainer.device
+
+    def test_default_trainer_loss_unchanged(self, tmp_path):
+        """Neutrality: without the options, same loss as before on a fixed batch."""
+        import torch.nn.functional as F
+
+        torch.manual_seed(0)
+        logits_l1 = torch.randn(_BATCH, _L1)
+        logits_l2 = torch.randn(_BATCH, _L2)
+        y1 = torch.randint(0, _L1, (_BATCH,))
+        y2 = torch.randint(0, _L2, (_BATCH,))
+
+        with _patched_environment():
+            trainer = _make_trainer(tmp_path, data=_make_v2_data())
+        total, _, _ = trainer.criterion([logits_l1, logits_l2], None, y1, y2)
+        expected = 0.5 * F.cross_entropy(logits_l1, y1) + F.cross_entropy(logits_l2, y2)
+        assert torch.allclose(total, expected, atol=1e-6)
+        assert trainer.criterion.loss_fn_l1.weight is None
+        assert trainer.criterion.logit_adjustment_l2 is None

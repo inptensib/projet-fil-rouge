@@ -3,16 +3,152 @@
 Provides:
 - get_linear_schedule_with_warmup: linear warmup then linear decay scheduler.
 - make_hierarchical_loader: HierarchicalProductDataset + DataLoader factory.
+- compute_class_weights: per-class loss weights from real (non synthetic) counts.
+- compute_logit_adjustment: tau * log(prior) tensor (Menon et al., 2021).
+- resolve_rebalancing: guard + class weight / logit adjustment tensors from a
+  loader data dict.
 - EarlyStopping: patience-based early stopping state.
 - MLflowSession: fault-tolerant MLflow logging wrapper (never fails a training).
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
+import torch
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 
 from shared.data_loader import HierarchicalProductDataset
+
+_WEIGHTING_SCHEMES = ("none", "inv_sqrt", "inv")
+
+
+def compute_class_weights(
+    real_counts: Mapping,
+    classes: Sequence,
+    scheme: str,
+    normalize: bool = True,
+) -> torch.Tensor | None:
+    """Per-class loss weights from real (non synthetic) training counts.
+
+    Classes absent from ``real_counts`` (100% synthetic, e.g. SYNTH-ORPH
+    templates) get the weight of the smallest non-zero count.
+
+    Args:
+        real_counts: Mapping class -> real sample count (Counter).
+        classes: Class keys ordered by encoded index; position i in the
+            returned tensor is the weight of classes[i].
+        scheme: "none" (returns None), "inv_sqrt" (1/sqrt(n)) or "inv" (1/n).
+        normalize: Rescale weights so their mean is 1.
+
+    Returns:
+        Float tensor of shape [len(classes)], or None if scheme is "none".
+    """
+    if scheme == "none":
+        return None
+    if scheme not in _WEIGHTING_SCHEMES:
+        raise ValueError(
+            f"scheme invalide: {scheme!r} (attendu: {', '.join(_WEIGHTING_SCHEMES)})"
+        )
+    counts = [real_counts.get(c, 0) for c in classes]
+    nonzero = [n for n in counts if n > 0]
+    if not nonzero:
+        raise ValueError("compute_class_weights: aucun compte réel non nul")
+    floor = min(nonzero)
+    effective = torch.tensor(
+        [n if n > 0 else floor for n in counts], dtype=torch.float32
+    )
+    weights = effective.rsqrt() if scheme == "inv_sqrt" else effective.reciprocal()
+    if normalize:
+        weights = weights / weights.mean()
+    return weights
+
+
+def compute_logit_adjustment(
+    real_counts: Mapping,
+    classes: Sequence,
+    tau: float,
+) -> torch.Tensor | None:
+    """tau * log(prior) per class, with add-one smoothed priors.
+
+    Used as the logit offset of the logit-adjusted loss (Menon et al., 2021):
+    the trainer adds it to the logits inside the loss, so raw logits at
+    inference are implicitly corrected for the class priors.
+
+    Args:
+        real_counts: Mapping class -> real sample count (Counter).
+        classes: Class keys ordered by encoded index.
+        tau: Adjustment temperature. 0 disables (returns None).
+
+    Returns:
+        Float tensor of shape [len(classes)], or None if tau == 0.
+    """
+    if tau == 0:
+        return None
+    counts = torch.tensor(
+        [real_counts.get(c, 0) for c in classes], dtype=torch.float32
+    )
+    priors = (counts + 1.0) / (counts + 1.0).sum()
+    return tau * torch.log(priors)
+
+
+def resolve_rebalancing(
+    data: dict,
+    num_classes_l1: int,
+    num_classes_l2: int,
+    class_weighting: str = "none",
+    logit_adjustment_tau: float = 0.0,
+) -> dict[str, torch.Tensor | None]:
+    """Build the HYDRALoss rebalancing tensors from a loader data dict.
+
+    Guard (règle « doublons OU pondération ») : enabling class weighting or
+    logit adjustment on a train split still containing the oversampled
+    SYNTH-OVS/OVL duplicates would double-correct the imbalance. The data
+    must come from prepare_hierarchical_data_from_splits with
+    synthetic_policy="drop_oversampled".
+
+    Returns:
+        Dict with keys class_weights_l1, class_weights_l2,
+        logit_adjustment_l1, logit_adjustment_l2 (Tensor or None), ready to
+        be passed as HYDRALoss kwargs. All None when both options are off.
+    """
+    tensors: dict[str, torch.Tensor | None] = {
+        "class_weights_l1": None,
+        "class_weights_l2": None,
+        "logit_adjustment_l1": None,
+        "logit_adjustment_l2": None,
+    }
+    if class_weighting == "none" and logit_adjustment_tau == 0.0:
+        return tensors
+    if data.get("synthetic_policy") != "drop_oversampled":
+        raise ValueError(
+            "class_weighting / logit_adjustment_tau exigent un train sans "
+            "doublons oversamplés (règle « doublons OU pondération ») : "
+            "rechargez les données avec synthetic_policy='drop_oversampled' "
+            f"(actuel: {data.get('synthetic_policy')!r})"
+        )
+    if "real_class_counts_l1" not in data or "real_class_counts_l2" not in data:
+        raise ValueError(
+            "real_class_counts_l1/l2 absents du dict data : rechargez les "
+            "données avec un shared/data_loader.py à jour "
+            "(prepare_hierarchical_data_from_splits)"
+        )
+    classes_l1 = range(num_classes_l1)
+    classes_l2 = range(num_classes_l2)
+    tensors["class_weights_l1"] = compute_class_weights(
+        data["real_class_counts_l1"], classes_l1, class_weighting
+    )
+    tensors["class_weights_l2"] = compute_class_weights(
+        data["real_class_counts_l2"], classes_l2, class_weighting
+    )
+    tensors["logit_adjustment_l1"] = compute_logit_adjustment(
+        data["real_class_counts_l1"], classes_l1, logit_adjustment_tau
+    )
+    tensors["logit_adjustment_l2"] = compute_logit_adjustment(
+        data["real_class_counts_l2"], classes_l2, logit_adjustment_tau
+    )
+    return tensors
 
 
 def get_linear_schedule_with_warmup(

@@ -29,12 +29,13 @@ from transformers import AutoTokenizer
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from shared.data_loader import build_parent_child_matrix
-from shared.metrics import compute_all_metrics
+from shared.metrics import compute_all_metrics, compute_f1_by_tranche
 from shared.training_utils import (
     EarlyStopping,
     MLflowSession,
     get_linear_schedule_with_warmup,
     make_hierarchical_loader,
+    resolve_rebalancing,
 )
 from shared.utils import ENCODERS, enforce_hierarchy, get_device, set_seed
 
@@ -82,6 +83,11 @@ class HYDRATrainer:
         seed: Random seed.
         warmup_ratio: Fraction of total steps for linear warmup.
         fp16: Enable mixed precision training.
+        class_weighting: Per-class loss weights from the real (non synthetic)
+            train counts: 'none', 'inv_sqrt' or 'inv'. Requires data loaded
+            with synthetic_policy='drop_oversampled'.
+        logit_adjustment_tau: Temperature of the logit-adjusted loss
+            (Menon et al., 2021). 0 disables. Same data requirement.
     """
 
     def __init__(
@@ -116,12 +122,16 @@ class HYDRATrainer:
         checkpoint_every_n_steps: int = 10_000,
         condition_l2_on_l1: bool = False,
         experiment_suffix: str = "",
+        class_weighting: str = "none",
+        logit_adjustment_tau: float = 0.0,
     ):
         set_seed(seed)
         self.resume_from = resume_from
         self.checkpoint_every_n_steps = checkpoint_every_n_steps
         self.condition_l2_on_l1 = condition_l2_on_l1
         self.experiment_suffix = experiment_suffix
+        self.class_weighting = class_weighting
+        self.logit_adjustment_tau = logit_adjustment_tau
         self.device = get_device()
         self.variant = variant
         self.encoder_name = encoder_name
@@ -154,6 +164,17 @@ class HYDRATrainer:
         self.l2_to_l1_mapping = data["l2_to_l1_mapping"]
         self.num_classes_l1 = data["num_classes_l1"]
         self.num_classes_l2 = data["num_classes_l2"]
+
+        # Rééquilibrage des pertes (None partout quand les options sont off)
+        rebalancing = resolve_rebalancing(
+            data, self.num_classes_l1, self.num_classes_l2,
+            class_weighting=class_weighting,
+            logit_adjustment_tau=logit_adjustment_tau,
+        )
+        rebalancing = {
+            key: tensor.to(self.device) if tensor is not None else None
+            for key, tensor in rebalancing.items()
+        }
 
         # Parent-child matrix for hierarchy enforcement
         self.parent_child_matrix = build_parent_child_matrix(
@@ -193,6 +214,7 @@ class HYDRATrainer:
             level_weight_l1=level_weight_l1,
             focal_gamma=focal_gamma,
             use_focal=use_focal,
+            **rebalancing,
         )
 
         # Optimizer
@@ -257,6 +279,11 @@ class HYDRATrainer:
             all_labels_l2, all_preds_l2,
             self.l2_to_l1_mapping,
         )
+        real_counts_l2 = self.data.get("real_class_counts_l2")
+        if real_counts_l2 is not None:
+            metrics["f1_l2_by_tranche"] = compute_f1_by_tranche(
+                all_labels_l2, all_preds_l2, real_counts_l2
+            )
         metrics["_preds_l1"] = all_preds_l1
         metrics["_preds_l2"] = all_preds_l2
         metrics["_labels_l1"] = all_labels_l1
@@ -349,6 +376,8 @@ class HYDRATrainer:
             "focal_gamma": self.focal_gamma,
             "early_stopping_patience": self.early_stopping_patience,
             "early_stopping_min_delta": self.early_stopping_min_delta,
+            "class_weighting": self.class_weighting,
+            "logit_adjustment_tau": self.logit_adjustment_tau,
             "gpu_type": gpu_type,
         })
 
