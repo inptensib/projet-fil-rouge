@@ -162,7 +162,7 @@ model = torch.load(f"{local_dir}/hydra-local-camembert/best_model.pt", map_locat
 ```
 
 Pour recharger avec l'architecture complète, cloner le repo du projet et utiliser
-`02_hydra/src/models.py::create_hydra_model()`.
+`rakuten/models/hydra/models.py::create_hydra_model()`.
 """
 
 

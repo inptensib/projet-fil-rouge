@@ -1,6 +1,6 @@
 """Training orchestrator for the FlatHydra baseline.
 
-Mirrors 02_hydra/src/trainer.py in structure, adapted for the Flat
+Mirrors rakuten/models/hydra/trainer.py in structure, adapted for the Flat
 architecture (single unified head, unified_logits sliced for L1/L2).
 
 Public API:

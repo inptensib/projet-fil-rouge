@@ -29,9 +29,9 @@ jupyter nbconvert \
     --to notebook \
     --execute \
     --output word2vec_baseline_executed.ipynb \
-    --output-dir 01_baselines/notebooks/ \
+    --output-dir notebooks/baselines/ \
     --ExecutePreprocessor.timeout=-1 \
     --ExecutePreprocessor.kernel_name=python3 \
-    01_baselines/notebooks/word2vec_baseline.ipynb
+    notebooks/baselines/word2vec_baseline.ipynb
 
 echo "=== Terminé : $(date) ==="

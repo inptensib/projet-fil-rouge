@@ -28,9 +28,9 @@ jupyter nbconvert \
     --to notebook \
     --execute \
     --output tfidf_baseline_executed.ipynb \
-    --output-dir 01_baselines/notebooks/ \
+    --output-dir notebooks/baselines/ \
     --ExecutePreprocessor.timeout=-1 \
     --ExecutePreprocessor.kernel_name=python3 \
-    01_baselines/notebooks/tfidf_baseline.ipynb
+    notebooks/baselines/tfidf_baseline.ipynb
 
 echo "=== Terminé : $(date) ==="
