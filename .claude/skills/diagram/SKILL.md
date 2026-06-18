@@ -19,7 +19,7 @@ Generation de diagrammes techniques professionnels en Mermaid (markdown) et draw
 Exemples :
 - `/diagram mermaid arch` — architecture en Mermaid, affiche dans le chat
 - `/diagram drawio flow pipeline.drawio` — flowchart draw.io, ecrit dans le fichier
-- `/diagram mermaid class rakuten/models/hydra/docs/classes.md` — diagramme de classes dans un fichier
+- `/diagram mermaid class docs/diagrams/classes.md` — diagramme de classes dans un fichier
 
 ## Taches
 

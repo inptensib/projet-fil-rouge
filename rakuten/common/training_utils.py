@@ -131,7 +131,7 @@ def resolve_rebalancing(
     if "real_class_counts_l1" not in data or "real_class_counts_l2" not in data:
         raise ValueError(
             "real_class_counts_l1/l2 absents du dict data : rechargez les "
-            "données avec un shared/data_loader.py à jour "
+            "données avec un rakuten/common/data_loader.py à jour "
             "(prepare_hierarchical_data_from_splits)"
         )
     classes_l1 = range(num_classes_l1)

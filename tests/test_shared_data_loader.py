@@ -1,4 +1,4 @@
-"""Tests for shared/data_loader.py."""
+"""Tests for rakuten/common/data_loader.py."""
 
 from __future__ import annotations
 

@@ -24,7 +24,7 @@ class FlatHydra(nn.Module):
     Args:
         encoder_name: HuggingFace model identifier (e.g. 'camembert-base').
         num_classes_l1: Number of L1 classes (157).
-        num_classes_l2: Number of L2 classes (6100+).
+        num_classes_l2: Number of L2 classes (~5 777 en v2 ; dérivé des données).
         pooling: Pooling strategy applied after projection ('cls', 'mean', 'max', 'last').
         project_embedding: Project last_hidden_state from d to d*num_levels before pooling.
         dropout: Dropout rate in the unified classifier head.
@@ -69,7 +69,7 @@ class FlatHydra(nn.Module):
             self.embedding_projector = None
             total_input = d  # 768
 
-        total_labels = num_classes_l1 + num_classes_l2  # 157 + 6100+ = 6257+
+        total_labels = num_classes_l1 + num_classes_l2  # 157 + num_classes_l2 (= 5 934 en v2)
 
         self.unified_classifier = nn.Sequential(
             nn.Linear(total_input, d * 2),

@@ -11,7 +11,7 @@ Features:
 - Early stopping on f1_l2_macro.
 - Gradient accumulation with final flush.
 - MLflow logging (hyperparams, per-epoch metrics, model artifact).
-- Config loaded from configs/default.yaml.
+- Config loaded from configs/hydra/default.yaml.
 """
 
 from __future__ import annotations

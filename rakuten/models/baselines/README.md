@@ -43,6 +43,10 @@ python -m rakuten.models.baselines.bert_flat_classifier --data_path <chemin>/pro
 | `flat_hydra_mbert.yaml`      | `bert-base-multilingual-cased`   | 2× P100     | 128   | mBERT (179M params, plus lourd que CamemBERT) |
 | `flat_hydra_title_3090.yaml` | `camembert-base`                 | 2× RTX 3090 | 512   | Title-only (`max_length: 128`, `lr: 4.9e-5` scaling √k) |
 
+> Les configs ciblant le **dataset v2** dé-fuité (suffixe `_v2`, p.ex.
+> `flat_hydra_v2.yaml`, `flat_hydra_camembert_v2.yaml`, `flat_hydra_mbert_v2.yaml`)
+> activent le kit de rééquilibrage v2 — cf. [docs/PIPELINE.md](../../../docs/PIPELINE.md).
+
 ## Structure
 
 ```

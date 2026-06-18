@@ -36,7 +36,7 @@ Référence officielle :
 ## Contexte et objectif
 
 Le papier HYDRA définit `Flat` comme la **baseline de référence** : un seul
-modèle qui prédit L1 (157 classes) et L2 (5 777 classes) simultanément via
+modèle qui prédit L1 (157 classes) et L2 simultanément via
 une unique tête unifiée, sans aucune modélisation de la hiérarchie.
 
 C'est la borne inférieure à battre avec les variantes `local`, `global`,

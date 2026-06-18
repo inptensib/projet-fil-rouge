@@ -19,7 +19,7 @@ Implémentation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hi
 - **FocalLoss** : `FL(p_t) = -(1 - p_t)^gamma * log(p_t)` -- concentre l'apprentissage sur les cas difficiles (gamma=0 revient à la CE standard)
 - **HYDRALoss** : `L = w_L1 * L1 + w_L2 * L2 [+ w_global * L_global]` -- combine CrossEntropy ou FocalLoss par niveau
 
-## Configuration (`configs/default.yaml`)
+## Configuration (`configs/hydra/default.yaml`)
 
 | Paramètre | Default | Description |
 |-----------|---------|-------------|

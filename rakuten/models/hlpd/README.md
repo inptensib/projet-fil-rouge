@@ -3,6 +3,11 @@
 Implémentation de **HLPD** (Torba, Laclau et al., ECIR 2025) pour la classification
 hiérarchique multi-label sur le dataset Rakuten (157 L1 × 5 777 L2 en v2).
 
+> **Note sur les dimensions.** Les schémas et coûts ci-dessous emploient
+> `L = 6 283` (= 157 + 6 126), valeur du **dataset v1** sur lequel HLPD a été
+> entraîné (F1 L2 = 61.5 %). Sur le dataset v2 dé-fuité, `L = 5 934` (= 157 + 5 777).
+> L'architecture est identique ; seule la taille de l'espace de labels change.
+
 ## Idée clé
 
 Contrairement à HYDRA (têtes parallèles), HLPD utilise un **décodeur Transformer
@@ -52,7 +57,7 @@ BCE multiclass pour L=6283 classes.
 > | Paramètre | Papier | Notre config | Impact |
 > |---|---|---|---|
 > | `num_decoder_layers` | 2 | **1** | ×2 sur le décodeur |
-> | `nhead` | 2 | **2** | ×2 sur l'attention O(L²) |
+> | `nhead` | 4 | **2** | ×2 sur l'attention O(L²) |
 > | `gradient_checkpointing` | — | **false** | VRAM suffisante |
 > | `batch_size` | — | **16** (8/GPU) | Throughput maximal |
 >
