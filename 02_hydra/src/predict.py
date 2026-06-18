@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader, Dataset
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from shared.utils import ENCODERS, enforce_hierarchy
+from rakuten.common.utils import ENCODERS, enforce_hierarchy
 
 from .models import create_hydra_model
 

@@ -287,7 +287,7 @@ class TestFlatHydraTrainer:
         data = _make_data()
         trainer = FlatHydraTrainer(data=data, config=self._config())
 
-        from shared.data_loader import HierarchicalProductDataset
+        from rakuten.common.data_loader import HierarchicalProductDataset
         from torch.utils.data import DataLoader
 
         ds = HierarchicalProductDataset(
@@ -379,7 +379,7 @@ class TestFlatHydraTrainer:
         data["real_class_counts_l2"] = Counter(data["y_l2_train"])
         trainer = FlatHydraTrainer(data=data, config=self._config())
 
-        from shared.data_loader import HierarchicalProductDataset
+        from rakuten.common.data_loader import HierarchicalProductDataset
         from torch.utils.data import DataLoader
 
         ds = HierarchicalProductDataset(

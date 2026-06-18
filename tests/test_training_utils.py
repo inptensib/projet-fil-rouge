@@ -11,15 +11,13 @@ from collections import Counter
 from pathlib import Path
 from unittest import mock
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 import numpy as np
 import pytest
 import torch
 
-_PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(_PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(_PROJECT_ROOT))
-
-from shared.training_utils import (  # noqa: E402
+from rakuten.common.training_utils import (
     EarlyStopping,
     MLflowSession,
     compute_class_weights,

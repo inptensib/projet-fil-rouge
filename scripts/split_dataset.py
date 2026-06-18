@@ -17,7 +17,7 @@ from collections import Counter
 
 from sklearn.model_selection import train_test_split
 
-from shared.data_loader import extract_level_2
+from rakuten.common.data_loader import extract_level_2
 
 logger = logging.getLogger(__name__)
 

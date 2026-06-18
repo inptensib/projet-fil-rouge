@@ -45,8 +45,8 @@ if _ROOT not in sys.path:
 sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
 
 from src.trainer import HYDRATrainer
-from shared.data_loader import prepare_hierarchical_data_from_splits
-from shared.metrics import compute_per_class_f1
+from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
+from rakuten.common.metrics import compute_per_class_f1
 
 # flat_trainer (01_baselines/src/) et HYDRATrainer (02_hydra/src/) partagent le même nom
 # de paquet `src`, ce qui provoque un conflit sys.path. On charge 01_baselines/src comme

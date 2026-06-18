@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
 from src.config import map_config
 from src.trainer import HYDRATrainer
 
-from shared.data_loader import prepare_hierarchical_data, prepare_hierarchical_data_from_splits
+from rakuten.common.data_loader import prepare_hierarchical_data, prepare_hierarchical_data_from_splits
 
 
 def main():

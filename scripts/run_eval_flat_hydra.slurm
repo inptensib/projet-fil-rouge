@@ -37,7 +37,7 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "01_baselines"))
 
 import torch
-from shared.data_loader import prepare_hierarchical_data_from_splits
+from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
 from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer
 
 CONFIG   = "01_baselines/configs/flat_hydra_3090.yaml"

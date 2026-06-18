@@ -34,7 +34,7 @@ for p in (_ROOT, _HLPD_ROOT):
         sys.path.insert(0, str(p))
 
 from src import HLPDConfig, HLPDTrainer           # noqa: E402
-from shared.data_loader import (                   # noqa: E402
+from rakuten.common.data_loader import (                   # noqa: E402
     prepare_hierarchical_data,
     prepare_hierarchical_data_from_splits,
 )

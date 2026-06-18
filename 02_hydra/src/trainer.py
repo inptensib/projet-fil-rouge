@@ -28,16 +28,16 @@ from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from shared.data_loader import build_parent_child_matrix
-from shared.metrics import compute_all_metrics, compute_f1_by_tranche
-from shared.training_utils import (
+from rakuten.common.data_loader import build_parent_child_matrix
+from rakuten.common.metrics import compute_all_metrics, compute_f1_by_tranche
+from rakuten.common.training_utils import (
     EarlyStopping,
     MLflowSession,
     get_linear_schedule_with_warmup,
     make_hierarchical_loader,
     resolve_rebalancing,
 )
-from shared.utils import ENCODERS, enforce_hierarchy, get_device, set_seed
+from rakuten.common.utils import ENCODERS, enforce_hierarchy, get_device, set_seed
 
 from .losses import HYDRALoss
 from .models import create_hydra_model
@@ -57,7 +57,7 @@ class HYDRATrainer:
     """Training orchestrator for HYDRA models.
 
     Args:
-        data: Dictionary from shared.data_loader.prepare_hierarchical_data().
+        data: Dictionary from rakuten.common.data_loader.prepare_hierarchical_data().
         encoder_name: Key from ENCODERS dict (e.g., 'CamemBERT').
         variant: HYDRA variant ('local', 'global', 'nested').
         batch_size: Training batch size.
@@ -560,7 +560,7 @@ class HYDRATrainer:
         try:
             import matplotlib.pyplot as plt
 
-            from shared.metrics import plot_training_curves
+            from rakuten.common.metrics import plot_training_curves
 
             self._mlflow.log_metrics({
                 "train_loss": avg_train_loss,
@@ -590,7 +590,7 @@ class HYDRATrainer:
         """Log the L1 and L2 (top 50) confusion matrix figures to MLflow."""
         import matplotlib.pyplot as plt
 
-        from shared.metrics import plot_confusion_matrix
+        from rakuten.common.metrics import plot_confusion_matrix
 
         v_preds_l1 = val_metrics.get("_preds_l1", [])
         v_labels_l1 = val_metrics.get("_labels_l1", [])
@@ -615,7 +615,7 @@ class HYDRATrainer:
         """Log the per-class F1 figures and JSON dicts (L1 and L2) to MLflow."""
         import matplotlib.pyplot as plt
 
-        from shared.metrics import compute_per_class_f1, plot_per_class_f1
+        from rakuten.common.metrics import compute_per_class_f1, plot_per_class_f1
 
         v_preds_l1 = val_metrics.get("_preds_l1", [])
         v_labels_l1 = val_metrics.get("_labels_l1", [])
@@ -636,7 +636,7 @@ class HYDRATrainer:
 
     def _log_explainability(self, val_metrics: dict) -> None:
         """Generate the validation explainability HTML report and log it to MLflow."""
-        from shared.explainability import generate_explainability_report
+        from rakuten.common.explainability import generate_explainability_report
 
         X_val = self.data["X_val"]
         val_texts = X_val.tolist() if hasattr(X_val, "tolist") else list(X_val)

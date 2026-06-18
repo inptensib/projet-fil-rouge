@@ -29,8 +29,8 @@ from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from shared.metrics import compute_all_metrics, compute_f1_by_tranche  # noqa: E402
-from shared.training_utils import (  # noqa: E402
+from rakuten.common.metrics import compute_all_metrics, compute_f1_by_tranche  # noqa: E402
+from rakuten.common.training_utils import (  # noqa: E402
     EarlyStopping,
     MLflowSession,
     get_linear_schedule_with_warmup as _get_linear_schedule_with_warmup,
@@ -384,7 +384,7 @@ class FlatHydraTrainer:
             return
         try:
             import matplotlib.pyplot as plt
-            from shared.metrics import (
+            from rakuten.common.metrics import (
                 compute_per_class_f1,
                 plot_confusion_matrix,
                 plot_per_class_f1,

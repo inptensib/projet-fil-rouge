@@ -19,7 +19,7 @@ import torch
 from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data import DataLoader
 
-from shared.data_loader import HierarchicalProductDataset
+from rakuten.common.data_loader import HierarchicalProductDataset
 
 _WEIGHTING_SCHEMES = ("none", "inv_sqrt", "inv")
 

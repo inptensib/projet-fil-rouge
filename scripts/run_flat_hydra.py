@@ -38,7 +38,7 @@ if str(_BASELINES_ROOT) not in sys.path:
     sys.path.insert(0, str(_BASELINES_ROOT))
 
 from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer  # noqa: E402
-from shared.data_loader import (                                  # noqa: E402
+from rakuten.common.data_loader import (                                  # noqa: E402
     prepare_hierarchical_data,
     prepare_hierarchical_data_from_splits,
 )

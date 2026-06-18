@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from shared.text_normalization import normalize_text
+from rakuten.common.text_normalization import normalize_text
 
 REAL_WORLD_INPUTS = [
     "Connecteur Sma - Sma Femme - RÃ©trÃ©cissement - DorÃ© - Par 1 Morceau (S)",

@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from shared.utils import count_parameters, get_device, set_seed
+from rakuten.common.utils import count_parameters, get_device, set_seed
 
 
 class TestSetSeed:

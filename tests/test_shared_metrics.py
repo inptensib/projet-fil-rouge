@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sklearn.metrics import f1_score
 
-from shared.metrics import (
+from rakuten.common.metrics import (
     compute_all_metrics,
     compute_f1_by_tranche,
     compute_f1_metrics,

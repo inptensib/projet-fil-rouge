@@ -39,8 +39,8 @@ sys.path.insert(0, str(Path(".").resolve()))
 
 import fasttext
 
-from shared.data_loader import prepare_hierarchical_data_from_splits
-from shared.metrics import compute_all_metrics, compute_per_class_f1
+from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
+from rakuten.common.metrics import compute_all_metrics, compute_per_class_f1
 
 N_JOBS      = int(os.environ.get("N_JOBS", 10))
 SEED        = 42

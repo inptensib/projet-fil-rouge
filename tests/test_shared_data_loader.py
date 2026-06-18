@@ -7,7 +7,7 @@ import os
 
 import torch
 
-from shared.data_loader import (
+from rakuten.common.data_loader import (
     build_parent_child_mapping,
     build_parent_child_matrix,
     extract_level_2,
@@ -393,7 +393,7 @@ class TestNormalize:
             assert all("&eacute;" in text for text in result[key])
 
     def test_single_file_path_normalize(self, tmp_path):
-        from shared.data_loader import prepare_hierarchical_data
+        from rakuten.common.data_loader import prepare_hierarchical_data
 
         records = [
             _make_record(str(i), f"{self.RAW} {i}", "Épicerie", "Café" if i % 2 else "Thé")

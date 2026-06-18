@@ -33,8 +33,8 @@ from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from shared.metrics import compute_all_metrics  # noqa: E402
-from shared.training_utils import (             # noqa: E402
+from rakuten.common.metrics import compute_all_metrics  # noqa: E402
+from rakuten.common.training_utils import (             # noqa: E402
     EarlyStopping,
     MLflowSession,
     get_linear_schedule_with_warmup as _get_linear_schedule_with_warmup,

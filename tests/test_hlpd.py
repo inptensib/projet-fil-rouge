@@ -378,7 +378,7 @@ class TestHLPDTrainer:
             config=_trainer_config(Path(tempfile.mkdtemp())),
         )
 
-        from shared.data_loader import HierarchicalProductDataset
+        from rakuten.common.data_loader import HierarchicalProductDataset
         from torch.utils.data import DataLoader
 
         ds = HierarchicalProductDataset(

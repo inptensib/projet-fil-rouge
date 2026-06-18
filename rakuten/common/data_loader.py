@@ -17,7 +17,7 @@ import numpy as np
 import pandas as pd
 import torch
 
-from shared.text_normalization import normalize_text
+from rakuten.common.text_normalization import normalize_text
 
 def _cpu_has_avx2() -> bool:
     """Check if CPU supports AVX2 (required by Polars)."""
