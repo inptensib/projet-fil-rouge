@@ -24,7 +24,6 @@ import gc
 import json
 import os
 import pickle
-import sys
 import time
 from typing import Optional
 
@@ -38,14 +37,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
 
-# ---------------------------------------------------------------------------
-# Cross-directory import from shared/
-# ---------------------------------------------------------------------------
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
-
-from rakuten.common.data_loader import load_random_sample  # noqa: E402
+from rakuten.common.data_loader import load_random_sample
 
 # ---------------------------------------------------------------------------
 # Constants

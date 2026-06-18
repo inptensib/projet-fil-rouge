@@ -6,15 +6,10 @@ with optional hierarchical enforcement.
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import torch
 import torch.nn.functional as F
 from torch.amp import autocast
 from torch.utils.data import DataLoader, Dataset
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from rakuten.common.utils import ENCODERS, enforce_hierarchy
 

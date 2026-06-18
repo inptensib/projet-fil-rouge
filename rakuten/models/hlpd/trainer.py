@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import pickle
-import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -30,8 +29,6 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from rakuten.common.metrics import compute_all_metrics  # noqa: E402
 from rakuten.common.training_utils import (             # noqa: E402

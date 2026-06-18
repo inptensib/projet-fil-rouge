@@ -14,7 +14,6 @@ Features:
 
 from __future__ import annotations
 
-import sys
 import time
 from pathlib import Path
 
@@ -25,8 +24,6 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from rakuten.common.data_loader import build_parent_child_matrix
 from rakuten.common.metrics import compute_all_metrics, compute_f1_by_tranche

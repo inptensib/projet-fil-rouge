@@ -48,8 +48,8 @@ Implémentation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hi
 *Note : exemple d'API bas-niveau. Pour entraîner, passer par HYDRATrainer via scripts/run_train.py (voir docs/PIPELINE.md).*
 
 ```python
-from src.models import create_hydra_model
-from src.losses import HYDRALoss
+from rakuten.models.hydra.models import create_hydra_model
+from rakuten.models.hydra.losses import HYDRALoss
 
 model = create_hydra_model(
     variant="local", encoder_name="camembert-base",

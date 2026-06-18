@@ -13,19 +13,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from typing import Optional
 
 import pandas as pd
 from sklearn.metrics import classification_report, f1_score
-
-# ---------------------------------------------------------------------------
-# Cross-directory import from shared/
-# ---------------------------------------------------------------------------
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if _PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, _PROJECT_ROOT)
-
 
 # ---------------------------------------------------------------------------
 # Core evaluation
