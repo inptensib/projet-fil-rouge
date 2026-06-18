@@ -1,4 +1,4 @@
-"""Tests for 02b_hlpd/src/ — HLPD model, losses, attention bias, trainer.
+"""Tests for rakuten/models/hlpd/ — HLPD model, losses, attention bias, trainer.
 
 Uses mocked HuggingFace models to avoid downloading weights.
 All tests run on CPU.
@@ -15,21 +15,10 @@ import pytest
 import torch
 import torch.nn as nn
 
-from helpers import import_from_hlpd                             # noqa: E402
-
-_attn_mod     = import_from_hlpd("attention_bias")
-build_M_hiera = _attn_mod.build_M_hiera
-
-_losses_mod = import_from_hlpd("losses")
-ZLPRLoss    = _losses_mod.ZLPRLoss
-
-_models_mod     = import_from_hlpd("models")
-HLPD            = _models_mod.HLPD
-HLPDDecoderLayer = _models_mod.HLPDDecoderLayer
-
-_trainer_mod = import_from_hlpd("trainer")
-HLPDConfig   = _trainer_mod.HLPDConfig
-HLPDTrainer  = _trainer_mod.HLPDTrainer
+from rakuten.models.hlpd.attention_bias import build_M_hiera
+from rakuten.models.hlpd.losses import ZLPRLoss
+from rakuten.models.hlpd.models import HLPD, HLPDDecoderLayer
+from rakuten.models.hlpd.trainer import HLPDConfig, HLPDTrainer
 
 # ---------------------------------------------------------------------------
 # Constants — small enough for CPU tests
