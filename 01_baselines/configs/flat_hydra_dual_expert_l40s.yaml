@@ -1,0 +1,74 @@
+# ==============================================================================
+# FlatHydra Dual-Expert — L40S (48 GB GDDR6, single GPU)
+# ==============================================================================
+# batch_size=128 : ~26 GB/48 GB (~54% VRAM) — safe, bon compromis
+# num_workers=8  : 10 CPUs alloués, prefetching compensant la bande passante GDDR6
+# Temps estimé   : ~4–5 h (early stopping epoch 4–6)
+# ==============================================================================
+
+# ---------------------------------------------------------------------------
+# Encoder
+# ---------------------------------------------------------------------------
+encoder: camembert-base
+max_length: 256
+freeze_encoder: false
+
+# ---------------------------------------------------------------------------
+# Architecture
+# ---------------------------------------------------------------------------
+project_embedding: true
+pooling: cls
+dropout: 0.2
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+batch_size: 128            # ~26 GB/48 GB — GDDR6 compense avec prefetching CPU agressif
+epochs: 10
+lr: 3.5e-5
+weight_decay: 0.01
+warmup_ratio: 0.1
+max_grad_norm: 1.0
+fp16: true
+num_workers: 8             # L40S = GDDR6 (864 GB/s) — num_workers élevé pour masquer latence
+seed: 42
+
+# ---------------------------------------------------------------------------
+# Early stopping
+# ---------------------------------------------------------------------------
+early_stopping_patience: 2
+early_stopping_min_delta: 0.001
+
+# ---------------------------------------------------------------------------
+# Loss
+# ---------------------------------------------------------------------------
+use_focal: false
+focal_gamma: 2.0
+level_weight_l1: 0.5
+
+# --- Dual-Expert: loss L2 ---
+l2_loss_type: focal_ce
+focal_gamma_l2: 2.0
+use_l2_class_weights: true
+l2_class_weights_path: ""  # vide = auto-construction depuis les labels train
+
+# ---------------------------------------------------------------------------
+# Label-path augmentation
+# ---------------------------------------------------------------------------
+label_path_aug_enabled: true       # passer à true pour l'expérience Run 3
+label_path_aug_apply_to: rare_only
+label_path_aug_rare_threshold: 100
+label_path_aug_factor_rare: 3
+label_path_aug_factor_medium: 2
+label_path_aug_mask_prob: 0.3       # inactif (allow_full_path=False par défaut)
+
+# ---------------------------------------------------------------------------
+# Data
+# ---------------------------------------------------------------------------
+use_description: true
+
+# ---------------------------------------------------------------------------
+# Logging & output
+# ---------------------------------------------------------------------------
+experiment_name: dual_expert_l40s
+save_dir: models/dual_expert_l40s
