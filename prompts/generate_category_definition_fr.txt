@@ -25,7 +25,7 @@ Exemples produits associés à cette L2 :
 {sampled_products}
 
 Réponds uniquement en JSON valide avec ce schéma :
-{
+{{
   "definition_fr": "...",
   "included_products": ["..."],
   "excluded_products": ["..."],
@@ -33,4 +33,4 @@ Réponds uniquement en JSON valide avec ce schéma :
   "negative_signals": ["..."],
   "ambiguities": ["..."],
   "confidence": "high|medium|low"
-}
+}}
