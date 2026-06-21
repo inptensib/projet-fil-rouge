@@ -49,6 +49,7 @@ def _sample_examples(
     n: int = 20,
     seed: int = 42,
     representative: bool = False,
+    confidences: list[float] | None = None,
 ) -> list[str]:
     """Sample up to n product texts.
 
@@ -56,10 +57,17 @@ def _sample_examples(
     into thirds by character length (short / medium / long) and samples equally
     from each stratum to capture the breadth of product descriptions in the
     category.  Falls back to random sampling if a stratum is empty.
+
+    When confidences is provided, selects the n products with the lowest model
+    confidence (hardest cases), ignoring representative and seed.
     """
     import random
     if len(texts) <= n:
         return texts
+    if confidences is not None:
+        # Least confident first — best examples for discriminative definitions
+        sorted_pairs = sorted(zip(confidences, texts), key=lambda x: x[0])
+        return [t for _, t in sorted_pairs[:n]]
     if not representative:
         return random.Random(seed).sample(texts, n)
 
@@ -83,6 +91,86 @@ def _sample_examples(
         pool = [t for t in texts if t not in set(sampled)]
         sampled.extend(rng.sample(pool, min(remaining, len(pool))))
     return sampled[:n]
+
+
+def _compute_confidence_scores(
+    texts: list[str],
+    checkpoint_dir: str | Path,
+    num_classes_l1: int,
+    batch_size: int = 64,
+) -> list[float]:
+    """Run FlatHydra inference and return max L2 confidence per sample.
+
+    Args:
+        texts: Product texts (designation [+ description]).
+        checkpoint_dir: FlatHydra checkpoint directory.
+        num_classes_l1: Number of L1 classes (to slice unified logits).
+        batch_size: Tokenization + inference batch size.
+
+    Returns:
+        List of floats in [0, 1], one per text. Lower = model was less confident.
+    """
+    import json
+    import sys
+
+    import torch
+    import torch.nn.functional as F
+    from pathlib import Path as _P
+    from transformers import AutoTokenizer
+
+    d = _P(checkpoint_dir)
+    proj_root = _P(__file__).resolve().parents[1]
+    baselines_root = proj_root / "01_baselines"
+    for p in (proj_root, baselines_root):
+        if str(p) not in sys.path:
+            sys.path.insert(0, str(p))
+
+    from src.flat_model import FlatHydra  # noqa: E402
+
+    with open(d / "config.json") as f:
+        cfg = json.load(f)
+
+    tokenizer = AutoTokenizer.from_pretrained(str(d / "tokenizer"))
+    model = FlatHydra(
+        encoder_name=cfg.get("encoder", "camembert-base"),
+        num_classes_l1=cfg["num_classes_l1"],
+        num_classes_l2=cfg["num_classes_l2"],
+        pooling=cfg.get("pooling", "cls"),
+        project_embedding=cfg.get("project_embedding", True),
+        dropout=0.0,
+    )
+    ckpt = torch.load(d / "best_model.pt", map_location="cpu", weights_only=False)
+    state = ckpt.get("model_state_dict", ckpt)
+    state = {k.replace("module.", ""): v for k, v in state.items()}
+    model.load_state_dict(state)
+    model.eval()
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    max_length = cfg.get("max_length", 256)
+
+    confidences: list[float] = []
+    n_total = len(texts)
+    for i in range(0, n_total, batch_size):
+        batch = [str(t) for t in texts[i: i + batch_size]]
+        enc = tokenizer(
+            batch,
+            max_length=max_length,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+        enc = {k: v.to(device) for k, v in enc.items()}
+        with torch.no_grad():
+            _, unified_logits = model(**enc)
+            logits_l2 = unified_logits[:, num_classes_l1:]
+            probs_l2 = F.softmax(logits_l2, dim=-1)
+            max_conf = probs_l2.max(dim=-1).values
+            confidences.extend(max_conf.cpu().tolist())
+        if (i // batch_size + 1) % 50 == 0:
+            print(f"  [Confidence] {min(i + batch_size, n_total):,}/{n_total:,}")
+
+    return confidences
 
 
 def _build_generation_prompt(
@@ -212,7 +300,22 @@ def main() -> None:
                             "within each category (short / medium / long descriptions). "
                             "Default is random sampling."
                         ))
+    parser.add_argument("--confidence-sampling", action="store_true",
+                        help=(
+                            "Select the N products per category where the model was "
+                            "least confident (lowest max L2 probability). Produces "
+                            "more discriminative definitions for ambiguous categories. "
+                            "Requires --checkpoint."
+                        ))
+    parser.add_argument("--checkpoint", default=None, metavar="DIR",
+                        help="FlatHydra checkpoint directory (required for --confidence-sampling)")
+    parser.add_argument("--confidence-batch-size", type=int, default=64,
+                        help="Batch size for confidence scoring inference")
     args = parser.parse_args()
+
+    if args.confidence_sampling and not args.checkpoint:
+        import argparse as _ap
+        raise _ap.ArgumentTypeError("--confidence-sampling requires --checkpoint")
 
     # Load data
     split_dir = Path(args.split_dir)
@@ -237,6 +340,22 @@ def main() -> None:
     l2_texts: dict[int, list[str]] = defaultdict(list)
     for text, l2 in zip(data["X_train"], data["y_l2_train"]):
         l2_texts[int(l2)].append(str(text))
+
+    # Confidence scores (optional)
+    l2_confidences: dict[int, list[float]] | None = None
+    if args.confidence_sampling:
+        print(f"[GenDefs] Computing confidence scores from {args.checkpoint}...")
+        all_texts = [str(t) for t in data["X_train"]]
+        all_confs = _compute_confidence_scores(
+            all_texts,
+            args.checkpoint,
+            num_classes_l1=num_l1,
+            batch_size=args.confidence_batch_size,
+        )
+        l2_confidences = defaultdict(list)
+        for conf, l2 in zip(all_confs, data["y_l2_train"]):
+            l2_confidences[int(l2)].append(conf)
+        print(f"[GenDefs] Confidence scores computed for {len(all_texts):,} samples.")
 
     # Build L1 → siblings map
     l1_to_l2s: dict[int, list[int]] = defaultdict(list)
@@ -281,11 +400,13 @@ def main() -> None:
             l1_name = str(l1_enc.classes_[l1_id]) if l1_id < len(l1_enc.classes_) else f"L1_{l1_id}"
 
             texts = l2_texts.get(l2_id, [])
+            confs = l2_confidences.get(l2_id) if l2_confidences is not None else None
             sampled = _sample_examples(
                 texts,
                 n=args.examples_per_category,
                 seed=args.seed + l2_id,
                 representative=args.representative_sampling,
+                confidences=confs,
             )
 
             siblings = [
