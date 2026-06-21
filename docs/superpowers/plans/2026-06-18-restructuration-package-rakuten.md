@@ -441,7 +441,7 @@ Run :
   --split-dir ~/fil_rouge/dataset_v2/datasets_finaux --n-samples 2000 \
   --config configs/hydra/default.yaml 2>&1 | head -20
 ```
-(NB : si `configs/` pas encore déplacé — Task 8 — utiliser `02_hydra/configs/default.yaml`.)
+(NB : si `configs/` pas encore déplacé — Task 8 — utiliser `configs/hydra/default.yaml`.)
 Expected : le training démarre (chargement données + « Training HYDRA… »), pas
 d'`ImportError`. Interrompre après confirmation (Ctrl-C).
 
@@ -505,8 +505,8 @@ git commit -m "refactor(restructure): suppression de la gymnastique d'import des
 ### Task 8 : Regrouper les configs YAML
 
 **Files:**
-- Move: `02_hydra/configs/` → `configs/hydra/`, `01_baselines/configs/` →
-  `configs/baselines/`, `02b_hlpd/configs/` → `configs/hlpd/`
+- Move: `configs/hydra/` → `configs/hydra/`, `configs/baselines/` →
+  `configs/baselines/`, `configs/hlpd/` → `configs/hlpd/`
 - Modify: chemins de config dans `scripts/*.slurm`, `scripts/*.py` et docs
 
 **Interfaces:**
@@ -516,17 +516,17 @@ git commit -m "refactor(restructure): suppression de la gymnastique d'import des
 
 ```bash
 mkdir -p configs
-git mv 02_hydra/configs configs/hydra
-git mv 01_baselines/configs configs/baselines
-git mv 02b_hlpd/configs configs/hlpd
+git mv configs/hydra configs/hydra
+git mv configs/baselines configs/baselines
+git mv configs/hlpd configs/hlpd
 rmdir 02_hydra 01_baselines 02b_hlpd 2>/dev/null || true
 ```
 
 - [ ] **Step 2 : Réécrire les chemins de config**
 
 ```bash
-grep -rl "02_hydra/configs\|01_baselines/configs\|02b_hlpd/configs" scripts/ docs/ *.md \
-  | xargs sed -i -E 's#02_hydra/configs#configs/hydra#g; s#01_baselines/configs#configs/baselines#g; s#02b_hlpd/configs#configs/hlpd#g'
+grep -rl "configs/hydra\|configs/baselines\|configs/hlpd" scripts/ docs/ *.md \
+  | xargs sed -i -E 's#configs/hydra#configs/hydra#g; s#configs/baselines#configs/baselines#g; s#configs/hlpd#configs/hlpd#g'
 ```
 
 - [ ] **Step 3 : Vérifier qu'un script charge bien sa config**
@@ -534,7 +534,7 @@ grep -rl "02_hydra/configs\|01_baselines/configs\|02b_hlpd/configs" scripts/ doc
 Run :
 ```bash
 /home/infres/tandriam-25/fil_rouge/venv/bin/python -c "import yaml; print(yaml.safe_load(open('configs/hydra/default.yaml'))['variant'])"
-grep -rn "02_hydra/configs\|01_baselines/configs\|02b_hlpd/configs" scripts/ docs/ || echo "0 chemin obsolète"
+grep -rn "configs/hydra\|configs/baselines\|configs/hlpd" scripts/ docs/ || echo "0 chemin obsolète"
 ```
 Expected : `local` ; `0 chemin obsolète`.
 

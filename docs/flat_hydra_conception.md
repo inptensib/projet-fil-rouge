@@ -7,6 +7,15 @@ les paramètres d'apprentissage et les décisions d'implémentation.
 Référence officielle :
 [`modeling/baselines.py`](https://github.com/FKarl/HYDRA/blob/main/modeling/baselines.py)
 
+> **Note sur les dimensions.** Les shapes de tenseurs de ce document
+> (`L2 = 6 126`, sortie unifiée `6 283 = 157 + 6 126`) correspondent au
+> **dataset v1 d'origine**, sur lequel le modèle FlatHydra de référence a été
+> entraîné (F1 L2 = 71.7 %). Sur le **dataset v2 dé-fuité** (couramment livré),
+> `L2 = 5 777` et la sortie unifiée vaut `5 934 = 157 + 5 777`. L'architecture
+> est identique : la taille de la tête L2 est dérivée des données à l'exécution
+> (`len(l2_encoder.classes_)`), jamais codée en dur. Cf.
+> [METRICS.md](METRICS.md) pour le détail de la fuite v1 → v2.
+
 ---
 
 ## Table des matières
@@ -27,7 +36,7 @@ Référence officielle :
 ## Contexte et objectif
 
 Le papier HYDRA définit `Flat` comme la **baseline de référence** : un seul
-modèle qui prédit L1 (157 classes) et L2 (6 126 classes) simultanément via
+modèle qui prédit L1 (157 classes) et L2 simultanément via
 une unique tête unifiée, sans aucune modélisation de la hiérarchie.
 
 C'est la borne inférieure à battre avec les variantes `local`, `global`,
@@ -220,7 +229,7 @@ confs_l2, preds_l2 = probs_l2.max(dim=-1)
 ## Paramètres d'apprentissage
 
 Tous les paramètres canoniques sont définis dans
-`01_baselines/configs/flat_hydra.yaml`.
+`configs/baselines/flat_hydra.yaml`.
 
 ### Encodeur
 
@@ -442,7 +451,7 @@ Chaque slot vérifie :
 sbatch --job-name=flat-hydra --array=0-9%1 scripts/run_flat_variant.slurm
 # Smoke test :
 sbatch --job-name=flat-hydra-smoke --array=0-2%1 \
-  scripts/run_flat_variant.slurm 01_baselines/configs/flat_hydra.yaml 5000
+  scripts/run_flat_variant.slurm configs/baselines/flat_hydra.yaml 5000
 ```
 
 ---

@@ -32,7 +32,7 @@ export TRANSFORMERS_OFFLINE=1
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
-CONFIG="02b_hlpd/configs/hlpd_3090.yaml"
+CONFIG="configs/hlpd/hlpd_3090.yaml"
 SAVE_DIR=$(python -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/hlpd'))" 2>/dev/null || echo "models/hlpd")
 CKPT="${SAVE_DIR}/checkpoint_latest.pt"
 COMPLETE="${SAVE_DIR}/training_complete.txt"

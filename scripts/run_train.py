@@ -3,9 +3,11 @@
 Maps the YAML config keys to HYDRATrainer constructor parameters.
 
 Usage:
-    python scripts/run_train.py --data shared/dataset/products.jsonl
-    python scripts/run_train.py --data shared/dataset/products.jsonl --n-samples 50000
-    python scripts/run_train.py --config 02_hydra/configs/default.yaml --data shared/dataset/products.jsonl
+    # Splits pré-générés (recommandé — voir scripts/download_dataset.py)
+    python scripts/run_train.py --split-dir dataset/ --config configs/hydra/default.yaml
+    python scripts/run_train.py --split-dir dataset/ --config configs/hydra/default.yaml --n-samples 50000
+    # Fichier JSONL unique (sample + split automatique)
+    python scripts/run_train.py --data <chemin>/products.jsonl --config configs/hydra/default.yaml
 """
 from __future__ import annotations
 
@@ -15,23 +17,16 @@ from pathlib import Path
 
 import yaml
 
-# Ensure project root is on sys.path
-_ROOT = str(Path(__file__).resolve().parents[1])
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
-sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
-
-from src.config import map_config
-from src.trainer import HYDRATrainer
-
-from shared.data_loader import prepare_hierarchical_data, prepare_hierarchical_data_from_splits
+from rakuten.models.hydra.config import map_config
+from rakuten.models.hydra.trainer import HYDRATrainer
+from rakuten.common.data_loader import prepare_hierarchical_data, prepare_hierarchical_data_from_splits
 
 
 def main():
     parser = argparse.ArgumentParser(description="HYDRA single-GPU training")
     parser.add_argument(
         "--config",
-        default="02_hydra/configs/default.yaml",
+        default="configs/hydra/default.yaml",
         help="Path to YAML config file",
     )
     parser.add_argument(
@@ -93,6 +88,8 @@ def main():
             n_samples=args.n_samples if args.n_samples != 10_000 else None,
             seed=seed,
             use_description=cfg.get("use_description", True),
+            synthetic_policy=cfg.get("synthetic_policy", "keep_all"),
+            normalize=cfg.get("normalize_text", False),
         )
     else:
         data_path = Path(args.data)
@@ -105,6 +102,7 @@ def main():
             n_samples=args.n_samples,
             seed=seed,
             use_description=cfg.get("use_description", True),
+            normalize=cfg.get("normalize_text", False),
         )
 
     trainer_kwargs = map_config(cfg)

@@ -1,15 +1,10 @@
-"""Tests for 02_hydra/src/losses.py."""
+"""Tests for rakuten/models/hydra/losses.py."""
 
 from __future__ import annotations
 
 import pytest
 import torch
-from helpers import import_from_hydra
-
-# Import at module level using helper
-_losses_mod = import_from_hydra("losses")
-FocalLoss = _losses_mod.FocalLoss
-HYDRALoss = _losses_mod.HYDRALoss
+from rakuten.models.hydra.losses import FocalLoss, HYDRALoss
 
 
 class TestFocalLoss:
@@ -154,6 +149,108 @@ class TestHYDRALoss:
         y1 = torch.randint(0, 5, (4,))
         y2 = torch.randint(0, 10, (4,))
         loss_fn = HYDRALoss(architecture="local")
+        total, _, _ = loss_fn([l1, l2], None, y1, y2)
+        total.backward()
+        assert l1.grad is not None
+        assert l2.grad is not None
+
+
+class TestRebalancedLosses:
+    """class_weights / logit_adjustment: None = bit-identical, tensors = effective."""
+
+    def _make_inputs(self, num_l1=5, num_l2=10, batch=4, seed=7):
+        torch.manual_seed(seed)
+        logits_l1 = torch.randn(batch, num_l1)
+        logits_l2 = torch.randn(batch, num_l2)
+        labels_l1 = torch.randint(0, num_l1, (batch,))
+        labels_l2 = torch.randint(0, num_l2, (batch,))
+        return logits_l1, logits_l2, labels_l1, labels_l2
+
+    def test_none_defaults_are_neutral(self):
+        """Explicit None tensors give the exact same loss as before."""
+        l1, l2, y1, y2 = self._make_inputs()
+        plain = HYDRALoss(architecture="local")
+        explicit = HYDRALoss(
+            architecture="local",
+            class_weights_l1=None, class_weights_l2=None,
+            logit_adjustment_l1=None, logit_adjustment_l2=None,
+        )
+        total_a, l1_a, l2_a = plain([l1, l2], None, y1, y2)
+        total_b, l1_b, l2_b = explicit([l1, l2], None, y1, y2)
+        assert torch.equal(total_a, total_b)
+        assert torch.equal(l1_a, l1_b)
+        assert torch.equal(l2_a, l2_b)
+
+    def test_focal_class_weights_match_weighted_ce_at_gamma_zero(self):
+        """FocalLoss(gamma=0, class_weights=w) == CrossEntropyLoss(weight=w)."""
+        l1, _, y1, _ = self._make_inputs()
+        weights = torch.tensor([0.5, 1.0, 2.0, 1.5, 0.8])
+        focal = FocalLoss(gamma=0.0, class_weights=weights)
+        ce = torch.nn.CrossEntropyLoss(weight=weights)
+        assert torch.allclose(focal(l1, y1), ce(l1, y1), atol=1e-5)
+
+    def test_focal_logit_adjustment_added_before_loss(self):
+        """FocalLoss(logit_adjustment=adj) == FocalLoss plain on logits + adj."""
+        _, l2, _, y2 = self._make_inputs()
+        adj = torch.linspace(-2.0, 0.0, 10)
+        adjusted_fn = FocalLoss(gamma=2.0, logit_adjustment=adj)
+        plain_fn = FocalLoss(gamma=2.0)
+        assert torch.allclose(adjusted_fn(l2, y2), plain_fn(l2 + adj, y2))
+
+    def test_hydra_class_weights_l1(self):
+        """L1 stays CrossEntropy, now weighted."""
+        l1, l2, y1, y2 = self._make_inputs()
+        weights = torch.tensor([0.5, 1.0, 2.0, 1.5, 0.8])
+        loss_fn = HYDRALoss(architecture="local", class_weights_l1=weights)
+        _, loss_l1, _ = loss_fn([l1, l2], None, y1, y2)
+        expected = torch.nn.CrossEntropyLoss(weight=weights)(l1, y1)
+        assert torch.allclose(loss_l1, expected, atol=1e-5)
+
+    def test_hydra_logit_adjustment_l2(self):
+        """The L2 adjustment is added to the L2 logits before the loss."""
+        l1, l2, y1, y2 = self._make_inputs()
+        adj = torch.linspace(-3.0, 0.0, 10)
+        loss_fn = HYDRALoss(architecture="local", logit_adjustment_l2=adj)
+        plain = HYDRALoss(architecture="local")
+        _, loss_l1_adj, loss_l2_adj = loss_fn([l1, l2], None, y1, y2)
+        _, loss_l1_ref, loss_l2_ref = plain([l1, l2 + adj], None, y1, y2)
+        assert torch.allclose(loss_l2_adj, loss_l2_ref, atol=1e-5)
+        assert torch.allclose(loss_l1_adj, loss_l1_ref, atol=1e-5)
+
+    def test_flat_path_rebalanced(self):
+        """FlatHydra path (empty level_outputs): unified slices are adjusted."""
+        num_l1, num_l2 = 5, 10
+        _, _, y1, y2 = self._make_inputs(num_l1, num_l2)
+        torch.manual_seed(11)
+        unified = torch.randn(4, num_l1 + num_l2)
+        adj_l2 = torch.linspace(-3.0, 0.0, num_l2)
+        weights_l1 = torch.rand(num_l1) + 0.5
+        loss_fn = HYDRALoss(
+            architecture="global",
+            num_classes_l1=num_l1, num_classes_l2=num_l2,
+            class_weights_l1=weights_l1, logit_adjustment_l2=adj_l2,
+        )
+        total, loss_l1, loss_l2 = loss_fn([], unified, y1, y2)
+        expected_l1 = torch.nn.CrossEntropyLoss(weight=weights_l1)(
+            unified[:, :num_l1], y1
+        )
+        expected_l2 = torch.nn.CrossEntropyLoss()(unified[:, num_l1:] + adj_l2, y2)
+        assert torch.allclose(loss_l1, expected_l1, atol=1e-5)
+        assert torch.allclose(loss_l2, expected_l2, atol=1e-5)
+        assert torch.allclose(total, 0.5 * expected_l1 + expected_l2, atol=1e-5)
+
+    def test_rebalanced_gradient_flows(self):
+        l1 = torch.randn(4, 5, requires_grad=True)
+        l2 = torch.randn(4, 10, requires_grad=True)
+        y1 = torch.randint(0, 5, (4,))
+        y2 = torch.randint(0, 10, (4,))
+        loss_fn = HYDRALoss(
+            architecture="local",
+            class_weights_l1=torch.rand(5) + 0.5,
+            class_weights_l2=torch.rand(10) + 0.5,
+            logit_adjustment_l1=torch.randn(5),
+            logit_adjustment_l2=torch.randn(10),
+        )
         total, _, _ = loss_fn([l1, l2], None, y1, y2)
         total.backward()
         assert l1.grad is not None

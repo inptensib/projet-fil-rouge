@@ -30,12 +30,21 @@ Presenter un tableau synthetique : jobs actifs, nodes disponibles, GPUs libres p
 
 ### `submit`
 
-Utiliser le script existant :
+> **Note** : le pipeline DDP distribue est archive via le tag git
+> `archive/distributed-pipeline` et hors livrable. Le training standard
+> (single-node, DataParallel) s'effectue via les scripts `.slurm` du projet.
+
+Utiliser, depuis la racine du projet, le script SLURM adapte :
 ```bash
-cd /home/infres/tandriam-25/fil_rouge/rakuten-classification/03_distributed
-./scripts/launch_distributed.sh $1 $2 $3 $4
+# HYDRA par variante (job array %1 = reprise auto sur checkpoint)
+sbatch scripts/run_train_variant.slurm <variant> <config>
+#   ex : sbatch scripts/run_train_variant.slurm local configs/hydra/default.yaml
+# ou la version array dediee
+sbatch scripts/run_train_array.slurm configs/hydra/default.yaml
 ```
-Arguments : variant (local/global/nested), encoder (CamemBERT/XLM-RoBERTa/mBERT), nb_nodes, gpu_type (p100/rtx3090)
+`<variant>` ∈ {local, global, nested} ; l'encodeur et les hyperparametres sont
+definis dans le `<config>` YAML (`configs/hydra/`). Pour FlatHydra/HLPD, voir
+les scripts `run_flat_*.slurm` / `run_hlpd_*.slurm` (cf. docs/PIPELINE.md).
 
 ### `cancel`
 
@@ -59,5 +68,4 @@ tail -50 logs/rank_0_*.log 2>/dev/null
 
 - Partitions : `P100` (nodes avec 2 GPUs Tesla P100 chacun), `3090` (node40, 2x RTX 3090)
 - QoS : max 2 GPUs/job, max 4 jobs simultanes
-- DDP config : fichier `.ddp_config` genere par `launch_distributed.sh`
-- Logs : `slurm-*.out` (racine) et `logs/rank_*_*.log` (par process)
+- Logs : `slurm-*.out` (racine)

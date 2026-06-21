@@ -82,7 +82,7 @@ classification hiérarchique de produits Rakuten France (EMNLP 2025 — architec
 
 Classification hiérarchique à 2 niveaux :
 - **L1** : 157 catégories parentes
-- **L2** : 6 126 catégories feuilles
+- **L2** : 6 126 catégories feuilles (dataset v1 d'origine ; 5 777 sur le dataset v2 dé-fuité)
 
 Données : 8M+ produits Rakuten France, texte en français (`designation + description`).
 Dataset : [TahianaAndriambahoaka/rakuten-dataset](https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset)
@@ -162,7 +162,7 @@ model = torch.load(f"{local_dir}/hydra-local-camembert/best_model.pt", map_locat
 ```
 
 Pour recharger avec l'architecture complète, cloner le repo du projet et utiliser
-`02_hydra/src/models.py::create_hydra_model()`.
+`rakuten/models/hydra/models.py::create_hydra_model()`.
 """
 
 

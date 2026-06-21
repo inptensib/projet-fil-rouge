@@ -18,7 +18,7 @@ Usage:
 
     # HYDRA mBERT
     python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
-        --config 02_hydra/configs/mbert_default.yaml --results-tag ''
+        --config configs/hydra/mbert_default.yaml --results-tag ''
 
     # FlatHydra Title+Description
     python scripts/generate_f1_per_class.py --split-dir /path/to/splits --flat-hydra
@@ -31,44 +31,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 import time
 from pathlib import Path
 
-import importlib.util
 import torch
 import yaml
 
 _ROOT = str(Path(__file__).resolve().parents[1])
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
-sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
 
-from src.trainer import HYDRATrainer
-from shared.data_loader import prepare_hierarchical_data_from_splits
-from shared.metrics import compute_per_class_f1
-
-# flat_trainer (01_baselines/src/) et HYDRATrainer (02_hydra/src/) partagent le même nom
-# de paquet `src`, ce qui provoque un conflit sys.path. On charge 01_baselines/src comme
-# paquet alias `_baselines_src` pour préserver les imports relatifs de flat_trainer.
-def _load_baselines_src() -> tuple:
-    bl = Path(_ROOT) / "01_baselines" / "src"
-
-    def _reg(name: str, path: Path) -> object:
-        spec = importlib.util.spec_from_file_location(
-            name, str(path), submodule_search_locations=[str(bl)]
-        )
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules[name] = mod
-        spec.loader.exec_module(mod)
-        return mod
-
-    _reg("_baselines_src", bl / "__init__.py")
-    _reg("_baselines_src.flat_model", bl / "flat_model.py")
-    ft = _reg("_baselines_src.flat_trainer", bl / "flat_trainer.py")
-    return ft.FlatHydraConfig, ft.FlatHydraTrainer
-
-FlatHydraConfig, FlatHydraTrainer = _load_baselines_src()
+from rakuten.models.hydra.trainer import HYDRATrainer
+from rakuten.models.baselines.flat_trainer import FlatHydraConfig, FlatHydraTrainer
+from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
+from rakuten.common.metrics import compute_per_class_f1
 
 VARIANTS = ["local", "nested", "global"]
 RESULTS_DIR = Path(_ROOT) / "results"
@@ -216,7 +190,7 @@ def evaluate_flat_hydra_and_save(
 def main():
     parser = argparse.ArgumentParser(description="Génère f1_per_class L1/L2 en JSON")
     parser.add_argument("--split-dir", required=True, help="Répertoire des splits")
-    parser.add_argument("--config", default="02_hydra/configs/default.yaml")
+    parser.add_argument("--config", default="configs/hydra/default.yaml")
     parser.add_argument("--variant", default=None, choices=VARIANTS)
     parser.add_argument("--batch-size", type=int, default=None,
                         help="Batch size pour l'évaluation (défaut: config YAML)")

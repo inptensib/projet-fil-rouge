@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies (torch CPU + package)
+        run: |
+          python -m pip install --upgrade pip
+          # torch CPU explicite : évite le tag CUDA local de requirements.txt
+          pip install torch==2.7.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -e .
+
+      - name: Run test suite
+        run: pytest tests/ -q

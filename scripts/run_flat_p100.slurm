@@ -37,5 +37,5 @@ fi
 
 python scripts/run_flat_hydra.py \
     --split-dir "$DATA_DIR/" \
-    --config 01_baselines/configs/flat_hydra.yaml \
+    --config configs/baselines/flat_hydra.yaml \
     $RESUME_FLAG

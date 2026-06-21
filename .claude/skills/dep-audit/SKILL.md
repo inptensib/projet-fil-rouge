@@ -17,7 +17,7 @@ Compare les imports Python reels avec `requirements.txt`.
 grep -rh "^import \|^from " --include="*.py" . | sort -u
 ```
 
-Exclure les imports de la stdlib Python et les imports internes au projet (shared/, src/, etc.)
+Exclure les imports de la stdlib Python et les imports internes au projet (rakuten/, src/, etc.)
 
 ### 2. Lire requirements.txt
 
@@ -37,12 +37,12 @@ Pour chaque import tiers dans le code :
 
 | Package pip | Import Python | Utilise dans |
 |-------------|---------------|--------------|
-| `torch` | `torch` | 02_hydra/, 03_distributed/ |
-| `transformers` | `transformers` | 02_hydra/src/models.py |
-| `scikit-learn` | `sklearn` | 01_baselines/ |
-| `mlflow` | `mlflow` | 03_distributed/src/trainer_ddp.py |
-| `sentence-transformers` | `sentence_transformers` | notebooks/ |
-| `pyyaml` | `yaml` | 02_hydra/src/trainer.py |
+| `torch` | `torch` | `rakuten/models/hydra/`, `rakuten/models/baselines/` |
+| `transformers` | `transformers` | `rakuten/models/hydra/models.py` |
+| `scikit-learn` | `sklearn` | `rakuten/models/baselines/` |
+| `mlflow` | `mlflow` | `rakuten/models/hydra/trainer.py` |
+| `sentence-transformers` | `sentence_transformers` | `notebooks/` |
+| `pyyaml` | `yaml` | `rakuten/models/hydra/trainer.py` |
 
 ### 5. Verifier aussi les notebooks
 

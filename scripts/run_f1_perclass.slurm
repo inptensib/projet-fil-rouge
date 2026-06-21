@@ -33,7 +33,7 @@ echo "GPUs : $(python -c 'import torch; print(torch.cuda.device_count())')"
 
 python scripts/generate_f1_per_class.py \
     --split-dir "$DATA_DIR/" \
-    --config 02_hydra/configs/default.yaml \
+    --config configs/hydra/default.yaml \
     --batch-size 512
 
 echo "=== Terminé : $(date) ==="

@@ -7,7 +7,7 @@ Usage:
 
     # Depuis un seul fichier JSONL (sample + split automatique)
     python scripts/run_flat_hydra.py \
-        --data shared/dataset/products.jsonl \
+        --data <chemin>/products.jsonl \
         --n-samples 1000 \
         --epochs 2 \
         --batch-size 16
@@ -15,35 +15,26 @@ Usage:
     # Depuis des splits pré-générés (recommandé pour le dataset complet)
     python scripts/run_flat_hydra.py \
         --split-dir /path/to/dataset/ \
-        --config 01_baselines/configs/flat_hydra.yaml
+        --config configs/baselines/flat_hydra.yaml
 
     # Reprendre un training interrompu
     python scripts/run_flat_hydra.py \
-        --data shared/dataset/products.jsonl \
+        --data <chemin>/products.jsonl \
         --resume models/flat_hydra_cpu/checkpoint_latest.pt
 """
 
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parents[1]
-_BASELINES_ROOT = _ROOT / "01_baselines"
-
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-if str(_BASELINES_ROOT) not in sys.path:
-    sys.path.insert(0, str(_BASELINES_ROOT))
-
-from src.flat_trainer import FlatHydraConfig, FlatHydraTrainer  # noqa: E402
-from shared.data_loader import (                                  # noqa: E402
+from rakuten.models.baselines.flat_trainer import FlatHydraConfig, FlatHydraTrainer
+from rakuten.common.data_loader import (
     prepare_hierarchical_data,
     prepare_hierarchical_data_from_splits,
 )
 
-_DEFAULT_CONFIG = _BASELINES_ROOT / "configs" / "flat_hydra.yaml"
+_DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "configs" / "baselines" / "flat_hydra.yaml"
 
 
 def main() -> None:
@@ -152,6 +143,8 @@ def main() -> None:
             n_samples=args.n_samples,
             seed=config.seed,
             use_description=config.use_description,
+            synthetic_policy=config.synthetic_policy,
+            normalize=config.normalize_text,
         )
     else:
         data_path = Path(args.data)
@@ -165,6 +158,7 @@ def main() -> None:
             n_samples=n,
             seed=config.seed,
             use_description=config.use_description,
+            normalize=config.normalize_text,
         )
 
     print(

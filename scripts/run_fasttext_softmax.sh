@@ -22,9 +22,9 @@ jupyter nbconvert \
     --to notebook \
     --execute \
     --output fasttext_softmax_baseline_executed.ipynb \
-    --output-dir 01_baselines/notebooks/ \
+    --output-dir notebooks/baselines/ \
     --ExecutePreprocessor.timeout=-1 \
     --ExecutePreprocessor.kernel_name=python3 \
-    01_baselines/notebooks/fasttext_softmax_baseline.ipynb
+    notebooks/baselines/fasttext_softmax_baseline.ipynb
 
 echo "=== Terminé : $(date) ==="

@@ -31,7 +31,7 @@ echo "GPU : $(python -c 'import torch; [print(f"  GPU {i}: {torch.cuda.get_devic
 
 python scripts/generate_f1_per_class.py \
     --split-dir "$DATA_DIR/" \
-    --config 02_hydra/configs/mbert_default.yaml \
+    --config configs/hydra/mbert_default.yaml \
     --variant local \
     --results-dir hydra-local-mbert \
     --batch-size 512

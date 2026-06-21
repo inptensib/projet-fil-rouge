@@ -14,12 +14,12 @@ Verification complete avant commit. Execute dans l'ordre, s'arrete au premier ec
 ### 1. Lint (syntaxe et style)
 
 ```bash
-/home/infres/tandriam-25/fil_rouge/venv/bin/python -m py_compile <fichiers modifies>
+python -m py_compile <fichiers modifies>
 ```
 
 Si `ruff` est installe :
 ```bash
-/home/infres/tandriam-25/fil_rouge/venv/bin/ruff check --select=E,F,W .
+python -m ruff check --select=E,F,W .
 ```
 
 Sinon, verifier au minimum :
@@ -30,7 +30,7 @@ Sinon, verifier au minimum :
 ### 2. Tests
 
 ```bash
-/home/infres/tandriam-25/fil_rouge/venv/bin/python -m pytest tests/ -x -q --tb=short
+python -m pytest tests/ -x -q --tb=short
 ```
 
 Tous les tests doivent passer. Arret immediat si echec.

@@ -14,7 +14,7 @@
 #
 # Usage:
 #   sbatch scripts/run_train_array.slurm                          # défaut: default.yaml
-#   sbatch scripts/run_train_array.slurm 02_hydra/configs/hierarchy.yaml  # avec conditioning
+#   sbatch scripts/run_train_array.slurm configs/hydra/hierarchy.yaml  # avec conditioning
 
 # --- Chemins (surcharger via export avant sbatch si besoin) ---
 PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
@@ -30,7 +30,7 @@ export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 # Mapping index → variante
 VARIANTS=(local nested global)
 VARIANT=${VARIANTS[$SLURM_ARRAY_TASK_ID]}
-CONFIG="${1:-02_hydra/configs/default.yaml}"
+CONFIG="${1:-configs/hydra/default.yaml}"
 
 # Déterminer le save_dir depuis le config
 SAVE_DIR=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models'))" 2>/dev/null || echo "models")

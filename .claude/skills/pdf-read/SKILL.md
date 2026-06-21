@@ -28,7 +28,7 @@ Utiliser `/tmp/_pdf_read.pdf` comme chemin. Sinon, utiliser `$0` directement.
 ### 2. Metadonnees et table des matieres
 
 ```bash
-/home/infres/tandriam-25/fil_rouge/venv/bin/python << 'PYEOF'
+python << 'PYEOF'
 import fitz, json, sys
 PDF_PATH = sys.argv[1] if len(sys.argv) > 1 else "/tmp/_pdf_read.pdf"
 doc = fitz.open(PDF_PATH)
@@ -54,7 +54,7 @@ Presenter les metadonnees dans un tableau markdown. Si TOC non vide, lister les 
 Traiter par chunks de 20 pages. Pour chaque page dans la plage demandee :
 
 ```bash
-/home/infres/tandriam-25/fil_rouge/venv/bin/python << 'PYEOF'
+python << 'PYEOF'
 import fitz, json, sys
 PDF_PATH = sys.argv[1]
 START = int(sys.argv[2]) if len(sys.argv) > 2 else 0

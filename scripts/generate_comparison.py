@@ -623,7 +623,7 @@ def discover_hydra_title_hierarchy_models() -> list[dict]:
         } if val_f1_l2 is not None else {}
 
         params: dict = {}
-        cfg_path = PROJECT_ROOT / "02_hydra" / "configs" / "title_only_hierarchy.yaml"
+        cfg_path = PROJECT_ROOT / "configs" / "hydra" / "title_only_hierarchy.yaml"
         if cfg_path.exists():
             import yaml as _yaml
             cfg = _yaml.safe_load(cfg_path.read_text())
@@ -806,7 +806,7 @@ def discover_hlpd_model() -> list[dict]:
     val_path = HLPD_RESULTS_DIR / "val_metrics.json"
     val_m = json.loads(val_path.read_text()) if val_path.exists() else {}
 
-    cfg_path = Path("02b_hlpd/configs/hlpd_3090.yaml")
+    cfg_path = Path("configs/hlpd/hlpd_3090.yaml")
     cfg = yaml.safe_load(cfg_path.read_text()) if cfg_path.exists() else {}
 
     images = {}
@@ -969,7 +969,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
 
 <h1>Comparaison des modèles — Classification Hiérarchique Rakuten</h1>
 <p style="color:#6c757d">
-    157 catégories L1 · 6 126 catégories L2 · 8M+ produits<br>
+    157 catégories L1 · 6 126 catégories L2 (dataset v1) · 8M+ produits<br>
     Télécom Paris × Rakuten France · Généré le <span id="gen-date"></span>
 </p>
 
@@ -1062,7 +1062,7 @@ details[open] summary { border-radius: 8px 8px 0 0; }
     <div class="table-container"><table id="per-class-table"></table></div>
 </section>
 <section id="per-class-l2">
-    <h2>Comparaison par classe L2 (6 126 classes)</h2>
+    <h2>Comparaison par classe L2 (6 126 classes, dataset v1)</h2>
     <div class="controls-bar">
         <input type="text" id="class-l2-search" placeholder="Filtrer par nom ou catégorie L1...">
         <select id="class-l2-sort">

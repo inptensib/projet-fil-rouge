@@ -29,7 +29,7 @@ export TRANSFORMERS_OFFLINE=1
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 
 VARIANT="${1:?Usage: sbatch --array=0-9%1 $0 <variant> [config]}"
-CONFIG="${2:-02_hydra/configs/default.yaml}"
+CONFIG="${2:-configs/hydra/default.yaml}"
 
 SAVE_DIR=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models'))" 2>/dev/null || echo "models")
 ENCODER_KEY=$(python3 -c "

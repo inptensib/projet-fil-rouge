@@ -9,7 +9,6 @@ et publier chaque modèle du projet.
 1. [Matrice modèle × étape](#matrice-modèle--étape)
 1. [Configs YAML](#configs-yaml)
 1. [Scripts SLURM](#scripts-slurm)
-1. [Pipeline DDP multi-nœuds](#pipeline-ddp-multi-nœuds)
 1. [Génération des rapports](#génération-des-rapports)
 1. [Utilitaires](#utilitaires)
 1. [Dettes techniques connues](#dettes-techniques-connues)
@@ -45,10 +44,10 @@ Commandes depuis la racine du repo.
 ```bash
 # Entraîner (une variante, job array auto-reprise)
 sbatch --job-name=hydra-local --array=0-9%1 \
-    scripts/run_train_variant.slurm local 02_hydra/configs/default.yaml
+    scripts/run_train_variant.slurm local configs/hydra/default.yaml
 
 # Ou les 3 variantes en parallèle (1 GPU chacune)
-sbatch scripts/run_train_array.slurm 02_hydra/configs/default.yaml
+sbatch scripts/run_train_array.slurm configs/hydra/default.yaml
 
 # Évaluer (3 variantes, avec/sans masque)
 sbatch scripts/run_eval.slurm
@@ -61,7 +60,7 @@ sbatch scripts/run_f1_perclass.slurm
 
 ```bash
 # Entraîner — chaînage de N arrays si > 36 h
-./scripts/chain_submit_array.sh 3 02_hydra/configs/hierarchy.yaml
+./scripts/chain_submit_array.sh 3 configs/hydra/hierarchy.yaml
 
 # Évaluer (les modèles sont dans models_hierarchy/)
 sbatch scripts/run_eval.slurm models_hierarchy
@@ -74,7 +73,7 @@ sbatch scripts/run_f1_perclass_hierarchy.slurm
 
 ```bash
 sbatch --job-name=hydra-local-mbert --array=0-9%1 \
-    scripts/run_train_variant.slurm local 02_hydra/configs/mbert_default.yaml
+    scripts/run_train_variant.slurm local configs/hydra/mbert_default.yaml
 sbatch scripts/run_eval_hydra_mbert.slurm
 sbatch scripts/run_f1_perclass_mbert.slurm
 ```
@@ -103,7 +102,7 @@ sbatch scripts/run_eval_flat_hydra_title.slurm     # éval title-only
 
 ```bash
 sbatch --job-name=hlpd --array=0-9%1 scripts/run_hlpd_3090.slurm
-# Config : 02b_hlpd/configs/hlpd_3090.yaml — voir 02b_hlpd/README.md
+# Config : configs/hlpd/hlpd_3090.yaml
 ```
 
 ### Baselines
@@ -122,7 +121,7 @@ bash scripts/run_fasttext_eval.sh
 
 ## Configs YAML
 
-`02_hydra/configs/default.yaml` est la **source de vérité**. Divergences
+`configs/hydra/default.yaml` est la **source de vérité**. Divergences
 des autres configs :
 
 | Config                       | Batch | LR        | Divergences clés                          |
@@ -139,10 +138,19 @@ des autres configs :
 > (1.12e-4). Les configs title-only supportent de gros batches car les
 > séquences (titre seul) sont bien plus courtes.
 
-Configs FlatHydra (`01_baselines/configs/`) : `dropout: 0.2` (fidélité au
+Configs FlatHydra (`configs/baselines/`) : `dropout: 0.2` (fidélité au
 papier, ≠ 0.3 HYDRA) ; le batch varie selon le GPU — `flat_hydra.yaml`
 (64, CPU/debug), `flat_hydra_3090.yaml` (256), `flat_hydra_title_3090.yaml`
 (512), `flat_hydra_mbert.yaml` (128, mBERT plus lourd).
+
+> **Configs dataset v2** : `configs/hydra/v2_default.yaml` et
+> `configs/baselines/flat_hydra_v2.yaml` ciblent le **dataset v2 dé-fuité**
+> (5 777 L2) et activent le kit de rééquilibrage (`normalize_text`,
+> `synthetic_policy: drop_oversampled`, `class_weighting: inv_sqrt`,
+> `logit_adjustment_tau`). Elles s'invoquent comme les autres
+> (`--config configs/hydra/v2_default.yaml`) ; ce sont les configs de
+> référence pour reproduire les résultats v2. Les configs ci-dessus
+> (sans suffixe `v2`) correspondent aux entraînements v1 historiques.
 
 ## Scripts SLURM
 
@@ -166,23 +174,6 @@ par tâche, partitions `P100` (2×16 Go) et `3090` (2-4×24 Go).
 > script de surveillance auto-resoumission (incident des 110 jobs,
 > avertissement admin). Les job arrays `%1` couvrent le besoin.
 
-## Pipeline DDP Multi-Nœuds
-
-Le module `03_distributed/` permet l'entraînement multi-GPU multi-nœuds
-(sharding par rank). Point d'entrée :
-
-```bash
-cd 03_distributed
-python -m src.main \
-    --config ../02_hydra/configs/default.yaml \
-    --split_dir "$DATA_DIR" \
-    --shard_dir shards
-```
-
-Priorité des hyperparamètres : flags CLI explicites > YAML (`--config`) >
-défauts du trainer. Valider les shards avant tout run
-(`03_distributed/src/data_sharding.py`).
-
 ## Génération des Rapports
 
 ```bash
@@ -191,7 +182,7 @@ python scripts/generate_comparison.py        # → results/comparison.html
 
 # F1 par classe d'un modèle déjà entraîné
 python scripts/generate_f1_per_class.py \
-    --split-dir "$DATA_DIR" --config 02_hydra/configs/default.yaml \
+    --split-dir "$DATA_DIR" --config configs/hydra/default.yaml \
     --variant local --results-dir hydra-local-camembert
 
 # Rapports HTML par modèle (confusion, courbes)
@@ -215,13 +206,14 @@ La provenance de chaque JSON consommé est tracée dans
 
 ## Dettes Techniques Connues
 
-- **Duplication des trainers** : `02_hydra/src/trainer.py`,
-  `01_baselines/src/flat_trainer.py`, `03_distributed/src/trainer_ddp.py`
-  et le trainer HLPD partagent beaucoup de logique train/eval sans
-  factorisation. Refactor risqué tant que des checkpoints en production
-  dépendent des structures actuelles.
-- **Tests DDP** : `trainer_ddp.py` (~500 lignes) n'a pas de couverture
-  dédiée — nécessite une infra multi-GPU pour des tests significatifs.
+- **Duplication des trainers** : `rakuten/models/hydra/trainer.py`,
+  `rakuten/models/baselines/flat_trainer.py` et le trainer HLPD partagent
+  beaucoup de logique train/eval sans factorisation commune. La
+  `rakuten/common/training_utils.py` fournit les briques partagées
+  (EarlyStopping, compute_class_weights).
 - **Structures JSON hétérogènes dans `results/`** : trois formats
   coexistent selon la famille de modèle (voir [METRICS.md](METRICS.md)) ;
   harmoniser exigerait de régénérer toutes les évaluations.
+- **Pipeline DDP** : exploré pendant le projet mais écarté du livrable au
+  profit du DataParallel single-node. Disponible au tag git
+  `archive/distributed-pipeline` — voir [docs/ARCHITECTURE.md](ARCHITECTURE.md).

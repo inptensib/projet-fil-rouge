@@ -7,8 +7,8 @@
 #   docker compose run --rm --profile gpu train                 # HYDRA training
 #   docker compose run --rm --profile baselines baseline-tfidf  # TF-IDF baseline
 #
-# Dataset : placer products.jsonl dans shared/dataset/ avant le training.
-# Multi-GPU SLURM : ./03_distributed/scripts/launch_distributed.sh
+# Dataset : placer les splits JSONL dans dataset/ avant le training
+#   (cf. scripts/download_dataset.py). Entraînement sur cluster : voir docs/PIPELINE.md.
 # ==============================================================================
 
 # --- Anchor YAML (not a service, ignored by Compose) ---
@@ -17,7 +17,7 @@ x-app: &app
     context: .
     dockerfile: Dockerfile
   volumes:
-    - ./shared/dataset:/app/shared/dataset:ro
+    - ./dataset:/app/dataset:ro
     - ./models:/app/models
   environment:
     HF_HOME: /app/.cache/huggingface
@@ -62,8 +62,8 @@ services:
     <<: *app
     command: >
       python scripts/run_train.py
-        --config 02_hydra/configs/default.yaml
-        --data shared/dataset/products.jsonl
+        --config configs/hydra/default.yaml
+        --split-dir dataset/
         --n-samples 10000
     deploy:
       resources:
@@ -80,8 +80,8 @@ services:
   baseline-tfidf:
     <<: *app
     command: >
-      python 01_baselines/src/tfidf_pipeline.py
-        --data_path shared/dataset/products.jsonl
+      python -m rakuten.models.baselines.tfidf_pipeline
+        --data_path dataset/products.jsonl
         --n_samples 10000
         --save_dir models/baseline_tfidf
     profiles: ["baselines"]
@@ -89,8 +89,8 @@ services:
   baseline-word2vec:
     <<: *app
     command: >
-      python 01_baselines/src/word2vec_pipeline.py
-        --data_path shared/dataset/products.jsonl
+      python -m rakuten.models.baselines.word2vec_pipeline
+        --data_path dataset/products.jsonl
         --n_samples 10000
         --save_dir models/baseline_word2vec
     profiles: ["baselines"]
@@ -98,8 +98,8 @@ services:
   baseline-bert:
     <<: *app
     command: >
-      python 01_baselines/src/bert_flat_classifier.py
-        --data_path shared/dataset/products.jsonl
+      python -m rakuten.models.baselines.bert_flat_classifier
+        --data_path dataset/products.jsonl
         --n_samples 10000
         --save_dir models/baseline_bert
     profiles: ["baselines"]

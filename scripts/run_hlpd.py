@@ -4,21 +4,22 @@ Usage:
     # Depuis les splits pré-générés (recommandé pour le dataset complet)
     python scripts/run_hlpd.py \\
         --split-dir /path/to/dataset/ \\
-        --config 02b_hlpd/configs/hlpd_3090.yaml
+        --config configs/hlpd/hlpd_3090.yaml
 
     # Smoke test local (N=1000 samples, 1 epoch)
     python scripts/run_hlpd.py \\
         --split-dir /path/to/dataset/ \\
-        --config 02b_hlpd/configs/hlpd_3090.yaml \\
+        --config configs/hlpd/hlpd_3090.yaml \\
         --n-samples 1000 \\
         --epochs 1
 
     # Reprendre un training interrompu
     python scripts/run_hlpd.py \\
         --split-dir /path/to/dataset/ \\
-        --config 02b_hlpd/configs/hlpd_3090.yaml \\
+        --config configs/hlpd/hlpd_3090.yaml \\
         --resume models/hlpd/checkpoint_latest.pt
 """
+# NOTE : les configs YAML restent dans configs/hlpd/ (non migré).
 
 from __future__ import annotations
 
@@ -27,19 +28,14 @@ import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
-_HLPD_ROOT = _ROOT / "02b_hlpd"
 
-for p in (_ROOT, _HLPD_ROOT):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
-
-from src import HLPDConfig, HLPDTrainer           # noqa: E402
-from shared.data_loader import (                   # noqa: E402
+from rakuten.models.hlpd import HLPDConfig, HLPDTrainer
+from rakuten.common.data_loader import (
     prepare_hierarchical_data,
     prepare_hierarchical_data_from_splits,
 )
 
-_DEFAULT_CONFIG = _HLPD_ROOT / "configs" / "hlpd_3090.yaml"
+_DEFAULT_CONFIG = _ROOT / "configs" / "hlpd" / "hlpd_3090.yaml"
 
 
 def main() -> None:

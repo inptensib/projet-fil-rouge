@@ -2,33 +2,75 @@
 
 from __future__ import annotations
 
-from helpers import import_from_hydra
-
 
 class TestSharedImports:
     def test_import_shared_utils(self):
-        import shared.utils
-        assert hasattr(shared.utils, "set_seed")
-        assert hasattr(shared.utils, "ENCODERS")
+        import rakuten.common.utils as utils
+        assert hasattr(utils, "set_seed")
+        assert hasattr(utils, "ENCODERS")
 
     def test_import_shared_metrics(self):
-        import shared.metrics
-        assert hasattr(shared.metrics, "compute_all_metrics")
+        import rakuten.common.metrics as metrics
+        assert hasattr(metrics, "compute_all_metrics")
 
     def test_import_shared_data_loader(self):
-        import shared.data_loader
-        assert hasattr(shared.data_loader, "HierarchicalProductDataset")
+        import rakuten.common.data_loader as data_loader
+        assert hasattr(data_loader, "HierarchicalProductDataset")
 
 
 class TestHydraImports:
     def test_import_hydra_models(self):
-        models = import_from_hydra("models")
+        import rakuten.models.hydra.models as models
         assert hasattr(models, "HYDRALocal")
         assert hasattr(models, "HYDRAGlobal")
         assert hasattr(models, "HYDRANested")
         assert hasattr(models, "create_hydra_model")
 
     def test_import_hydra_losses(self):
-        losses = import_from_hydra("losses")
+        import rakuten.models.hydra.losses as losses
         assert hasattr(losses, "FocalLoss")
         assert hasattr(losses, "HYDRALoss")
+
+    def test_import_hydra_trainer(self):
+        import rakuten.models.hydra.trainer as trainer
+        assert hasattr(trainer, "HYDRATrainer")
+
+
+class TestBaselinesImports:
+    def test_import_baselines_flat_trainer(self):
+        import rakuten.models.baselines.flat_trainer as flat_trainer
+        assert hasattr(flat_trainer, "FlatHydraTrainer")
+
+    def test_import_baselines_flat_model(self):
+        import rakuten.models.baselines.flat_model as flat_model
+        assert hasattr(flat_model, "FlatHydra")
+
+    def test_import_baselines_tfidf_pipeline(self):
+        import rakuten.models.baselines.tfidf_pipeline as tfidf
+        assert hasattr(tfidf, "train_tfidf_pipeline")
+        assert hasattr(tfidf, "main")
+
+    def test_import_baselines_word2vec_pipeline(self):
+        import rakuten.models.baselines.word2vec_pipeline as word2vec
+        assert hasattr(word2vec, "train_word2vec_pipeline")
+        assert hasattr(word2vec, "main")
+
+    def test_import_baselines_bert_flat_classifier(self):
+        import rakuten.models.baselines.bert_flat_classifier as bert_flat
+        assert hasattr(bert_flat, "BERTClassifier")
+        assert hasattr(bert_flat, "main")
+
+    def test_import_baselines_evaluate(self):
+        import rakuten.models.baselines.evaluate as evaluate
+        assert hasattr(evaluate, "compare_baselines")
+        assert hasattr(evaluate, "main")
+
+
+class TestHlpdImports:
+    def test_import_hlpd_models(self):
+        import rakuten.models.hlpd.models as models
+        assert hasattr(models, "HLPD")
+
+    def test_import_hlpd_trainer(self):
+        import rakuten.models.hlpd.trainer as trainer
+        assert hasattr(trainer, "HLPDTrainer")

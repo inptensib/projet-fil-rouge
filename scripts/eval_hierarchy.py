@@ -21,21 +21,17 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
-import sys
 import time
 from pathlib import Path
 
 import torch
 import yaml
 
-_ROOT = str(Path(__file__).resolve().parents[1])
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
-sys.path.insert(0, str(Path(_ROOT) / "02_hydra"))
+from rakuten.models.hydra.config import map_config
+from rakuten.models.hydra.trainer import HYDRATrainer
+from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
 
-from src.config import map_config
-from src.trainer import HYDRATrainer
-from shared.data_loader import prepare_hierarchical_data_from_splits
+_ROOT = Path(__file__).resolve().parents[1]
 
 
 VARIANTS = ["local", "nested", "global"]
@@ -48,6 +44,8 @@ _EVAL_IRRELEVANT_KEYS = (
     "save_dir",
     "experiment_suffix",
     "condition_l2_on_l1",
+    "class_weighting",
+    "logit_adjustment_tau",
 )
 
 
@@ -199,7 +197,7 @@ def print_results(all_results: dict):
 def main():
     parser = argparse.ArgumentParser(description="Évaluation HYDRA avec/sans conditioning hiérarchique")
     parser.add_argument("--split-dir", required=True, help="Répertoire des splits train/val/test")
-    parser.add_argument("--config", default="02_hydra/configs/default.yaml")
+    parser.add_argument("--config", default="configs/hydra/default.yaml")
     parser.add_argument("--variant", default=None, choices=VARIANTS, help="Une seule variante (défaut: toutes)")
     parser.add_argument(
         "--eval-batch-size", type=int, default=2048,
@@ -243,6 +241,7 @@ def main():
         test_path=str(split_dir / "test_split.jsonl"),
         seed=cfg.get("seed", 42),
         use_description=not args.no_description,
+        normalize=cfg.get("normalize_text", False),
     )
     print(f"  Test: {len(data['X_test']):,} samples, L1: {data['num_classes_l1']}, L2: {data['num_classes_l2']}")
 

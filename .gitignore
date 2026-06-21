@@ -37,15 +37,13 @@ ENV/
 *.pkl
 *.pickle
 shards/
-dataset/
-!shared/dataset/
-shared/dataset/*
-!shared/dataset/.gitkeep
+# Dossier de données téléchargé localement (racine uniquement, ancré)
+/dataset/
 
 # ==============================================================================
 # Models (weights only -- code IS tracked)
 # ==============================================================================
-models/
+/models/
 *.pt
 *.pth
 *.safetensors
@@ -106,11 +104,11 @@ rendez_vous*
 # ==============================================================================
 *.so
 *.o
-!models/.gitkeep
+!/models/.gitkeep
 
 # Logs d'exécution locaux (machines lame, GPU directs)
 logs_*.out
 
 # Résultats générés par les notebooks baselines
-01_baselines/notebooks/results/
-models_v2/
+notebooks/baselines/results/
+/models_v2/

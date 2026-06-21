@@ -40,7 +40,7 @@ Determiner le type de source :
 Meme procedure que le skill `/pdf-read` :
 
 ```bash
-/home/infres/tandriam-25/fil_rouge/venv/bin/python << 'PYEOF'
+python << 'PYEOF'
 import fitz, json, sys
 PDF_PATH = sys.argv[1]
 doc = fitz.open(PDF_PATH)

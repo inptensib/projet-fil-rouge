@@ -27,17 +27,17 @@ publié dans `results/`.
 
 ## Définitions
 
-Toutes les métriques sont implémentées dans `shared/metrics.py` :
+Toutes les métriques sont implémentées dans `rakuten/common/metrics.py` :
 
 | Métrique               | Définition                                            |
 |:-----------------------|:-------------------------------------------------------|
 | `f1_l1_macro`          | F1 macro sur les 157 classes L1 (chaque classe pèse 1) |
-| `f1_l2_macro`          | F1 macro sur les 6 126 classes L2 — **métrique cible** |
+| `f1_l2_macro`          | F1 macro sur les 5 777 classes L2 — **métrique cible** |
 | `constrained_f1_macro` | F1 L2 compté correct seulement si le parent L1 l'est   |
 | `hcr`                  | % de prédictions où L2 est un enfant valide de L1      |
 
 Le **macro**-averaging donne le même poids aux classes rares qu'aux
-classes fréquentes — c'est voulu : la longue traîne des 6 126 classes L2
+classes fréquentes — c'est voulu : la longue traîne des 5 777 classes L2
 est l'enjeu du projet. Objectif global : maximiser `f1_l2_macro` en
 maintenant un HCR > 95 % pour les variantes hiérarchiques.
 
@@ -73,7 +73,7 @@ Depuis, le script choisit le bon mode automatiquement :
 
 ```bash
 python scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
-    --config 02_hydra/configs/mbert_default.yaml \
+    --config configs/hydra/mbert_default.yaml \
     --output-json results/eval.json
 # → mode "base" car la config n'a ni check_hierarchy ni condition_l2_on_l1
 ```

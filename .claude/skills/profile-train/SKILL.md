@@ -17,7 +17,7 @@ Profile et optimise les performances d'un training run HYDRA.
 ## Taches
 
 ### 1. Analyse statique du code
-- Lire le script de training (`$0` ou `02_hydra/src/trainer.py` par defaut)
+- Lire le script de training (`$0` ou `rakuten/models/hydra/trainer.py` par defaut)
 - Identifier : batch_size, max_length, nombre de parametres du modele, gradient accumulation
 - Estimer la memoire GPU requise : `params * 4 bytes (fp32) * 3 (model + grads + optimizer)`
 
@@ -37,10 +37,13 @@ nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free,utilization.gpu
 - Verifier si `pin_memory=True` est active
 - Verifier mixed precision (fp16/bf16) si GPU le supporte
 
-### 5. Recommandations DDP
+### 5. Recommandations multi-GPU
 - Calculer la taille optimale de batch par GPU
-- Estimer le speedup lineaire attendu vs observe (8 GPUs)
-- Verifier la config NCCL (backend, timeout)
+- Estimer le speedup lineaire attendu vs observe
+- Verifier la config NCCL (backend, timeout) si training distribue actif
+
+> **Note** : le pipeline DDP complet est archive via le tag git
+> `archive/distributed-pipeline` et hors livrable.
 
 ## Output
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import functools
 import importlib.util
-import sys
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -17,9 +16,6 @@ _ROOT = Path(__file__).resolve().parents[1]
 @functools.lru_cache(maxsize=None)
 def _eval_hierarchy():
     """Charge scripts/eval_hierarchy.py (import lourd : trainer HYDRA)."""
-    for k in list(sys.modules):
-        if k == "src" or k.startswith("src."):
-            del sys.modules[k]
     spec = importlib.util.spec_from_file_location(
         "eval_hierarchy", _ROOT / "scripts" / "eval_hierarchy.py"
     )
@@ -82,9 +78,9 @@ class TestSerializeResults:
 
     def test_metadata_keys_present_and_prefixed(self):
         mod = _eval_hierarchy()
-        out = mod._serialize_results(self._RESULTS, "base", "02_hydra/configs/default.yaml")
+        out = mod._serialize_results(self._RESULTS, "base", "configs/hydra/default.yaml")
         assert out["_mode"] == "base"
-        assert out["_config"] == "02_hydra/configs/default.yaml"
+        assert out["_config"] == "configs/hydra/default.yaml"
         assert "_date" in out
         # Contrat generate_comparison.py : les variantes restent des clés plates
         non_meta = [k for k in out if not k.startswith("_")]
