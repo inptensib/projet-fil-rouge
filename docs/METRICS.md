@@ -31,6 +31,11 @@ publié dans `results/`.
 > deçà de l'estimation initiale ; au L2 les chiffres v1 et v2 ne se comparent
 > pas terme à terme. (Mesuré sur FlatHydra / 2 encodeurs ; HYDRA et HLPD n'ont
 > pas été ré-entraînés sur v2.) Détail des 4 évals : `results/flat_hydra*/`.
+>
+> *Note : les modèles v2 ont **5 775** têtes L2 (et non 5 777) — 2 classes L2 du
+> dataset n'ont aucun échantillon en train après purge, le nombre de têtes étant
+> dérivé des données à l'exécution. D'où `num_classes_l2: 5775` dans
+> `results/flat_hydra_v2/test_metrics.json`.*
 
 ## Table des Matières
 

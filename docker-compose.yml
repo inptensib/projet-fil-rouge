@@ -81,7 +81,7 @@ services:
     <<: *app
     command: >
       python -m rakuten.models.baselines.tfidf_pipeline
-        --data_path dataset/products.jsonl
+        --data_path dataset/train_split.jsonl
         --n_samples 10000
         --save_dir models/baseline_tfidf
     profiles: ["baselines"]
@@ -90,7 +90,7 @@ services:
     <<: *app
     command: >
       python -m rakuten.models.baselines.word2vec_pipeline
-        --data_path dataset/products.jsonl
+        --data_path dataset/train_split.jsonl
         --n_samples 10000
         --save_dir models/baseline_word2vec
     profiles: ["baselines"]
@@ -99,7 +99,7 @@ services:
     <<: *app
     command: >
       python -m rakuten.models.baselines.bert_flat_classifier
-        --data_path dataset/products.jsonl
+        --data_path dataset/train_split.jsonl
         --n_samples 10000
         --save_dir models/baseline_bert
     profiles: ["baselines"]

@@ -92,8 +92,8 @@ graph TD
 
 | Modèle | F1 L1 | F1 L2 | HCR |
 |:-------|:-----:|:-----:|:---:|
-| TF-IDF + LinearSVC | 82.50 % | 42.23 % | 57.29 % |
-| FastText Supervised | 83.72 % | 9.48 % | 28.60 % |
+| TF-IDF + LinearSVC | 83.26 % | 42.75 % | 63.41 % |
+| FastText Supervised | 82.60 % | 10.01 % | 29.29 % |
 | Word2Vec + LinearSVC | 60.24 % | 22.27 % | 25.06 % |
 | **FlatHydra CamemBERT** | **—** | **71.7 %** | — |
 | HYDRA local CamemBERT | — | 66.8 % | > 95 % |

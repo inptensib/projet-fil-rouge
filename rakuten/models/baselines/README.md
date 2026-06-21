@@ -28,10 +28,14 @@ Classification "à plat" (non-hiérarchique) sur les **157 catégories L1** du c
 Commandes à lancer depuis la racine du repo :
 
 ```bash
-python -m rakuten.models.baselines.tfidf_pipeline --data_path <chemin>/products.jsonl --n_samples 50000
-python -m rakuten.models.baselines.word2vec_pipeline --data_path <chemin>/products.jsonl --n_samples 50000
-python -m rakuten.models.baselines.bert_flat_classifier --data_path <chemin>/products.jsonl --backbone camembert --mode fine_tuning
+python -m rakuten.models.baselines.tfidf_pipeline --data_path dataset/train_split.jsonl --n_samples 50000
+python -m rakuten.models.baselines.word2vec_pipeline --data_path dataset/train_split.jsonl --n_samples 50000
+python -m rakuten.models.baselines.bert_flat_classifier --data_path dataset/train_split.jsonl --backbone camembert --mode fine_tuning
 ```
+
+> Les pipelines baselines prennent **un seul fichier** (`--data_path`) et font
+> leur propre split interne train/test. Chiffres canoniques :
+> `results/baselines/baseline_results.json`.
 
 ## Configurations FlatHydra
 
