@@ -7,14 +7,30 @@ publié dans `results/`.
 > **Warning — fuite de données dans les benchmarks v1 (12/06/2026)** :
 > un audit du dataset a révélé que **11,2 % des lignes de val et de test
 > avaient un jumeau exact dans le train** (même fiche produit scrapée
-> plusieurs fois, 98 % avec le même label). Tous les résultats actuels de
-> `results/` et `comparison.html` — entraînés et évalués sur ce dataset
-> « v1 » — sont donc **optimistes de +1,5 à +3 points** en absolu. Les
-> comparaisons *entre* modèles restent valides (même fuite pour tous).
-> Le dataset redressé (« v2 », fuite purgée : −448 359 lignes de train)
-> est sur HuggingFace dans `datasets_finaux/` — les futurs benchmarks v2
-> ne seront **pas comparables** aux chiffres v1 : la baisse attendue
-> correspond à la disparition de la triche, pas à une régression.
+> plusieurs fois, 98 % avec le même label). Tous les résultats de `results/`
+> et `comparison.html` ont été entraînés et évalués sur ce dataset « v1 »
+> (fuite non purgée). Les comparaisons *entre* modèles restent valides
+> (même fuite pour tous).
+>
+> Le dataset redressé (« v2 », fuite purgée : **−314 624 lignes de train
+> nettes**, 6 126 → 5 777 classes L2) est sur HuggingFace dans
+> `datasets_finaux/`.
+>
+> **Effet réel mesuré (≠ l'estimation initiale de +1,5–3 pts).** FlatHydra a
+> été ré-entraîné + ré-évalué sur v2 (CamemBERT **et** mBERT, méthode naïve
+> identique à v1, seule la donnée change) :
+> - **L1 (mêmes 157 classes — comparaison propre)** : v2 est **0,8 à 1,3 pt
+>   plus bas** que v1 → c'est le vrai effet de la fuite, qui gonflait v1
+>   d'**~1 pt**.
+> - **L2** : v2 est *plus haut* (CamemBERT 71,7 → 78,9 ; mBERT 71,8 → 77,4),
+>   mais **pas directement comparable** : ~3 pts viennent mécaniquement des 351
+>   classes droppées (F1 moyen 0,20), et le reste du fait que dé-fuiter a
+>   *amélioré* l'entraînement (doublons retirés), pas gonflé le test.
+>
+> Conclusion : l'inflation v1 réelle est **~1 pt** (mesurée au L1), bien en
+> deçà de l'estimation initiale ; au L2 les chiffres v1 et v2 ne se comparent
+> pas terme à terme. (Mesuré sur FlatHydra / 2 encodeurs ; HYDRA et HLPD n'ont
+> pas été ré-entraînés sur v2.) Détail des 4 évals : `results/flat_hydra*/`.
 
 ## Table des Matières
 

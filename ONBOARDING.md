@@ -81,11 +81,11 @@ sur le repo privé HuggingFace [`TahianaAndriambahoaka/rakuten-dataset`][hf-data
 | Fichier             | Lignes    |
 |:--------------------|:----------|
 | `train_split.jsonl` | 5 259 035 |
-| `val_split.jsonl`   | 1 124 793 |
-| `test_split.jsonl`  | 1 124 793 |
+| `val_split.jsonl`   | 1 194 355 |
+| `test_split.jsonl`  | 1 194 356 |
 
-> **Dataset v2** : fuite de doublons purgée (−448 359 lignes de train).
-> Voir [docs/METRICS.md](docs/METRICS.md) pour l'historique v1 → v2.
+> **Dataset v2** : fuite de doublons purgée (−314 624 lignes de train nettes).
+> Voir [docs/METRICS.md](docs/METRICS.md) pour l'historique v1 → v2 et l'effet mesuré.
 
 ```bash
 export HF_TOKEN="hf_..."          # token read fourni par le propriétaire
@@ -225,8 +225,9 @@ Architecture détaillée et table de correspondance : [docs/ARCHITECTURE.md](doc
 - **Configs title-only** : `batch_size`/`lr` plus élevés que `default.yaml`
   (scaling en racine carrée, séquences plus courtes) — justifié dans
   [docs/PIPELINE.md](docs/PIPELINE.md).
-- **Dataset v1 vs v2** : les chiffres publiés avant le 12/06/2026 sont
-  gonflés de +1,5 à +3 pts (fuite de doublons) — voir [docs/METRICS.md](docs/METRICS.md).
+- **Dataset v1 vs v2** : les chiffres publiés sont sur v1 (fuité). Effet mesuré
+  de la fuite : ~1 pt au L1 ; au L2 v1↔v2 ne se comparent pas (6 126 → 5 777
+  classes) — voir [docs/METRICS.md](docs/METRICS.md).
 
 ## Pour Aller Plus Loin
 

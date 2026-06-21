@@ -40,16 +40,19 @@ Un produit arrive avec un titre et une description en français. Le modèle pré
 
 Trois familles de modèles comparées :
 
-| Famille | Approche | Meilleur F1 L2 (v2) |
+| Famille | Approche | Meilleur F1 L2 (v1, test) |
 |:--------|:---------|:-------------------:|
 | Baselines | TF-IDF, Word2Vec, fastText + classifieurs | 42.9 % |
 | **FlatHydra** | CamemBERT + tête unique L1+L2 | **71.7 %** |
 | HYDRA | CamemBERT multi-têtes (EMNLP 2025) | 66.8 % |
 | HLPD | Décodeur hiérarchique (ECIR 2025) | 61.5 % |
 
-> **Avertissement fuite v1 → v2** : les benchmarks produits avant le 12/06/2026
-> sont gonflés de +1,5 à +3 pts (doublons train/test purgés). Les chiffres
-> ci-dessus sont les valeurs v2. Détail : [docs/METRICS.md](docs/METRICS.md).
+> **Note v1 → v2 (mesuré)** : ces chiffres sont sur le dataset **v1** (fuite
+> train/test non purgée). Sur le dataset **v2** dé-fuité, FlatHydra CamemBERT
+> ré-évalué donne **78,9 %** de F1 L2 — non directement comparable à v1 (les
+> classes L2 passent de 6 126 à 5 777). L'effet propre de la fuite, mesuré au
+> niveau L1 (mêmes 157 classes), est de **~1 pt** (v1 légèrement gonflé).
+> Détail : [docs/METRICS.md](docs/METRICS.md).
 
 ---
 
@@ -153,8 +156,8 @@ Sous-dossier : `datasets_finaux/` — splits pré-générés (70/15/15, stratifi
 | Fichier | Lignes |
 |:--------|-------:|
 | `train_split.jsonl` | 5 259 035 |
-| `val_split.jsonl` | 1 124 793 |
-| `test_split.jsonl` | 1 124 793 |
+| `val_split.jsonl` | 1 194 355 |
+| `test_split.jsonl` | 1 194 356 |
 
 Chaque ligne : `{"designation": "...", "description": "...", "typelabel": "L1", "producttype": "L2"}`
 
@@ -163,9 +166,10 @@ export HF_TOKEN="hf_..."           # token read fourni par le propriétaire
 python scripts/download_dataset.py  # télécharge dans <repo>/dataset/
 ```
 
-> **Dataset v2** : fuite de doublons purgée (−448 359 lignes de train).
-> Les benchmarks antérieurs (v1) sont gonflés de +1,5 à +3 pts.
-> Voir [docs/METRICS.md](docs/METRICS.md).
+> **Dataset v2** : fuite de doublons purgée (−314 624 lignes de train nettes).
+> Effet mesuré de la fuite (FlatHydra) : ~1 pt au L1 ; au L2 les chiffres v1↔v2
+> ne se comparent pas terme à terme (6 126 → 5 777 classes). Voir
+> [docs/METRICS.md](docs/METRICS.md).
 
 ### Modèles entraînés (~50 Go)
 
