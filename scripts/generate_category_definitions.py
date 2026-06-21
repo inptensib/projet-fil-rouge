@@ -162,7 +162,10 @@ def _compute_confidence_scores(
         )
         enc = {k: v.to(device) for k, v in enc.items()}
         with torch.no_grad():
-            _, unified_logits = model(**enc)
+            _, unified_logits = model(
+                input_ids=enc["input_ids"],
+                attention_mask=enc["attention_mask"],
+            )
             logits_l2 = unified_logits[:, num_classes_l1:]
             probs_l2 = F.softmax(logits_l2, dim=-1)
             max_conf = probs_l2.max(dim=-1).values
