@@ -117,10 +117,10 @@ Dataset : [TahianaAndriambahoaka/rakuten-dataset](https://huggingface.co/dataset
 | `flat-hydra-camembert-v2` | **v2** | 92.47 % | **78.93 %** | 85.17 % |
 | `flat-hydra-mbert-v2` | **v2** | 92.09 % | 77.40 % | 85.20 % |
 | `flat-hydra-mbert` | v1 | 93.38 % | 71.78 % | 85.61 % |
-| `hydra-global-mbert` | v1 | — | 66.28 %* | — |
-| `hydra-nested-mbert` | v1 | — | 64.31 %* | — |
+| `hydra-global-mbert` | v1 | — | 66.28 % (val) | — |
+| `hydra-nested-mbert` | v1 | — | 64.31 % (val) | — |
 
-\* F1 L2 **validation** (set test non évalué pour ces deux modèles).
+Note : « (val) » = F1 L2 **validation** (set test non évalué pour ces deux modèles).
 
 ### HLPD (Hierarchical Label-aware Pre-trained Decoder)
 
