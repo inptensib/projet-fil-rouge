@@ -108,6 +108,20 @@ Dataset : [TahianaAndriambahoaka/rakuten-dataset](https://huggingface.co/dataset
 | `hydra-global-hierarchy-camembert` | Title + Desc | 92.59 % | 62.70 % | **99.74 %** |
 | `hydra-local-mbert` | Title + Desc | 93.04 % | 66.80 % | 85.81 % |
 
+### FlatHydra mBERT & dataset v2 (méthode naïve, ajoutés post-restructure)
+
+> v2 = dataset dé-fuité (5 777 L2). **Non comparable terme à terme** à v1 (6 126 L2) — cf. dataset.
+
+| Modèle | Dataset | F1 L1 | F1 L2 | HCR |
+|---|---|---|---|---|
+| `flat-hydra-camembert-v2` | **v2** | 92.47 % | **78.93 %** | 85.17 % |
+| `flat-hydra-mbert-v2` | **v2** | 92.09 % | 77.40 % | 85.20 % |
+| `flat-hydra-mbert` | v1 | 93.38 % | 71.78 % | 85.61 % |
+| `hydra-global-mbert` | v1 | — | 66.28 %* | — |
+| `hydra-nested-mbert` | v1 | — | 64.31 %* | — |
+
+\* F1 L2 **validation** (set test non évalué pour ces deux modèles).
+
 ### HLPD (Hierarchical Label-aware Pre-trained Decoder)
 
 | Modèle | Entrée | F1 L1 | F1 L2 | HCR |
@@ -134,6 +148,8 @@ rakuten-models/
 ├── hydra-nested-camembert/
 ├── hydra-global-camembert/
 ├── hydra-local-mbert/
+├── hydra-global-mbert/
+├── hydra-nested-mbert/
 ├── hydra-local-hierarchy-camembert/
 ├── hydra-nested-hierarchy-camembert/
 ├── hydra-global-hierarchy-camembert/
@@ -145,6 +161,9 @@ rakuten-models/
 ├── hydra-global-title-hierarchy-camembert/
 ├── flat-hydra/                   # + tokenizer/, label_encoders, mappings
 ├── flat-hydra-title/
+├── flat-hydra-mbert/
+├── flat-hydra-camembert-v2/      # meilleur F1 L2 : 78.9 % (dataset v2)
+├── flat-hydra-mbert-v2/
 ├── hlpd/                         # checkpoint_latest.pt uniquement
 └── baselines/
     ├── tfidf/
