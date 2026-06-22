@@ -32,6 +32,8 @@ UPLOAD_MAPPING = [
     (PROJECT_ROOT / "models" / "HYDRA_global_CamemBERT",        "hydra-global-camembert"),
     # HYDRA mBERT
     (PROJECT_ROOT / "models" / "HYDRA_local_mBERT",             "hydra-local-mbert"),
+    (PROJECT_ROOT / "models" / "HYDRA_global_mBERT",            "hydra-global-mbert"),
+    (PROJECT_ROOT / "models" / "HYDRA_nested_mBERT",            "hydra-nested-mbert"),
     # HYDRA hierarchy CamemBERT
     (PROJECT_ROOT / "models_hierarchy" / "HYDRA_local_CamemBERT",   "hydra-local-hierarchy-camembert"),
     (PROJECT_ROOT / "models_hierarchy" / "HYDRA_nested_CamemBERT",  "hydra-nested-hierarchy-camembert"),
@@ -47,6 +49,10 @@ UPLOAD_MAPPING = [
     # FlatHydra
     (PROJECT_ROOT / "models" / "flat_hydra",       "flat-hydra"),
     (PROJECT_ROOT / "models" / "flat_hydra_title", "flat-hydra-title"),
+    # FlatHydra mBERT + dataset v2 (entraînés post-restructure, méthode naïve)
+    (PROJECT_ROOT / "models" / "flat_hydra_mbert",    "flat-hydra-mbert"),
+    (PROJECT_ROOT / "models_v2" / "flat_hydra",       "flat-hydra-camembert-v2"),
+    (PROJECT_ROOT / "models_v2" / "flat_hydra_mbert", "flat-hydra-mbert-v2"),
     # HLPD
     (PROJECT_ROOT / "models" / "hlpd", "hlpd"),
     # Baselines
