@@ -244,20 +244,32 @@ class FlatHydraTrainer:
         """Load L2 class weights from disk or build them from training labels."""
         from pathlib import Path as _P
 
+        def _load_and_validate(path: "_P") -> Optional[torch.Tensor]:
+            wt = torch.load(str(path), map_location="cpu", weights_only=True).float()
+            if wt.shape[0] != self.num_classes_l2:
+                print(
+                    f"[DualExpert] WARNING: class weights at {path} have size "
+                    f"{wt.shape[0]} but num_classes_l2={self.num_classes_l2} — "
+                    f"rebuilding from training labels."
+                )
+                return None
+            print(f"[DualExpert] L2 class weights loaded from {path}")
+            return wt
+
         # Try explicit path first
         if self.config.l2_class_weights_path:
             p = _P(self.config.l2_class_weights_path)
             if p.exists():
-                wt = torch.load(str(p), map_location="cpu", weights_only=True)
-                print(f"[DualExpert] L2 class weights loaded from {p}")
-                return wt.float()
+                wt = _load_and_validate(p)
+                if wt is not None:
+                    return wt
 
         # Fall back to save_dir
         default_path = _P(self.config.save_dir) / "l2_class_weights.pt"
         if default_path.exists():
-            wt = torch.load(str(default_path), map_location="cpu", weights_only=True)
-            print(f"[DualExpert] L2 class weights loaded from {default_path}")
-            return wt.float()
+            wt = _load_and_validate(default_path)
+            if wt is not None:
+                return wt
 
         # Build from training labels if not found
         print("[DualExpert] Building effective-number L2 class weights from train labels...")
@@ -284,6 +296,25 @@ class FlatHydraTrainer:
 
         logits_l1 = unified_output[:, :self.num_classes_l1]
         logits_l2 = unified_output[:, self.num_classes_l1:]
+
+        # Guard: catch label/logit size mismatch before CUDA raises an opaque error
+        l1_max, l2_max = int(labels_l1.max()), int(labels_l2.max())
+        if l1_max >= logits_l1.shape[1]:
+            raise ValueError(
+                f"L1 label out of range: max={l1_max} >= num_classes_l1={logits_l1.shape[1]}"
+            )
+        if l2_max >= logits_l2.shape[1]:
+            raise ValueError(
+                f"L2 label out of range: max={l2_max} >= num_classes_l2={logits_l2.shape[1]} "
+                f"(self.num_classes_l2={self.num_classes_l2}). "
+                f"Stale l2_class_weights.pt? Delete {self.config.save_dir}/l2_class_weights.pt and retry."
+            )
+        if self._l2_class_weights is not None and l2_max >= self._l2_class_weights.shape[0]:
+            raise ValueError(
+                f"L2 label out of range for class weights: max={l2_max} >= "
+                f"weights.shape[0]={self._l2_class_weights.shape[0]}. "
+                f"Delete {self.config.save_dir}/l2_class_weights.pt and retry."
+            )
 
         loss_l1 = torch.nn.functional.cross_entropy(logits_l1, labels_l1)
         loss_l2 = focal_cross_entropy(
@@ -641,7 +672,32 @@ class FlatHydraTrainer:
             f"epochs_trained={history['epoch'][-1] if history['epoch'] else 0}\n"
         )
         print(f"\n[Done] Best F1 L2: {best_val_f1:.4f} — artefacts in {model_dir}/")
+        self._save_train_confidence_scores(model_dir)
         return history
+
+    def _save_train_confidence_scores(self, model_dir: Path) -> None:
+        """Run the best model on the train set and save per-sample L2 confidence scores.
+
+        Saved as train_confidence_scores.pt — a 1-D float tensor of length n_train.
+        Used by generate_category_definitions.py to skip the ~3h inference pass.
+        """
+        conf_path = model_dir / "train_confidence_scores.pt"
+        print("[Train] Computing train confidence scores (best model)...")
+        best_ckpt = torch.load(
+            model_dir / "best_model.pt", map_location=self.device, weights_only=False
+        )
+        state = best_ckpt.get("model_state_dict", best_ckpt)
+        state = {k.replace("module.", ""): v for k, v in state.items()}
+        self._base_model.load_state_dict(state)
+
+        train_loader = self._make_loader(
+            self.data["X_train"], self.data["y_l1_train"], self.data["y_l2_train"],
+            shuffle=False, use_augmentation=False,
+        )
+        metrics = self.evaluate(train_loader)
+        confs = torch.tensor(metrics["_confs_l2"])
+        torch.save(confs, conf_path)
+        print(f"[Train] Saved {len(confs):,} confidence scores → {conf_path}")
 
     def save(self, save_dir: Optional[str] = None) -> None:
         """Persist model artefacts to disk.

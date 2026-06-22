@@ -82,7 +82,7 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=10,
                         help="Number of candidates passed to the LLM")
     parser.add_argument("--provider",
-                        choices=["none", "local", "openai_compatible", "mistral_api"],
+                        choices=["none", "local", "openai_compatible", "mistral_api", "hf_local"],
                         default="none")
     parser.add_argument("--api-base-url", default="http://localhost:8080/v1")
     parser.add_argument("--api-key", default="none")
@@ -90,6 +90,10 @@ def main() -> None:
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--timeout", type=float, default=15.0)
+    parser.add_argument("--hf-load-in-4bit", action="store_true",
+                        help="Quantize hf_local model to 4-bit (bitsandbytes)")
+    parser.add_argument("--confidence-threshold", type=float, default=0.75,
+                        help="Route to LLM when L2 confidence < threshold (default 0.75)")
     parser.add_argument("--prompt-path",
                         default=str(_ROOT / "prompts" / "llm_reranker_fr.txt"),
                         help="Path to LLM reranker prompt template")
@@ -149,10 +153,13 @@ def main() -> None:
         api_key=args.api_key,
         timeout_seconds=args.timeout,
         fallback_to_domain_expert=True,
+        hf_load_in_4bit=getattr(args, "hf_load_in_4bit", False),
     )
+    from src.dual_expert.difficulty_router import RoutingThresholds
     router_cfg = DifficultyRouterConfig(
         enabled=True,
         max_llm_pass_through_rate=1.0,  # no cap during evaluation
+        thresholds=RoutingThresholds(min_l2_confidence=args.confidence_threshold),
     )
     gen_cfg = CandidateGenerationConfig(top_k=args.top_k)
 

@@ -447,14 +447,20 @@ def main() -> None:
     # Confidence scores (optional)
     l2_confidences: dict[int, list[float]] | None = None
     if args.confidence_sampling:
-        print(f"[GenDefs] Computing confidence scores from {args.checkpoint}...")
-        all_texts = [str(t) for t in data["X_train"]]
-        all_confs = _compute_confidence_scores(
-            all_texts,
-            args.checkpoint,
-            num_classes_l1=num_l1,
-            batch_size=args.confidence_batch_size,
-        )
+        conf_cache = Path(args.checkpoint) / "train_confidence_scores.pt"
+        if conf_cache.exists():
+            print(f"[GenDefs] Loading cached confidence scores from {conf_cache}...")
+            import torch as _torch
+            all_confs = _torch.load(conf_cache, map_location="cpu").tolist()
+        else:
+            print(f"[GenDefs] Computing confidence scores from {args.checkpoint}...")
+            all_texts = [str(t) for t in data["X_train"]]
+            all_confs = _compute_confidence_scores(
+                all_texts,
+                args.checkpoint,
+                num_classes_l1=num_l1,
+                batch_size=args.confidence_batch_size,
+            )
         l2_confidences = defaultdict(list)
         for conf, l2 in zip(all_confs, data["y_l2_train"]):
             l2_confidences[int(l2)].append(conf)
