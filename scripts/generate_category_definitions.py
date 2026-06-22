@@ -130,7 +130,10 @@ def _compute_confidence_scores(
     with open(d / "config.json") as f:
         cfg = json.load(f)
 
-    tokenizer = AutoTokenizer.from_pretrained(str(d / "tokenizer"), local_files_only=True)
+    # Load tokenizer from encoder name (already cached from training) to avoid
+    # huggingface_hub path validation rejecting absolute local paths.
+    encoder_name = cfg.get("encoder", "camembert-base")
+    tokenizer = AutoTokenizer.from_pretrained(encoder_name)
     model = FlatHydra(
         encoder_name=cfg.get("encoder", "camembert-base"),
         num_classes_l1=cfg["num_classes_l1"],
