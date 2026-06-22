@@ -228,29 +228,111 @@ def _make_dry_run_definition(
     }
 
 
-def _call_llm(
-    prompt: str,
-    provider: str,
-    api_base_url: str,
-    api_key: str,
-    model_name: str,
-    temperature: float,
-    max_new_tokens: int,
-    timeout: float,
-) -> str:
-    """Call LLM API and return raw text response."""
-    import requests
-    payload = {
-        "model": model_name,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": temperature,
-        "max_tokens": max_new_tokens,
-    }
-    headers = {"Authorization": f"Bearer {api_key}"}
-    url = f"{api_base_url.rstrip('/')}/chat/completions"
-    resp = requests.post(url, json=payload, headers=headers, timeout=timeout)
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+class _APIClient:
+    """HTTP client for OpenAI-compatible endpoints (local server, Mistral API, etc.)."""
+
+    def __init__(self, api_base_url: str, api_key: str) -> None:
+        try:
+            import requests as _req
+            self._requests = _req
+        except ImportError as e:
+            raise ImportError("requests is required: pip install requests") from e
+        self._base_url = api_base_url.rstrip("/")
+        self._api_key = api_key
+
+    def generate(self, prompt: str, model_name: str, temperature: float,
+                 max_new_tokens: int, timeout: float) -> str:
+        payload = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+            "max_tokens": max_new_tokens,
+        }
+        resp = self._requests.post(
+            f"{self._base_url}/chat/completions",
+            json=payload,
+            headers={"Authorization": f"Bearer {self._api_key}"},
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
+
+class _HFLocalClient:
+    """In-process HuggingFace client — loads the model once, runs inference in-memory.
+
+    No HTTP server required. The model is loaded on first instantiation and
+    kept alive for the full generation loop (one load for all ~6 000 categories).
+
+    Args:
+        model_name: HuggingFace model id or local path.
+        load_in_4bit: Quantize to 4-bit via bitsandbytes (saves VRAM).
+    """
+
+    def __init__(self, model_name: str, load_in_4bit: bool = False) -> None:
+        try:
+            import torch
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+        except ImportError as e:
+            raise ImportError(
+                "transformers and torch are required for hf_local provider"
+            ) from e
+
+        print(f"[HFLocalClient] Loading {model_name} ...")
+        load_kwargs: dict = {
+            "device_map": "auto",
+            "torch_dtype": torch.bfloat16,
+            "trust_remote_code": True,
+        }
+        if load_in_4bit:
+            from transformers import BitsAndBytesConfig
+            load_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
+
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            model_name, trust_remote_code=True
+        )
+        self._model = AutoModelForCausalLM.from_pretrained(model_name, **load_kwargs)
+        self._model.eval()
+        print("[HFLocalClient] Model ready.")
+
+    def generate(self, prompt: str, model_name: str, temperature: float,
+                 max_new_tokens: int, timeout: float) -> str:
+        import torch
+
+        messages = [{"role": "user", "content": prompt}]
+        if hasattr(self._tokenizer, "apply_chat_template"):
+            input_text = self._tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        else:
+            input_text = prompt
+
+        inputs = self._tokenizer(
+            input_text, return_tensors="pt", truncation=True, max_length=4096
+        ).to(self._model.device)
+
+        with torch.no_grad():
+            output_ids = self._model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                temperature=max(temperature, 1e-6),
+                do_sample=temperature > 0,
+                pad_token_id=self._tokenizer.eos_token_id,
+            )
+
+        new_ids = output_ids[0][inputs["input_ids"].shape[1]:]
+        return self._tokenizer.decode(new_ids, skip_special_tokens=True)
+
+
+def _make_llm_client(provider: str, api_base_url: str, api_key: str,
+                     model_name: str, hf_load_in_4bit: bool = False):
+    """Factory — returns the appropriate client for the given provider."""
+    if provider == "hf_local":
+        return _HFLocalClient(model_name, load_in_4bit=hf_load_in_4bit)
+    if provider in ("local", "openai_compatible", "mistral_api"):
+        return _APIClient(api_base_url, api_key)
+    raise ValueError(f"Unknown provider: '{provider}'. "
+                     f"Choose from: hf_local, local, openai_compatible, mistral_api")
 
 
 def _validate_definition(defn: dict) -> tuple[bool, str]:
@@ -285,14 +367,25 @@ def main() -> None:
     parser.add_argument("--examples-per-category", type=int, default=20)
     parser.add_argument("--dry-run", action="store_true",
                         help="Skip LLM calls, generate placeholder definitions")
-    parser.add_argument("--provider", choices=["local", "openai_compatible", "mistral_api"],
-                        default="local")
-    parser.add_argument("--api-base-url", default="http://localhost:8080/v1")
-    parser.add_argument("--api-key", default="none")
-    parser.add_argument("--model", default="mixtral-8x7b-instruct")
+    parser.add_argument("--provider",
+                        choices=["hf_local", "local", "openai_compatible", "mistral_api"],
+                        default="local",
+                        help=(
+                            "hf_local: load model in-process via HuggingFace (no server needed). "
+                            "local/openai_compatible/mistral_api: HTTP /chat/completions endpoint."
+                        ))
+    parser.add_argument("--api-base-url", default="http://localhost:8080/v1",
+                        help="API base URL (ignored for hf_local)")
+    parser.add_argument("--api-key", default="none",
+                        help="API key (ignored for hf_local)")
+    parser.add_argument("--model", default="mixtral-8x7b-instruct",
+                        help="Model name or HuggingFace path (e.g. mistralai/Mistral-7B-Instruct-v0.2)")
+    parser.add_argument("--hf-load-in-4bit", action="store_true",
+                        help="Quantize to 4-bit via bitsandbytes (hf_local only, saves VRAM)")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--max-new-tokens", type=int, default=512)
-    parser.add_argument("--timeout", type=float, default=30.0)
+    parser.add_argument("--timeout", type=float, default=30.0,
+                        help="HTTP timeout in seconds (ignored for hf_local)")
     parser.add_argument("--version", default="v1")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--resume", action="store_true",
@@ -378,6 +471,17 @@ def main() -> None:
         else:
             print(f"[GenDefs] Prompt not found: {p} — using built-in default.")
 
+    # Build LLM client once (hf_local loads the model here, API clients are lightweight)
+    llm_client = None
+    if not args.dry_run and prompt_template:
+        llm_client = _make_llm_client(
+            provider=args.provider,
+            api_base_url=args.api_base_url,
+            api_key=args.api_key,
+            model_name=args.model,
+            hf_load_in_4bit=args.hf_load_in_4bit,
+        )
+
     # Resume: load already generated l2_ids
     already_done: set[int] = set()
     output_path = Path(args.output)
@@ -422,7 +526,7 @@ def main() -> None:
                 if s_l2 != l2_id and s_l2 < len(l2_enc.classes_)
             ][:20]
 
-            if args.dry_run or not prompt_template:
+            if args.dry_run or not prompt_template or llm_client is None:
                 defn = _make_dry_run_definition(
                     l2_id, l1_id, l1_name, l2_name, sampled, siblings, args.version
                 )
@@ -431,11 +535,8 @@ def main() -> None:
                     l1_name, l2_name, sampled, siblings, prompt_template
                 )
                 try:
-                    raw = _call_llm(
+                    raw = llm_client.generate(
                         prompt=prompt,
-                        provider=args.provider,
-                        api_base_url=args.api_base_url,
-                        api_key=args.api_key,
                         model_name=args.model,
                         temperature=args.temperature,
                         max_new_tokens=args.max_new_tokens,

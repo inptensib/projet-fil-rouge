@@ -8,7 +8,8 @@ Key design constraints:
 - JSON output is required.
 - Fallback to Domain Expert top-1 if parsing or validation fails.
 - Supports providers: 'local' (HTTP endpoint), 'mistral_api',
-  'openai_compatible', and 'none' (dry-run for testing).
+  'openai_compatible', 'hf_local' (in-process HuggingFace model),
+  and 'none' (dry-run for testing).
 """
 
 from __future__ import annotations
@@ -44,6 +45,8 @@ class LLMRerankerConfig:
     # For local / openai_compatible providers
     api_base_url: str = "http://localhost:8080/v1"
     api_key: str = "none"
+    # For hf_local provider
+    hf_load_in_4bit: bool = False   # quantize to 4-bit via bitsandbytes
 
 
 @dataclass
@@ -281,10 +284,86 @@ class _OpenAICompatibleClient:
         return resp.json()["choices"][0]["message"]["content"]
 
 
+class _HFLocalClient:
+    """In-process HuggingFace client — loads the model once, runs inference in-memory.
+
+    No HTTP server needed. The model is loaded on the first call and kept alive
+    for the lifetime of the reranker.
+
+    provider = "hf_local"
+    model_name = any HuggingFace model id or local path
+                 e.g. "mistralai/Mistral-7B-Instruct-v0.2"
+                      "/scratch/models/mixtral-8x7b"
+
+    Requires: transformers, torch (and optionally bitsandbytes for 4-bit).
+    Set load_in_4bit=True via hf_load_in_4bit config field to quantize.
+    """
+
+    def __init__(self, config: LLMRerankerConfig) -> None:
+        try:
+            from transformers import AutoTokenizer, AutoModelForCausalLM
+            import torch
+        except ImportError as e:
+            raise ImportError(
+                "transformers and torch are required for hf_local provider"
+            ) from e
+
+        print(f"[HFLocalClient] Loading model: {config.model_name} ...")
+        load_kwargs: dict = {
+            "device_map": "auto",
+            "torch_dtype": torch.bfloat16,
+            "trust_remote_code": True,
+        }
+        if getattr(config, "hf_load_in_4bit", False):
+            from transformers import BitsAndBytesConfig
+            load_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
+
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            config.model_name, trust_remote_code=True
+        )
+        self._model = AutoModelForCausalLM.from_pretrained(
+            config.model_name, **load_kwargs
+        )
+        self._model.eval()
+        self._config = config
+        print(f"[HFLocalClient] Model ready.")
+
+    def generate(self, prompt: str, config: LLMRerankerConfig) -> str:
+        import torch
+
+        messages = [{"role": "user", "content": prompt}]
+        # Use apply_chat_template if available (instruct models), else raw prompt
+        if hasattr(self._tokenizer, "apply_chat_template"):
+            input_text = self._tokenizer.apply_chat_template(
+                messages, tokenize=False, add_generation_prompt=True
+            )
+        else:
+            input_text = prompt
+
+        inputs = self._tokenizer(
+            input_text, return_tensors="pt", truncation=True, max_length=4096
+        ).to(self._model.device)
+
+        with torch.no_grad():
+            output_ids = self._model.generate(
+                **inputs,
+                max_new_tokens=config.max_new_tokens,
+                temperature=max(config.temperature, 1e-6),
+                do_sample=config.temperature > 0,
+                pad_token_id=self._tokenizer.eos_token_id,
+            )
+
+        # Decode only the newly generated tokens
+        new_ids = output_ids[0][inputs["input_ids"].shape[1]:]
+        return self._tokenizer.decode(new_ids, skip_special_tokens=True)
+
+
 def _make_client(config: LLMRerankerConfig):
     """Factory that creates the appropriate LLM client."""
     if config.provider == "none":
         return _NoneClient()
+    if config.provider == "hf_local":
+        return _HFLocalClient(config)
     if config.provider in ("local", "openai_compatible", "mistral_api"):
         return _OpenAICompatibleClient(config)
     raise ValueError(f"Unknown LLM provider: '{config.provider}'")

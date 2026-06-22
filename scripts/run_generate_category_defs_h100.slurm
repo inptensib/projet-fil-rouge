@@ -2,21 +2,24 @@
 # ==============================================================================
 # Génération des définitions de catégories L2 via LLM — H100 (80 GB HBM3)
 # ==============================================================================
-# 6 126 appels LLM × ~5s = ~8h — le job peut être interrompu et repris (--resume)
+# Deux modes LLM :
 #
-# Mode 1 — Sampling aléatoire (défaut) :
-#   sbatch scripts/run_generate_category_defs_h100.slurm
+#   Mode API  (défaut) — serveur LLM séparé requis :
+#     export LLM_API_URL=http://<node>:8080/v1
+#     sbatch scripts/run_generate_category_defs_h100.slurm
 #
-# Mode 2 — Sampling par confiance (exemples difficiles, meilleure qualité) :
-#   export CONFIDENCE_SAMPLING=1
-#   export CHECKPOINT=models/dual_expert_h100
-#   sbatch scripts/run_generate_category_defs_h100.slurm
+#   Mode hf_local — modèle chargé en mémoire, aucun serveur requis :
+#     export USE_HF_LOCAL=1
+#     export LLM_MODEL=mistralai/Mistral-7B-Instruct-v0.2
+#     sbatch scripts/run_generate_category_defs_h100.slurm
+#
+#   Sur H100 80 GB : modèles jusqu'à 70B en bfloat16 sans quantification
+#     export USE_HF_LOCAL=1
+#     export LLM_MODEL=mistralai/Mixtral-8x7B-Instruct-v0.1
+#     sbatch scripts/run_generate_category_defs_h100.slurm
 #
 # Reprendre un run interrompu :
 #   sbatch scripts/run_generate_category_defs_h100.slurm  # --resume est toujours actif
-#
-# Surcharger les chemins sans éditer ce fichier :
-#   export LLM_API_URL=http://<node>:8080/v1 && sbatch scripts/run_generate_category_defs_h100.slurm
 # ==============================================================================
 
 #SBATCH --partition=ENSTA-h100
@@ -36,7 +39,9 @@ DATA_DIR="${DATA_DIR:-$HOME/projet-fil-rouge/dataset}"
 TAXONOMY="${TAXONOMY:-$DATA_DIR/product_classification_taxonomy.csv}"
 OUTPUT="${OUTPUT:-$HOME/projet-fil-rouge/data/category_definitions/category_definitions_v1.jsonl}"
 
-# LLM server
+# LLM — mode API ou hf_local
+USE_HF_LOCAL="${USE_HF_LOCAL:-0}"         # 1 = chargement en mémoire, 0 = API HTTP
+HF_LOAD_IN_4BIT="${HF_LOAD_IN_4BIT:-0}"  # 1 = quantification 4-bit (rarement utile sur H100)
 LLM_API_URL="${LLM_API_URL:-http://localhost:8080/v1}"
 LLM_API_KEY="${LLM_API_KEY:-none}"
 LLM_MODEL="${LLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}"
@@ -72,8 +77,9 @@ echo " Generate Category Definitions | H100 | $(hostname) | $(date)"
 echo " Data       : $DATA_DIR"
 echo " Taxonomy   : $TAXONOMY"
 echo " Output     : $OUTPUT"
-echo " LLM URL    : $LLM_API_URL"
+echo " LLM mode   : $([ "$USE_HF_LOCAL" = "1" ] && echo "hf_local (in-process)" || echo "API ($LLM_API_URL)")"
 echo " LLM Model  : $LLM_MODEL"
+echo " 4-bit      : $([ "$HF_LOAD_IN_4BIT" = "1" ] && echo "oui" || echo "non")"
 echo " Sampling   : $([ "$CONFIDENCE_SAMPLING" = "1" ] && echo "confidence ($CHECKPOINT)" || echo "representative")"
 echo " GPU        : $(python -c 'import torch; print(torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU")' 2>/dev/null)"
 echo "======================================================================"
@@ -86,6 +92,14 @@ if [ "$CONFIDENCE_SAMPLING" = "1" ]; then
     CONFIDENCE_FLAGS="--confidence-sampling --checkpoint $CHECKPOINT --confidence-batch-size $CONFIDENCE_BATCH_SIZE"
 fi
 
+LLM_FLAGS=""
+if [ "$USE_HF_LOCAL" = "1" ]; then
+    LLM_FLAGS="--provider hf_local"
+    [ "$HF_LOAD_IN_4BIT" = "1" ] && LLM_FLAGS="$LLM_FLAGS --hf-load-in-4bit"
+else
+    LLM_FLAGS="--provider openai_compatible --api-base-url $LLM_API_URL --api-key $LLM_API_KEY --timeout $LLM_TIMEOUT"
+fi
+
 # ------------------------------------------------------------------------------
 # Lancement (--resume toujours actif pour permettre la reprise)
 # ------------------------------------------------------------------------------
@@ -93,16 +107,13 @@ python scripts/generate_category_definitions.py \
     --split-dir "$DATA_DIR" \
     --output "$OUTPUT" \
     --taxonomy-path "$TAXONOMY" \
-    --provider openai_compatible \
-    --api-base-url "$LLM_API_URL" \
-    --api-key "$LLM_API_KEY" \
     --model "$LLM_MODEL" \
     --max-new-tokens "$LLM_MAX_TOKENS" \
-    --timeout "$LLM_TIMEOUT" \
     --temperature "$LLM_TEMPERATURE" \
     --examples-per-category "$EXAMPLES_PER_CATEGORY" \
     --representative-sampling \
     --resume \
+    $LLM_FLAGS \
     $CONFIDENCE_FLAGS
 
 echo "======================================================================"
