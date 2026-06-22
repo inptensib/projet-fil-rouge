@@ -29,6 +29,7 @@ PROJECT_ROOT="${PROJECT_ROOT:-$HOME/projet-fil-rouge/rakuten-classification}"
 VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/projet-fil-rouge/venv/bin/activate}"
 DATA_DIR="${DATA_DIR:-$HOME/projet-fil-rouge/dataset}"
 CONFIG="${CONFIG:-01_baselines/configs/flat_hydra_dual_expert_l40s.yaml}"
+TAXONOMY="${TAXONOMY:-$DATA_DIR/product_classification_taxonomy.csv}"
 HF_CACHE="${HF_CACHE:-$HOME/.cache/huggingface}"
 
 # ------------------------------------------------------------------------------
@@ -63,6 +64,7 @@ echo " FlatHydra Dual-Expert | L40S | Task ${SLURM_ARRAY_TASK_ID:-0}/${SLURM_ARR
 echo " Host     : $(hostname)"
 echo " Date     : $(date)"
 echo " Config   : $CONFIG"
+echo " Taxonomy : $TAXONOMY"
 echo " Save dir : $SAVE_DIR"
 echo " GPUs     : $SLURM_GPUS_ON_NODE"
 python -c "import torch; [print(f' GPU {i}    : {torch.cuda.get_device_name(i)}') for i in range(torch.cuda.device_count())]" 2>/dev/null
@@ -91,6 +93,7 @@ fi
 python scripts/run_flat_hydra.py \
     --split-dir "$DATA_DIR/" \
     --config "$CONFIG" \
+    --taxonomy-path "$TAXONOMY" \
     $RESUME_FLAG
 
 echo "======================================================================"

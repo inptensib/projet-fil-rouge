@@ -112,6 +112,13 @@ def main() -> None:
         default=None,
         help="Répertoire de sauvegarde des artefacts",
     )
+    parser.add_argument(
+        "--taxonomy-path",
+        default=None,
+        metavar="CSV",
+        help="Chemin vers product_classification_taxonomy.csv. "
+             "Si omis, cherché automatiquement dans le dossier des données.",
+    )
 
     args = parser.parse_args()
 
@@ -152,6 +159,7 @@ def main() -> None:
             n_samples=args.n_samples,
             seed=config.seed,
             use_description=config.use_description,
+            taxonomy_path=args.taxonomy_path,
         )
     else:
         data_path = Path(args.data)
