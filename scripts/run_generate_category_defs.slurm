@@ -68,7 +68,7 @@ HF_CACHE="${HF_CACHE:-$HOME/.cache/huggingface}"
 source "$VENV_ACTIVATE"
 cd "$PROJECT_ROOT"
 
-export TRANSFORMERS_OFFLINE=1
+export TRANSFORMERS_OFFLINE=0
 export HF_HOME="$HF_CACHE"
 export PYTHONPATH=""
 
