@@ -182,10 +182,19 @@ python scripts/download_dataset.py  # télécharge dans <repo>/dataset/
 > ne se comparent pas terme à terme (6 126 → 5 777 classes). Voir
 > [docs/METRICS.md](docs/METRICS.md).
 
-### Modèles entraînés (~50 Go)
+### Modèles entraînés (~63 Go, 22 modèles)
 
 Repo HF privé : [`TahianaAndriambahoaka/rakuten-models`][hf-models]
-Télécharger uniquement le sous-dossier nécessaire :
+
+Le plus simple — via le script dédié :
+
+```bash
+export HF_TOKEN="hf_..."
+python scripts/download_models.py                      # tous les modèles (~63 Go)
+python scripts/download_models.py flat-hydra-camembert-v2   # un seul modèle
+```
+
+Ou directement en Python pour un sous-dossier précis :
 
 ```python
 from huggingface_hub import snapshot_download

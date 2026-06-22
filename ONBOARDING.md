@@ -106,9 +106,17 @@ Chaque ligne est un objet JSON avec les champs `designation`,
 
 ## Récupérer les Modèles Entraînés
 
-Tous les poids entraînés (~50 Go) sont archivés sur le repo privé
+Tous les poids entraînés (~63 Go, 22 modèles) sont archivés sur le repo privé
 [`TahianaAndriambahoaka/rakuten-models`][hf-models] — ils ne sont **pas**
-dans ce dépôt git. Télécharger uniquement le modèle voulu :
+dans ce dépôt git. Le plus simple, via le script dédié :
+
+```bash
+export HF_TOKEN="hf_..."
+python scripts/download_models.py                          # tous (~63 Go)
+python scripts/download_models.py flat-hydra-camembert-v2  # un seul modèle
+```
+
+Ou directement en Python pour un sous-dossier précis :
 
 ```python
 from huggingface_hub import snapshot_download
