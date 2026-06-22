@@ -42,8 +42,10 @@ implémentent trois familles de baselines classiques :
 - **fastText** : classification supervisée (mode supervised de fastText).
 - **FlatHydra** : CamemBERT avec une unique tête plate L1+L2 (5 934 sorties en
   v2 = 157 + 5 777 ; 6 283 sur le dataset v1 d'origine). C'est la meilleure
-  baseline (F1 L2 = 71.7 %, mesuré en v1) et le point de départ naturel pour
-  HYDRA.
+  baseline (F1 L2 = 71.7 % en v1, 78,9 % en v2) et le point de départ naturel pour
+  HYDRA. **Constat clé** : FlatHydra obtient le meilleur F1 L2 du projet, au-dessus
+  des têtes multi-niveaux HYDRA. Malgré son nom, FlatHydra n'est **pas** une variante
+  de HYDRA : c'est une baseline forte (rangée dans `rakuten/models/baselines/`).
 
 ### Étape 3 — HYDRA (EMNLP 2025)
 
@@ -145,6 +147,20 @@ from rakuten.models.baselines.flat_model import FlatHydra
 from rakuten.models.hlpd import HLPDConfig, HLPDTrainer
 from rakuten.models.hlpd.losses import ZLPRLoss
 ```
+
+---
+
+## Ajouter une Variante HYDRA
+
+Pour intégrer une nouvelle variante (ex. `bilinear`) :
+
+- Créer la classe dans `rakuten/models/hydra/models.py` en héritant de `HYDRABase`,
+  puis l'enregistrer dans le dictionnaire `HYDRA_VARIANTS` (ligne ~249).
+- Si la variante produit une sortie unifiée (comme `global`/`nested`), gérer le cas
+  dans `HYDRALoss.__init__` et `forward` (`rakuten/models/hydra/losses.py`) via le
+  paramètre `architecture`.
+- Ajouter un test dans `tests/test_hydra_models.py` (forward pass, dimensions de sortie).
+- Déclarer une config YAML dans `configs/hydra/` si les hyperparamètres divergent de `default.yaml`.
 
 ---
 

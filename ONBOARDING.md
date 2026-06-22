@@ -59,6 +59,8 @@ cd rakuten-classification
 
 python -m venv ../venv
 source ../venv/bin/activate
+# CPU ou autre version CUDA ? Installer torch d'abord via l'index PyTorch adapté
+# (cf. commentaire en tête de requirements.txt), puis :
 pip install -e .
 
 # Smoke test : la suite complète passe sans données ni GPU
@@ -139,7 +141,10 @@ constante `MODEL_CARD` de `scripts/upload_models_hf.py`.
 
 ## Premier Entraînement
 
-Smoke test local sur un sous-échantillon (CPU ou GPU, ~10 min) :
+Smoke test local sur un sous-échantillon — **nécessite le dataset** (section précédente).
+Durée : quelques minutes à dizaines de minutes selon la machine.
+
+> **Sans token HF** : s'arrêter après les 305 tests, c'est la voie de repli normale.
 
 ```bash
 python scripts/run_train.py \
@@ -239,6 +244,8 @@ Architecture détaillée et table de correspondance : [docs/ARCHITECTURE.md](doc
   provenance de chaque chiffre publié
 - [docs/flat_hydra_conception.md](docs/flat_hydra_conception.md) —
   conception de la baseline FlatHydra
+- [CONTRIBUTING.md](CONTRIBUTING.md) — branchement, pipeline qualité (tests + lint),
+  format de commit Conventional Commits
 
 [hf-dataset]: https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset
 [hf-models]: https://huggingface.co/TahianaAndriambahoaka/rakuten-models

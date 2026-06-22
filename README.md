@@ -86,9 +86,16 @@ graph TD
 | `global` | + tête unifiée L1+L2 | Implicite |
 | `nested` | + MLP de raffinement L2 conditionné sur L1 | Par construction |
 
+> **Constat clé** : la tête plate *FlatHydra* (CamemBERT + une seule tête L1+L2) obtient
+> le meilleur F1 L2 du projet, au-dessus des têtes multi-niveaux HYDRA. Malgré son nom,
+> FlatHydra n'est **pas** une variante de HYDRA : c'est une baseline forte (rangée dans
+> `rakuten/models/baselines/`).
+
 ---
 
-## Résultats clés
+## Résultats clés (v1, test)
+
+> F1 L1 non rapporté pour les modèles profonds — métrique cible = F1 L2.
 
 | Modèle | F1 L1 | F1 L2 | HCR |
 |:-------|:-----:|:-----:|:---:|
@@ -112,6 +119,8 @@ graph TD
 # 1. Cloner et installer
 git clone <repo-url> && cd rakuten-classification
 python -m venv venv && source venv/bin/activate
+# CPU ou autre version CUDA ? Installer torch d'abord via l'index PyTorch adapté
+# (cf. commentaire en tête de requirements.txt), puis :
 pip install -e .
 
 # 2. Vérifier l'installation — aucune donnée ni GPU requis
@@ -121,7 +130,9 @@ python -m pytest tests/ -q          # 305 tests doivent passer
 export HF_TOKEN="hf_..."
 python scripts/download_dataset.py
 
-# 4. Smoke test local (CPU, ~10 min)
+# 4. Smoke test local — nécessite le dataset (étape 3 ci-dessus)
+# Durée : quelques minutes à dizaines de minutes selon la machine
+# Sans token HF : s'arrêter après les 305 tests, c'est la voie de repli normale.
 python scripts/run_train.py --split-dir dataset/ --n-samples 5000 \
     --config configs/hydra/default.yaml
 
@@ -268,6 +279,12 @@ rakuten-classification/
 
 Architecture détaillée et table de correspondance ancien → nouveau :
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+---
+
+## Contribuer
+
+Voir [CONTRIBUTING.md](CONTRIBUTING.md) — branchement, pipeline qualité (tests + lint), format de commit.
 
 ---
 

@@ -89,13 +89,32 @@ sbatch scripts/run_eval_hydra_title_hierarchy.slurm     # évaluation
 ### FlatHydra (tête unique L1+L2)
 
 ```bash
-sbatch --job-name=flat --array=0-9%1 scripts/run_flat_3090.slurm     # 2×3090
-sbatch --job-name=flat --array=0-9%1 scripts/run_flat_p100.slurm     # 2×P100
+sbatch --job-name=flat --array=0-9%1 scripts/run_flat_3090.slurm     # 2×3090 (v1)
+sbatch --job-name=flat --array=0-9%1 scripts/run_flat_p100.slurm     # 2×P100 (v1)
 sbatch --job-name=flat-mbert --array=0-9%1 scripts/run_flat_mbert.slurm
 sbatch scripts/run_flat_hydra_title_3090.slurm                       # title-only
 
-sbatch scripts/run_eval_flat_hydra.slurm          # éval full-text
+sbatch scripts/run_eval_flat_hydra.slurm          # éval full-text (v1)
 sbatch scripts/run_eval_flat_hydra_title.slurm     # éval title-only
+```
+
+**Modèle phare v2 (référence 78,9 % F1 L2) :**
+
+```bash
+# Entraînement CamemBERT v2 (méthode naïve — config flat_hydra_camembert_v2.yaml)
+sbatch --array=0-9%1 scripts/run_flat_camembert_v2.slurm
+
+# Entraînement mBERT v2 (77,4 % F1 L2)
+sbatch --array=0-9%1 scripts/run_flat_mbert_v2.slurm
+
+# Évaluation test (générique, paramétrable via --export)
+sbatch scripts/run_eval_flat_hydra_generic.slurm
+# Exemple pour mBERT v2 :
+# sbatch --job-name=eval-mbert-v2 \
+#   --export=ALL,MODEL_PT=models_v2/flat_hydra_mbert/best_model.pt,\
+#   EVAL_CONFIG=configs/baselines/flat_hydra_mbert_v2.yaml,\
+#   RESULTS_DIR=results/flat_hydra_mbert_v2 \
+#   scripts/run_eval_flat_hydra_generic.slurm
 ```
 
 ### HLPD
@@ -143,14 +162,18 @@ papier, ≠ 0.3 HYDRA) ; le batch varie selon le GPU — `flat_hydra.yaml`
 (64, CPU/debug), `flat_hydra_3090.yaml` (256), `flat_hydra_title_3090.yaml`
 (512), `flat_hydra_mbert.yaml` (128, mBERT plus lourd).
 
-> **Configs dataset v2** : `configs/hydra/v2_default.yaml` et
-> `configs/baselines/flat_hydra_v2.yaml` ciblent le **dataset v2 dé-fuité**
-> (5 777 L2) et activent le kit de rééquilibrage (`normalize_text`,
-> `synthetic_policy: drop_oversampled`, `class_weighting: inv_sqrt`,
-> `logit_adjustment_tau`). Elles s'invoquent comme les autres
-> (`--config configs/hydra/v2_default.yaml`) ; ce sont les configs de
-> référence pour reproduire les résultats v2. Les configs ci-dessus
-> (sans suffixe `v2`) correspondent aux entraînements v1 historiques.
+> **Configs dataset v2 — attention aux confusions** :
+>
+> - `configs/baselines/flat_hydra_camembert_v2.yaml` = méthode **naïve** (identique v1, sans
+>   rééquilibrage). Lancée via `run_flat_camembert_v2.slurm` → produit le **78,9 % de F1 L2**
+>   de référence sur le dataset v2 (CamemBERT).
+> - `configs/baselines/flat_hydra_mbert_v2.yaml` = mBERT naïf v2, lancée via
+>   `run_flat_mbert_v2.slurm` → 77,4 % F1 L2.
+> - `configs/baselines/flat_hydra_v2.yaml` et `configs/hydra/v2_default.yaml` portent le
+>   **kit de rééquilibrage** (`normalize_text`, `synthetic_policy: drop_oversampled`,
+>   `class_weighting: inv_sqrt`, `logit_adjustment`) — ces deux configs **n'ont jamais été
+>   lancées** et constituent une expérience future, pas la référence du 78,9 %.
+> - Les configs sans suffixe `v2` correspondent aux entraînements v1 historiques.
 
 ## Scripts SLURM
 
