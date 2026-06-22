@@ -314,6 +314,9 @@ def main() -> None:
                         help="FlatHydra checkpoint directory (required for --confidence-sampling)")
     parser.add_argument("--confidence-batch-size", type=int, default=64,
                         help="Batch size for confidence scoring inference")
+    parser.add_argument("--taxonomy-path", default=None, metavar="CSV",
+                        help="Path to product_classification_taxonomy.csv. "
+                             "If omitted, looked up automatically in --split-dir.")
     args = parser.parse_args()
 
     if args.confidence_sampling and not args.checkpoint:
@@ -329,6 +332,7 @@ def main() -> None:
         test_path=str(split_dir / "test_split.jsonl"),
         n_samples=args.n_samples,
         seed=args.seed,
+        taxonomy_path=args.taxonomy_path,
     )
 
     l1_enc = data["l1_encoder"]
