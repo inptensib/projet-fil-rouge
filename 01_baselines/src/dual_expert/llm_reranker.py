@@ -318,11 +318,14 @@ class _HFLocalClient:
             from transformers import BitsAndBytesConfig
             load_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_4bit=True)
 
+        import os
+        _local = os.path.isdir(config.model_name)
         self._tokenizer = AutoTokenizer.from_pretrained(
-            config.model_name, trust_remote_code=True
+            config.model_name, trust_remote_code=True,
+            local_files_only=_local,
         )
         self._model = AutoModelForCausalLM.from_pretrained(
-            config.model_name, **load_kwargs
+            config.model_name, local_files_only=_local, **load_kwargs
         )
         self._model.eval()
         self._config = config

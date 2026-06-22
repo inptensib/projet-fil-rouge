@@ -130,7 +130,7 @@ def _compute_confidence_scores(
     with open(d / "config.json") as f:
         cfg = json.load(f)
 
-    tokenizer = AutoTokenizer.from_pretrained(str(d / "tokenizer"))
+    tokenizer = AutoTokenizer.from_pretrained(str(d / "tokenizer"), local_files_only=True)
     model = FlatHydra(
         encoder_name=cfg.get("encoder", "camembert-base"),
         num_classes_l1=cfg["num_classes_l1"],
