@@ -6,10 +6,12 @@ extraction, and train/val/test splitting.
 
 from __future__ import annotations
 
+import csv
 import gc
 import json
 import logging
 import random
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -183,6 +185,7 @@ def prepare_hierarchical_data(
     val_ratio: float = 0.125,
     seed: int = 42,
     use_description: bool = True,
+    taxonomy_path: Optional[str | Path] = None,
 ) -> dict:
     """Load JSONL data and prepare hierarchical labels with train/val/test splits.
 
@@ -209,10 +212,13 @@ def prepare_hierarchical_data(
     df["label_l1"] = l1_encoder.fit_transform(df["level_1"])
     df["label_l2"] = l2_encoder.fit_transform(df["level_2"])
 
-    # Build parent-child mapping
-    l2_to_l1 = build_parent_child_mapping(
-        df["label_l1"].values, df["label_l2"].values
-    )
+    # Build parent-child mapping — taxonomy file takes precedence over data
+    _taxonomy = taxonomy_path or Path(file_path).parent / "product_classification_taxonomy.csv"
+    l2_to_l1 = build_parent_child_mapping_from_taxonomy(_taxonomy, l1_encoder, l2_encoder)
+    data_mapping = build_parent_child_mapping(df["label_l1"].values, df["label_l2"].values)
+    for l2, l1 in data_mapping.items():
+        if l2 not in l2_to_l1:
+            l2_to_l1[l2] = l1
 
     # Train/val/test split
     try:
@@ -307,6 +313,7 @@ def prepare_hierarchical_data_from_splits(
     n_samples: Optional[int] = None,
     seed: int = 42,
     use_description: bool = True,
+    taxonomy_path: Optional[str | Path] = None,
 ) -> dict:
     """Load pre-split JSONL files and prepare hierarchical labels.
 
@@ -379,10 +386,15 @@ def prepare_hierarchical_data_from_splits(
     y_l1_test = l1_encoder.transform(_to_list(df_test["level_1"]))
     y_l2_test = l2_encoder.transform(_to_list(df_test["level_2"]))
 
-    # Build parent-child mapping from all data
+    # Build parent-child mapping — taxonomy file takes precedence over data
+    _taxonomy = taxonomy_path or Path(train_path).parent / "product_classification_taxonomy.csv"
+    l2_to_l1 = build_parent_child_mapping_from_taxonomy(_taxonomy, l1_encoder, l2_encoder)
     all_l1_enc = np.concatenate([y_l1_train, y_l1_val, y_l1_test])
     all_l2_enc = np.concatenate([y_l2_train, y_l2_val, y_l2_test])
-    l2_to_l1 = build_parent_child_mapping(all_l1_enc, all_l2_enc)
+    data_mapping = build_parent_child_mapping(all_l1_enc, all_l2_enc)
+    for l2, l1 in data_mapping.items():
+        if l2 not in l2_to_l1:
+            l2_to_l1[l2] = l1
 
     del all_l1_enc, all_l2_enc
 
@@ -427,6 +439,53 @@ def build_parent_child_mapping(
                 "L2 class %s has multiple L1 parents: existing=%s, new=%s",
                 l2, l2_to_l1[l2], l1,
             )
+    return l2_to_l1
+
+
+def build_parent_child_mapping_from_taxonomy(
+    taxonomy_path: str | Path,
+    l1_encoder,
+    l2_encoder,
+) -> dict[int, int]:
+    """Build L2→L1 mapping from the official Rakuten taxonomy CSV.
+
+    Args:
+        taxonomy_path: Path to product_classification_taxonomy.csv
+                       (columns: prdtypecode, Typelabel, type_de_produit).
+        l1_encoder: Fitted sklearn LabelEncoder for L1 names.
+        l2_encoder: Fitted sklearn LabelEncoder for L2 names.
+
+    Returns:
+        dict {l2_idx → l1_idx} for all L2 names present in both the CSV
+        and the encoder. L2 classes not found in the taxonomy are omitted
+        (caller should fill gaps with build_parent_child_mapping()).
+    """
+    path = Path(taxonomy_path)
+    if not path.exists():
+        logging.getLogger(__name__).warning(
+            "Taxonomy file not found: %s — falling back to data-derived mapping.", path
+        )
+        return {}
+
+    l1_set = set(l1_encoder.classes_)
+    l2_set = set(l2_encoder.classes_)
+    l2_to_l1: dict[int, int] = {}
+    n_mapped = 0
+    n_skipped = 0
+
+    with open(path, encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            l1_name = row["Typelabel"].strip()
+            l2_name = row["type_de_produit"].strip()
+            if l1_name not in l1_set or l2_name not in l2_set:
+                n_skipped += 1
+                continue
+            l2_idx = int(l2_encoder.transform([l2_name])[0])
+            l1_idx = int(l1_encoder.transform([l1_name])[0])
+            l2_to_l1[l2_idx] = l1_idx
+            n_mapped += 1
+
+    print(f"[Data] Taxonomy: {n_mapped} L2→L1 mappings loaded ({n_skipped} skipped — not in encoder)")
     return l2_to_l1
 
 
