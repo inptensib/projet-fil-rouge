@@ -30,7 +30,7 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -227,7 +227,7 @@ def _make_dry_run_definition(
         "generated_by_model": "dry-run",
         "generation_prompt_version": version,
         "definition_version": version,
-        "created_at": datetime.utcnow().strftime("%Y-%m-%d"),
+        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
     }
 
 
@@ -572,7 +572,7 @@ def main() -> None:
                         "generated_by_model": args.model,
                         "generation_prompt_version": args.version,
                         "definition_version": args.version,
-                        "created_at": datetime.utcnow().strftime("%Y-%m-%d"),
+                        "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                     }
                     if valid:
                         n_ok += 1
@@ -591,6 +591,7 @@ def main() -> None:
                     time.sleep(0.1)  # polite rate-limiting for API providers
 
             out_f.write(json.dumps(defn, ensure_ascii=False) + "\n")
+            out_f.flush()
 
             if (l2_id + 1) % 100 == 0:
                 print(f"  [{l2_id + 1}/{num_l2}] ok={n_ok} fail={n_fail} skip={n_skip}")

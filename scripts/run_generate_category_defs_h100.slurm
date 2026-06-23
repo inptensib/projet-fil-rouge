@@ -103,7 +103,7 @@ fi
 # ------------------------------------------------------------------------------
 # Lancement (--resume toujours actif pour permettre la reprise)
 # ------------------------------------------------------------------------------
-python scripts/generate_category_definitions.py \
+python -u scripts/generate_category_definitions.py \
     --split-dir "$DATA_DIR" \
     --output "$OUTPUT" \
     --taxonomy-path "$TAXONOMY" \
