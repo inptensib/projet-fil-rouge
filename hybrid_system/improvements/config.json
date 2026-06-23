@@ -8,11 +8,11 @@
       "output_dir": "checkpoints/l2_camembert_focal/",
       "expected_improvement": "+2-4% F1-macro, +0.5-1% accuracy",
       "actual_result": "Standalone acc=0.8100 / f1m=0.6087 (weaker accuracy). In the hybrid with XGB v2 it lifts f1m from 0.6608 to 0.6722.",
-      "time_estimate": "~9h on RTX 3090 (3 epochs)",
+      "time_estimate": "~12-18h on RTX 3090",
       "parameters": {
         "focal_gamma": 2.0,
         "label_smoothing": 0.1,
-        "class_weights": "inverse frequency (capped at 10x, normalized to mean=1)",
+        "class_weights": "inverse frequency (capped at 10x)",
         "lr": 1e-5,
         "lr_scheduler": "cosine",
         "epochs": 3,
@@ -29,7 +29,7 @@
       "output_dir": "checkpoints/l2_xgboost_v2/",
       "expected_improvement": "+1-3% XGBoost accuracy → +0.3-0.7% overall",
       "actual_result": "Hybrid (run2 + XGB v2, max_conf): acc=0.8467 / f1m=0.6608 / f1w=0.8440 — beats baseline on all metrics. Biggest single win.",
-      "time_estimate": "~9h embedding extraction + ~2h XGBoost training (embeddings cached after first run)",
+      "time_estimate": "~3-4h (embedding extraction + XGBoost training)",
       "parameters": {
         "embedding_mode": "concat (L1 768d + L2 768d = 1536d)",
         "alternative_modes": ["l2_only (768d)", "l1_only (768d, current baseline)"],
@@ -50,7 +50,6 @@
       "slurm": "scripts/run_meta_learner.sh",
       "output_dir": "checkpoints/meta_learner/",
       "expected_improvement": "+0.3-1% accuracy over max_conf",
-      "actual_result": "WORSE — excluded from final system (see README)",
       "time_estimate": "<5 min (CPU only, uses cached predictions)",
       "prerequisites": ["predictions_cache.pkl from threshold sweep"],
       "parameters": {
@@ -60,16 +59,70 @@
         "decision_target": "1=use XGBoost (when it's right and CamemBERT is wrong)"
       },
       "rationale": "max_conf is a global rule. A meta-learner can learn per-context patterns (e.g., 'trust XGBoost more when confidence gap is large AND models disagree')."
+    },
+    {
+      "id": "step4_xgboost_v3",
+      "name": "XGBoost v3 — concat embeddings + engineered text features",
+      "script": "scripts/train_xgboost_v3.py",
+      "slurm": "scripts/run_xgboost_v3.sh",
+      "output_dir": "checkpoints/l2_xgboost_v3/",
+      "expected_improvement": "small accuracy/F1 gain from explicit non-linear text signals",
+      "actual_result": "Hybrid (focal + XGB v3, max_conf): acc=0.8479 / f1m=0.6728 / f1w=0.8467 — only +0.06pp f1m over v2. Engineered features add almost nothing; the embeddings already capture them.",
+      "time_estimate": "~2h (reuses cached v2 concat embeddings, no GPU for features)",
+      "parameters": {
+        "feature_dim": 1546,
+        "base": "v2 1536d [emb_l1, emb_l2] + 10 engineered features",
+        "engineered_features": ["title_len_chars", "title_len_words", "desc_len_chars", "desc_len_words", "has_desc", "total_len_chars", "digit_ratio", "upper_ratio", "punct_ratio", "uniq_word_ratio"]
+      },
+      "rationale": "Trees benefit from explicit signals (lengths, digit/upper/punct ratios) that are hard to read off a CLS embedding. Strict superset of v2 features."
+    },
+    {
+      "id": "step5_xgboost_v3_balanced",
+      "name": "XGBoost v3_balanced — v3 features + inverse-frequency class weighting (rare-class booster)",
+      "script": "scripts/train_xgboost_v3.py (BALANCE=1)",
+      "slurm": "scripts/run_xgboost_v3_balanced.sh",
+      "output_dir": "checkpoints/l2_xgboost_v3_balanced/",
+      "expected_improvement": "F1-macro gain on the long tail (trees' analogue of focal loss)",
+      "actual_result": "Hybrid (focal + XGB v3_balanced, max_conf): acc=0.8490 / f1m=0.6814 / f1w=0.8480 — NEW STANDARD. +0.92pp f1m over focal+v2. The rare-class weighting is the real win.",
+      "time_estimate": "~2h (reuses cached concat embeddings)",
+      "parameters": {
+        "balance": true,
+        "balance_alpha": 0.5,
+        "balance_cap": 10,
+        "weight_formula": "w_subcat = (N / n_subcat) ** alpha, normalized to mean 1, capped at BALANCE_CAP",
+        "env_vars": "BALANCE=1 BALANCE_ALPHA=0.5 BALANCE_CAP=10"
+      },
+      "rationale": "Inverse-frequency sample weights amplify rare L2 subcategories the same way focal loss does for the CamemBERT branch — directly targets F1-macro. Engineered features alone (v3) did nothing; the weighting added +0.9pp f1m."
+    },
+    {
+      "id": "step6_knn_tail_expert",
+      "name": "kNN / Nearest-Class-Mean tail expert — third voter for the long tail",
+      "script": "eval_knn_tail.py",
+      "slurm": "run_knn_tail.sh",
+      "output_dir": "(no model file — NCM centroids rebuilt from cached embeddings at eval time)",
+      "expected_improvement": "F1-macro on the ultra-rare + rare bands, accuracy-neutral",
+      "actual_result": "Adopted at margin tau=0.15: acc=0.8487 / f1m=0.6912 — +0.98pp f1m for -0.03pp acc. ~+1pp f1m, well below the +15.8pp oracle ceiling (limited by detector precision/recall tradeoff).",
+      "time_estimate": "~15-25 min CPU (reuses cached concat embeddings, no GPU, no training)",
+      "parameters": {
+        "method": "Nearest-Class-Mean over ALL 6067 classes (L2-normalized centroids from train concat embeddings, L2-half = run2 768d)",
+        "tail_definition": "train count < 100 (2106 classes, ~12.3k val / test samples = ~1% of data)",
+        "gate": "margin = sim(nearest tail centroid) - sim(nearest non-tail centroid); override base when margin > tau",
+        "tau_recommended": 0.15,
+        "tau_alternatives": {"max_f1m": 0.125, "acc_neutral": 0.20},
+        "val_recall_at_1_on_tail": 0.704,
+        "why_margin": "absolute cosine-sim has no precision (BERT embeddings anisotropic — everything is moderately similar); margin vs non-tail centroids removes the global-similarity baseline"
+      },
+      "rationale": "Diagnostic (diagnose_tail.py) found +15.8pp oracle F1-macro headroom in the tail at flat accuracy, with 77-99% of tail errors being 'both base experts wrong' (need a NEW model). A flat NCM tail expert bypasses L1 routing (only the XGBoost branch is L1-capped) and works at 1-5 samples/class where gradient models can't."
     }
   ],
 
   "execution_order": [
     "Step 3 (meta-learner) can run IMMEDIATELY — only needs predictions_cache.pkl",
-    "Step 2 (XGBoost v2) needs GPU for embedding extraction (~9h, cached after) then trains 149 models",
-    "Step 1 (focal loss) ~9h for 3 epochs, gives biggest F1-macro gain",
+    "Step 2 (XGBoost v2) needs GPU for embedding extraction (~3h) then CPU for XGBoost",
+    "Step 1 (focal loss) is longest (~12-18h) but gives biggest F1-macro gain",
     "After Step 1 completes: re-run threshold sweep with new CamemBERT checkpoint",
     "After Step 2 completes: re-run threshold sweep with new XGBoost",
-    "Final: combine improvements in one sweep"
+    "Final: combine all 3 improvements in one sweep"
   ],
 
   "baseline_to_beat": {
@@ -80,20 +133,41 @@
   },
 
   "final_result": {
-    "system": "Focal L2 + XGBoost v2 (concat), max_conf",
-    "accuracy": 0.8476,
-    "f1_macro": 0.6722,
-    "f1_weighted": 0.8463,
+    "system": "Focal L2 + XGBoost v3_balanced (max_conf) + kNN/NCM tail expert (margin tau=0.15)",
+    "status": "CURRENT STANDARD",
+    "accuracy": 0.8487,
+    "f1_macro": 0.6912,
+    "f1_weighted": 0.848,
+    "config": "max_conf base (XGB on ~41% of contested) + tail override where NCM margin > 0.15 (~6k samples)",
+    "n_test_samples": 1194356,
     "beats_baseline": true,
-    "delta_vs_baseline": {
-      "accuracy": 0.0122,
-      "f1_macro": 0.0401,
-      "f1_weighted": 0.0151
+    "delta_vs_v1_baseline": {
+      "accuracy": 0.0133,
+      "f1_macro": 0.0591,
+      "f1_weighted": 0.0168
+    },
+    "delta_vs_focal_v3_balanced": {
+      "accuracy": -0.0003,
+      "f1_macro": 0.0098,
+      "f1_weighted": 0.0
+    },
+    "tail_expert_operating_points": {
+      "tau_0.125_max_f1m":  {"accuracy": 0.8484, "f1_macro": 0.6914},
+      "tau_0.15_adopted":   {"accuracy": 0.8487, "f1_macro": 0.6912},
+      "tau_0.20_acc_neutral": {"accuracy": 0.8490, "f1_macro": 0.6875}
+    },
+    "progression": {
+      "v1_baseline_run2_xgb_v1":   {"accuracy": 0.8354, "f1_macro": 0.6321, "f1_weighted": 0.8312},
+      "focal_xgb_v2":              {"accuracy": 0.8476, "f1_macro": 0.6722, "f1_weighted": 0.8463},
+      "focal_xgb_v3":              {"accuracy": 0.8479, "f1_macro": 0.6728, "f1_weighted": 0.8467, "note": "engineered features alone add ~nothing"},
+      "focal_xgb_v3_balanced":     {"accuracy": 0.8490, "f1_macro": 0.6814, "f1_weighted": 0.8480, "note": "rare-class weighting drives the F1-macro gain"},
+      "plus_knn_tail_expert":      {"accuracy": 0.8487, "f1_macro": 0.6912, "f1_weighted": 0.848,  "note": "NEW STANDARD — NCM tail voter, +1pp f1m at ~flat accuracy"}
     },
     "isolated_results": {
       "focal_only": {"accuracy": 0.8324, "f1_macro": 0.6548, "f1_weighted": 0.8307, "config": "gated, thr 0.8"},
       "xgb_v2_only": {"accuracy": 0.8467, "f1_macro": 0.6608, "f1_weighted": 0.8440, "config": "max_conf"},
-      "meta_learner": {"accuracy": 0.8331, "f1_macro": 0.6108, "note": "rejected — worse than max_conf"}
+      "meta_learner": {"accuracy": 0.8331, "f1_macro": 0.6108, "note": "rejected — worse than max_conf"},
+      "decision_layer_study": {"note": "calibration & learned gate both hurt; max_conf confirmed near-optimal — bottleneck is the component models, not the decision rule"}
     }
   }
 }
