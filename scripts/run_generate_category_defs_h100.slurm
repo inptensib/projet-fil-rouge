@@ -37,7 +37,7 @@ PROJECT_ROOT="${PROJECT_ROOT:-$HOME/projet-fil-rouge/rakuten-classification}"
 VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/projet-fil-rouge/venv/bin/activate}"
 DATA_DIR="${DATA_DIR:-$HOME/projet-fil-rouge/dataset}"
 TAXONOMY="${TAXONOMY:-$DATA_DIR/product_classification_taxonomy.csv}"
-OUTPUT="${OUTPUT:-$HOME/projet-fil-rouge/data/category_definitions/category_definitions_v1.jsonl}"
+OUTPUT="${OUTPUT:-$PROJECT_ROOT/models/category_definitions/category_definitions_v1.jsonl}"
 
 # LLM — mode API ou hf_local
 USE_HF_LOCAL="${USE_HF_LOCAL:-1}"         # 1 = chargement en mémoire, 0 = API HTTP
