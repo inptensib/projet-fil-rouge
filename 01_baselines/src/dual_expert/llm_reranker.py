@@ -95,10 +95,17 @@ def parse_llm_json(response_text: str) -> dict:
         pass
 
     match = re.search(r"\{.*\}", text, flags=re.DOTALL)
-    if not match:
-        raise ValueError(f"No JSON object found in LLM response: {text[:200]!r}")
+    if match:
+        return json.loads(match.group(0))
 
-    return json.loads(match.group(0))
+    # Truncated JSON recovery: extract definition_fr from incomplete response
+    defn_match = re.search(r'"definition_fr"\s*:\s*"((?:[^"\\]|\\.)*)', text, flags=re.DOTALL)
+    if defn_match:
+        definition_fr = defn_match.group(1).replace('\\"', '"').replace("\\n", " ").strip()
+        if definition_fr:
+            return {"definition_fr": definition_fr}
+
+    raise ValueError(f"No JSON object found in LLM response: {text[:200]!r}")
 
 
 def validate_llm_output(
