@@ -96,14 +96,26 @@ def parse_llm_json(response_text: str) -> dict:
 
     match = re.search(r"\{.*\}", text, flags=re.DOTALL)
     if match:
-        return json.loads(match.group(0))
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass  # malformed JSON — fall through to field extraction
 
-    # Truncated JSON recovery: extract definition_fr from incomplete response
-    defn_match = re.search(r'"definition_fr"\s*:\s*"((?:[^"\\]|\\.)*)', text, flags=re.DOTALL)
-    if defn_match:
-        definition_fr = defn_match.group(1).replace('\\"', '"').replace("\\n", " ").strip()
-        if definition_fr:
-            return {"definition_fr": definition_fr}
+    # Fallback: extract fields individually via regex (handles truncated or malformed JSON)
+    result = {}
+    for field in ("definition_fr", "confidence"):
+        m = re.search(rf'"{field}"\s*:\s*"((?:[^"\\]|\\.)*)"', text, flags=re.DOTALL)
+        if m:
+            result[field] = m.group(1).replace('\\"', '"').replace("\\n", " ").strip()
+    for field in ("included_products", "excluded_products", "positive_signals", "negative_signals", "ambiguities"):
+        m = re.search(rf'"{field}"\s*:\s*(\[.*?\])', text, flags=re.DOTALL)
+        if m:
+            try:
+                result[field] = json.loads(m.group(1))
+            except json.JSONDecodeError:
+                pass
+    if result.get("definition_fr"):
+        return result
 
     raise ValueError(f"No JSON object found in LLM response: {text[:200]!r}")
 
