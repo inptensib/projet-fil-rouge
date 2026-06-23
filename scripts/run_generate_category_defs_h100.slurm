@@ -40,7 +40,7 @@ TAXONOMY="${TAXONOMY:-$DATA_DIR/product_classification_taxonomy.csv}"
 OUTPUT="${OUTPUT:-$HOME/projet-fil-rouge/data/category_definitions/category_definitions_v1.jsonl}"
 
 # LLM — mode API ou hf_local
-USE_HF_LOCAL="${USE_HF_LOCAL:-0}"         # 1 = chargement en mémoire, 0 = API HTTP
+USE_HF_LOCAL="${USE_HF_LOCAL:-1}"         # 1 = chargement en mémoire, 0 = API HTTP
 HF_LOAD_IN_4BIT="${HF_LOAD_IN_4BIT:-0}"  # 1 = quantification 4-bit (rarement utile sur H100)
 LLM_API_URL="${LLM_API_URL:-http://localhost:8080/v1}"
 LLM_API_KEY="${LLM_API_KEY:-none}"
