@@ -587,7 +587,8 @@ def main() -> None:
                     defn["_error"] = str(e)
                     n_fail += 1
 
-                time.sleep(0.1)  # polite rate-limiting
+                if args.provider != "hf_local":
+                    time.sleep(0.1)  # polite rate-limiting for API providers
 
             out_f.write(json.dumps(defn, ensure_ascii=False) + "\n")
 
