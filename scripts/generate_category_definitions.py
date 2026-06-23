@@ -284,7 +284,7 @@ class _HFLocalClient:
         print(f"[HFLocalClient] Loading {model_name} ...")
         load_kwargs: dict = {
             "device_map": "auto",
-            "torch_dtype": torch.bfloat16,
+            "dtype": torch.bfloat16,
             "trust_remote_code": True,
         }
         if load_in_4bit:
