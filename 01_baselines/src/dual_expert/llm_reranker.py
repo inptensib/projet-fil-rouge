@@ -247,12 +247,12 @@ Réponds uniquement en JSON valide :
             lines.append(f"Signaux positifs: {positive}")
         if negative:
             lines.append(f"Exclusions / signaux négatifs: {negative}")
-        if isinstance(prob_l2, float):
-            lines.append(f"P(L2|texte): {prob_l2:.4f}")
-        if isinstance(hierarchy_score, float):
-            lines.append(f"Score hiérarchique: {hierarchy_score:.4f}")
-        else:
-            lines.append(f"Score hiérarchique: {hierarchy_score}")
+        # if isinstance(prob_l2, float):
+        #     lines.append(f"P(L2|texte): {prob_l2:.4f}")
+        # if isinstance(hierarchy_score, float):
+        #     lines.append(f"Score hiérarchique: {hierarchy_score:.4f}")
+        # else:
+        #     lines.append(f"Score hiérarchique: {hierarchy_score}")
         return "\n".join(lines)
 
 
