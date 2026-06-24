@@ -161,7 +161,7 @@ def _preprocess_df(df, use_description: bool = True):
                 ).alias("text"),
                 pl.col("level_2_raw").str.strip_chars().alias("level_2"),
             )
-            .select("text", "level_1", "level_2")
+            .select("text", "level_1", "level_2", "designation", "description")
         )
     else:
         # Pandas fallback
@@ -175,7 +175,7 @@ def _preprocess_df(df, use_description: bool = True):
             df["text"] = df["designation"] + ". " + df["description"]
         else:
             df["text"] = df["designation"]
-        return df[["text", "level_1", "level_2"]]
+        return df[["text", "level_1", "level_2", "designation", "description"]]
 
 
 def prepare_hierarchical_data(
@@ -403,6 +403,10 @@ def prepare_hierarchical_data_from_splits(
     X_val = df_val["text"].to_list()
     X_test = df_test["text"].to_list()
 
+    # Raw designation/description kept separately for LLM prompt construction
+    designations_test = df_test["designation"].to_list()
+    descriptions_test = df_test["description"].to_list()
+
     del df_train, df_val, df_test
     gc.collect()
 
@@ -414,6 +418,8 @@ def prepare_hierarchical_data_from_splits(
         "l2_to_l1_mapping": l2_to_l1,
         "num_classes_l1": len(l1_encoder.classes_),
         "num_classes_l2": len(l2_encoder.classes_),
+        "designations_test": designations_test,
+        "descriptions_test": descriptions_test,
     }
 
 
@@ -487,6 +493,8 @@ def build_parent_child_mapping_from_taxonomy(
 
     print(f"[Data] Taxonomy: {n_mapped} L2→L1 mappings loaded ({n_skipped} skipped — not in encoder)")
     return l2_to_l1
+
+
 
 
 def build_parent_child_matrix(
