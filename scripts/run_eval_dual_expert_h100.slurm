@@ -45,7 +45,7 @@ DATA_DIR="${DATA_DIR:-$HOME/projet-fil-rouge/dataset}"
 CHECKPOINT="${CHECKPOINT:-models/dual_expert_h100}"
 TAXONOMY="${TAXONOMY:-$DATA_DIR/product_classification_taxonomy.csv}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/dual_expert_eval_h100}"
-SPLIT="${SPLIT:-eval}"
+SPLIT="${SPLIT:-val}"
 TOP_K="${TOP_K:-5}"
 
 # LLM reranker (provider=none → Domain Expert seul)
