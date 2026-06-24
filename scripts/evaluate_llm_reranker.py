@@ -125,6 +125,10 @@ def main() -> None:
                         help="Enable short text routing rule (off by default)")
     parser.add_argument("--no-sibling-confusion", action="store_true",
                         help="Disable sibling confusion routing rule")
+    parser.add_argument("--hierarchy-alpha", type=float, default=0.5,
+                        help="Weight of parent L1 log-prob in candidate scoring: "
+                             "score = log P(L2) + alpha * log P(parent_L1). "
+                             "0.0 = pure L2 softmax ranking, 0.5 = default")
     parser.add_argument("--debug", action="store_true",
                         help="For each routed sample, print top-K candidates and full L1/L2 comparison")
     parser.add_argument("--prompt-path",
@@ -141,6 +145,7 @@ def main() -> None:
     from src.dual_expert.category_definitions import CategoryDefinitionStore
     from src.dual_expert.difficulty_router import DifficultyRouterConfig
     from src.dual_expert.dual_expert_classifier import DualExpertProductClassifier
+    from src.dual_expert.hierarchy_scorer import HierarchyScoringConfig
     from src.dual_expert.llm_reranker import LLMRerankerConfig
 
     split_dir = Path(args.split_dir)
@@ -218,10 +223,17 @@ def main() -> None:
         ),
     )
     gen_cfg = CandidateGenerationConfig(top_k=args.top_k)
+    scoring_cfg = HierarchyScoringConfig(
+        enabled=args.hierarchy_alpha > 0.0,
+        alpha=args.hierarchy_alpha,
+    )
 
     print(f"[Eval] Loading classifier from {args.checkpoint}...")
+    print(f"[Eval] Hierarchy alpha: {args.hierarchy_alpha} "
+          f"({'pure L2 softmax' if args.hierarchy_alpha == 0.0 else 'hierarchy-aware scoring'})")
     clf = DualExpertProductClassifier.from_checkpoint(
         args.checkpoint,
+        scoring_config=scoring_cfg,
         generation_config=gen_cfg,
         router_config=router_cfg,
         reranker_config=reranker_cfg,
