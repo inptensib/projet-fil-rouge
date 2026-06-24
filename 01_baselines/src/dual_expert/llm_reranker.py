@@ -363,6 +363,17 @@ class _HFLocalClient:
         else:
             input_text = prompt
 
+        # Measure prompt length before truncation to detect silent cuts
+        raw_ids = self._tokenizer(input_text, return_tensors="pt", truncation=False)
+        n_tokens = raw_ids["input_ids"].shape[1]
+        if n_tokens > 4096:
+            print(
+                f"[HFLocalClient] WARNING: prompt is {n_tokens} tokens — "
+                f"truncated to 4096. Designation/description or candidates may be cut."
+            )
+        else:
+            print(f"[HFLocalClient] Prompt: {n_tokens} tokens (limit: 4096)")
+
         inputs = self._tokenizer(
             input_text, return_tensors="pt", truncation=True, max_length=4096
         ).to(self._model.device)
