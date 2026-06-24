@@ -260,11 +260,29 @@ def main() -> None:
                        "✗→✓" if not correct_before and correct_after else
                        "✓→✗" if correct_before and not correct_after else
                        "✗→✗")
+
+            # Domain Expert labels (L1 derived from l2_to_l1 mapping)
+            domain_l1_id    = clf.router.l2_to_l1_mapping.get(domain_top1, -1)
+            domain_l1_label = clf._l1_name(domain_l1_id)
+            domain_l2_label = clf._l2_name(domain_top1)
+
+            # LLM General Expert labels (already on result)
+            llm_l1_label = result.pred_l1_label
+            llm_l2_label = result.pred_l2_label
+
+            # Ground-truth labels
+            gt_l2_label = clf._l2_name(label)
+            gt_l1_id    = clf.router.l2_to_l1_mapping.get(label, -1)
+            gt_l1_label = clf._l1_name(gt_l1_id)
+
             print(
                 f"  [Router] #{i:>5} | {outcome} | reasons: {', '.join(reasons)} | "
-                f"conf_l2={result.confidence_l2:.3f} | "
-                f"text: {designation[:60]!r}"
+                f"conf_l2={result.confidence_l2:.3f}"
             )
+            print(f"           text        : {designation[:80]!r}")
+            print(f"           ground truth: {gt_l1_label} > {gt_l2_label}")
+            print(f"           domain expert: {domain_l1_label} > {domain_l2_label}")
+            print(f"           llm expert   : {llm_l1_label} > {llm_l2_label}")
 
         if (i + 1) % 500 == 0:
             print(f"  [{i + 1}/{len(texts)}] routed so far: {len(routed_indices)}")
