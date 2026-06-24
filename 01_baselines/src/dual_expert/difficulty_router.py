@@ -33,6 +33,7 @@ class RoutingThresholds:
     rare_class_threshold: int = 100
     rare_class_min_confidence: float = 0.90
     min_text_chars: int = 30
+    sibling_confusion_min_count: int = 5  # min siblings in top-K to flag confusion
 
 
 @dataclass
@@ -121,7 +122,9 @@ def should_route_to_llm(
     if rules.send_if_short_text and short_text:
         reasons.append("short_text")
 
-    if rules.send_if_sibling_confusion and _has_sibling_confusion(top_l2_ids, l2_to_l1_mapping):
+    if rules.send_if_sibling_confusion and _has_sibling_confusion(
+        top_l2_ids, l2_to_l1_mapping, threshold=t.sibling_confusion_min_count
+    ):
         reasons.append("sibling_confusion")
 
     return len(reasons) > 0, reasons

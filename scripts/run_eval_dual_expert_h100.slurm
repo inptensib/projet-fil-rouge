@@ -59,8 +59,10 @@ LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-512}"
 LLM_TIMEOUT="${LLM_TIMEOUT:-15.0}"
 
 # Modes d'évaluation
-N_SAMPLES="${N_SAMPLES:-}"                   # vide = dataset complet ; ex: 10000
-CONFIDENCE_THRESHOLD="${CONFIDENCE_THRESHOLD:-0.75}"  # seuil routing LLM
+N_SAMPLES="${N_SAMPLES:-}"                             # vide = dataset complet ; ex: 10000
+CONFIDENCE_THRESHOLD="${CONFIDENCE_THRESHOLD:-0.75}"   # seuil routing LLM
+SIBLING_CONFUSION_THRESHOLD="${SIBLING_CONFUSION_THRESHOLD:-5}"  # min siblings dans top-K
+DISABLE_SIBLING_CONFUSION="${DISABLE_SIBLING_CONFUSION:-0}"       # 1 = désactiver la règle
 
 CATEGORY_DEFS="${CATEGORY_DEFS:-}"
 
@@ -89,6 +91,7 @@ echo " Output             : $OUTPUT_DIR"
 echo " Provider           : $PROVIDER"
 echo " N_SAMPLES          : ${N_SAMPLES:-complet}"
 echo " Confidence seuil   : $CONFIDENCE_THRESHOLD"
+echo " Sibling threshold  : $SIBLING_CONFUSION_THRESHOLD (disabled=$([ "$DISABLE_SIBLING_CONFUSION" = "1" ] && echo "oui" || echo "non"))"
 if [ "$PROVIDER" != "none" ]; then
     echo " LLM Model          : $LLM_MODEL"
     echo " 4-bit              : $([ "$HF_LOAD_IN_4BIT" = "1" ] && echo "oui" || echo "non")"
@@ -130,6 +133,8 @@ python scripts/evaluate_llm_reranker.py \
     --model "$LLM_MODEL" \
     --max-new-tokens "$LLM_MAX_TOKENS" \
     --confidence-threshold "$CONFIDENCE_THRESHOLD" \
+    --sibling-confusion-threshold "$SIBLING_CONFUSION_THRESHOLD" \
+    $([ "$DISABLE_SIBLING_CONFUSION" = "1" ] && echo "--no-sibling-confusion") \
     $LLM_FLAGS \
     $SAMPLE_FLAG \
     $DEFS_FLAG

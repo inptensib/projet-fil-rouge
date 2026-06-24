@@ -94,6 +94,10 @@ def main() -> None:
                         help="Quantize hf_local model to 4-bit (bitsandbytes)")
     parser.add_argument("--confidence-threshold", type=float, default=0.75,
                         help="Route to LLM when L2 confidence < threshold (default 0.75)")
+    parser.add_argument("--sibling-confusion-threshold", type=int, default=5,
+                        help="Min siblings in top-K to flag sibling confusion (default 5)")
+    parser.add_argument("--no-sibling-confusion", action="store_true",
+                        help="Disable the sibling confusion routing rule entirely")
     parser.add_argument("--prompt-path",
                         default=str(_ROOT / "prompts" / "llm_reranker_fr.txt"),
                         help="Path to LLM reranker prompt template")
@@ -163,11 +167,17 @@ def main() -> None:
         fallback_to_domain_expert=True,
         hf_load_in_4bit=getattr(args, "hf_load_in_4bit", False),
     )
-    from src.dual_expert.difficulty_router import RoutingThresholds
+    from src.dual_expert.difficulty_router import RoutingRules, RoutingThresholds
     router_cfg = DifficultyRouterConfig(
         enabled=True,
         max_llm_pass_through_rate=1.0,  # no cap during evaluation
-        thresholds=RoutingThresholds(min_l2_confidence=args.confidence_threshold),
+        thresholds=RoutingThresholds(
+            min_l2_confidence=args.confidence_threshold,
+            sibling_confusion_min_count=args.sibling_confusion_threshold,
+        ),
+        rules=RoutingRules(
+            send_if_sibling_confusion=not args.no_sibling_confusion,
+        ),
     )
     gen_cfg = CandidateGenerationConfig(top_k=args.top_k)
 
