@@ -186,12 +186,12 @@ Pour choisir :
 4. Sélectionne uniquement une catégorie candidate.
 
 Réponds uniquement en JSON valide :
-{{
+{
   "selected_l2_id": <int>,
   "selected_path": "<L1 > L2>",
   "confidence": "high|medium|low",
   "reason": "<raison courte en français>"
-}}"""
+}"""
 
     def __init__(self, prompt_template_path: Optional[str | Path] = None) -> None:
         self._template = self._DEFAULT_TEMPLATE
@@ -221,10 +221,11 @@ Réponds uniquement en JSON valide :
         candidate_blocks = "\n\n".join(
             self._format_candidate(c, rank=i + 1) for i, c in enumerate(candidates)
         )
-        return self._template.format(
-            designation=product.get("designation", ""),
-            description=product.get("description", ""),
-            candidate_blocks=candidate_blocks,
+        return (
+            self._template
+            .replace("{designation}", product.get("designation", ""))
+            .replace("{description}", product.get("description", ""))
+            .replace("{candidate_blocks}", candidate_blocks)
         )
 
     def _format_candidate(self, candidate: dict, rank: int) -> str:

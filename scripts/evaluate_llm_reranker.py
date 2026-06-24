@@ -119,7 +119,7 @@ def main() -> None:
         train_path=str(split_dir / "train_split.jsonl"),
         val_path=str(split_dir / "val_split.jsonl"),
         test_path=str(split_dir / "test_split.jsonl"),
-        n_samples=args.n_samples,
+        n_samples=None,
         seed=args.seed,
     )
 
@@ -129,6 +129,14 @@ def main() -> None:
     else:
         texts = data["X_val"]
         labels_l2 = [int(l) for l in data["y_l2_val"]]
+
+    if args.n_samples is not None and args.n_samples < len(texts):
+        import random as _random
+        rng = _random.Random(args.seed)
+        indices = rng.sample(range(len(texts)), args.n_samples)
+        texts = [texts[i] for i in indices]
+        labels_l2 = [labels_l2[i] for i in indices]
+        print(f"[Eval] Subsampled to {len(texts)} samples from {args.split} split.")
 
     num_classes_l2 = int(data["num_classes_l2"])
 

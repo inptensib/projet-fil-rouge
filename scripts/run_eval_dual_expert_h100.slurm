@@ -49,7 +49,7 @@ SPLIT="${SPLIT:-test}"
 TOP_K="${TOP_K:-10}"
 
 # LLM reranker (provider=none → Domain Expert seul)
-PROVIDER="${PROVIDER:-none}"
+PROVIDER="${PROVIDER:-hf_local}"
 USE_HF_LOCAL="${USE_HF_LOCAL:-0}"
 HF_LOAD_IN_4BIT="${HF_LOAD_IN_4BIT:-0}"
 LLM_API_URL="${LLM_API_URL:-http://localhost:8080/v1}"
