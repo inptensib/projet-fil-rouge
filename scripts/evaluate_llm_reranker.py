@@ -166,9 +166,13 @@ def main() -> None:
     if args.split == "test":
         texts = data["X_test"]
         labels_l2 = [int(l) for l in data["y_l2_test"]]
+        designations = data.get("designations_test", texts)
+        descriptions = data.get("descriptions_test", [""] * len(texts))
     else:
         texts = data["X_val"]
         labels_l2 = [int(l) for l in data["y_l2_val"]]
+        designations = texts   # val raw fields not stored — fall back to merged text
+        descriptions = [""] * len(texts)
 
     if args.n_samples is not None and args.n_samples < len(texts):
         import random as _random
@@ -176,6 +180,8 @@ def main() -> None:
         indices = rng.sample(range(len(texts)), args.n_samples)
         texts = [texts[i] for i in indices]
         labels_l2 = [labels_l2[i] for i in indices]
+        designations = [designations[i] for i in indices]
+        descriptions = [descriptions[i] for i in indices]
         print(f"[Eval] Subsampled to {len(texts)} samples from {args.split} split.")
 
     num_classes_l2 = int(data["num_classes_l2"])
@@ -255,9 +261,14 @@ def main() -> None:
     all_preds_l2: list[int] = []
     all_results: list = []
 
-    for i, (text, label) in enumerate(zip(texts, labels_l2)):
-        designation = str(text)
-        product = {"designation": designation, "description": "", "product_id": str(i)}
+    for i, (text, label, designation, description) in enumerate(
+        zip(texts, labels_l2, designations, descriptions)
+    ):
+        product = {
+            "designation": str(designation),
+            "description": str(description),
+            "product_id": str(i),
+        }
         result = clf.predict(product)
 
         all_preds_l2.append(result.pred_l2_id)
@@ -295,15 +306,16 @@ def main() -> None:
 
             if args.debug:
                 print(
-                f"  [Router] #{i:>5} | {outcome} | reasons: {', '.join(reasons)} | "
-                f"conf_l2={result.confidence_l2:.3f}"
+                    f"  [Router] #{i:>5} | {outcome} | reasons: {', '.join(reasons)} | "
+                    f"conf_l2={result.confidence_l2:.3f}"
                 )
-                print(f"           text         : {designation[:80]!r}")
+                print(f"           designation  : {designation[:80]!r}")
+                print(f"           description  : {description[:80]!r}")
                 print(f"           ground truth : {gt_l1_label} > {gt_l2_label}")
                 print(f"           domain expert: {domain_l1_label} > {domain_l2_label}"
-                  + (" [correct]" if correct_before else " [wrong]"))
+                      + (" [correct]" if correct_before else " [wrong]"))
                 print(f"           llm expert   : {llm_l1_label} > {llm_l2_label}"
-                  + (" [correct]" if correct_after else " [wrong]"))
+                      + (" [correct]" if correct_after else " [wrong]"))
 
                 candidates = getattr(result, "top_k_candidates", []) or []
                 gt_in_topk = any(c["l2_id"] == label for c in candidates)
@@ -326,6 +338,12 @@ def main() -> None:
                         f" | hier_score={c['hierarchy_score']:.4f}"
                         + (f"  {tag}" if tag else "")
                     )
+
+                prompt = clf.llm_reranker.prompt_builder.build(
+                    product, clf.llm_reranker._enrich_candidates(candidates)
+                )
+                print(f"           --- LLM prompt ---")
+                print(prompt)
                 print()
 
         if (i + 1) % 500 == 0:
