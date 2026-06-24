@@ -76,6 +76,7 @@ DISABLE_MARGIN_CHECK="${DISABLE_MARGIN_CHECK:-1}"
 DISABLE_RARE_CLASS_CHECK="${DISABLE_RARE_CLASS_CHECK:-1}"
 ENABLE_SHORT_TEXT_CHECK="${ENABLE_SHORT_TEXT_CHECK:-0}"      # désactivé par défaut
 DISABLE_SIBLING_CONFUSION="${DISABLE_SIBLING_CONFUSION:-1}"
+DEBUG="${DEBUG:-0}"                                          # 1 = afficher les top-K candidats par sample routé
 
 CATEGORY_DEFS="${CATEGORY_DEFS:-/home/telecom-paris/tp-boutrouft-25/projet-fil-rouge/rakuten-classification/models/category_definitions/category_definitions_v1.jsonl}"
 
@@ -162,6 +163,7 @@ python scripts/evaluate_llm_reranker.py \
     $([ "$DISABLE_RARE_CLASS_CHECK" = "1" ] && echo "--no-rare-class-check") \
     $([ "$ENABLE_SHORT_TEXT_CHECK"  = "1" ] && echo "--enable-short-text-check") \
     $([ "$DISABLE_SIBLING_CONFUSION" = "1" ] && echo "--no-sibling-confusion") \
+    $([ "$DEBUG"                     = "1" ] && echo "--debug") \
     $LLM_FLAGS \
     $SAMPLE_FLAG \
     $DEFS_FLAG

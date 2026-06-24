@@ -125,6 +125,8 @@ def main() -> None:
                         help="Enable short text routing rule (off by default)")
     parser.add_argument("--no-sibling-confusion", action="store_true",
                         help="Disable sibling confusion routing rule")
+    parser.add_argument("--debug", action="store_true",
+                        help="For each routed sample, print top-K candidates and full L1/L2 comparison")
     parser.add_argument("--prompt-path",
                         default=str(_ROOT / "prompts" / "llm_reranker_fr.txt"),
                         help="Path to LLM reranker prompt template")
@@ -275,14 +277,41 @@ def main() -> None:
             gt_l1_id    = clf.router.l2_to_l1_mapping.get(label, -1)
             gt_l1_label = clf._l1_name(gt_l1_id)
 
-            print(
+
+            if args.debug:
+                print(
                 f"  [Router] #{i:>5} | {outcome} | reasons: {', '.join(reasons)} | "
                 f"conf_l2={result.confidence_l2:.3f}"
-            )
-            print(f"           text        : {designation[:80]!r}")
-            print(f"           ground truth: {gt_l1_label} > {gt_l2_label}")
-            print(f"           domain expert: {domain_l1_label} > {domain_l2_label}")
-            print(f"           llm expert   : {llm_l1_label} > {llm_l2_label}")
+                )
+                print(f"           text         : {designation[:80]!r}")
+                print(f"           ground truth : {gt_l1_label} > {gt_l2_label}")
+                print(f"           domain expert: {domain_l1_label} > {domain_l2_label}"
+                  + (" [correct]" if correct_before else " [wrong]"))
+                print(f"           llm expert   : {llm_l1_label} > {llm_l2_label}"
+                  + (" [correct]" if correct_after else " [wrong]"))
+
+                candidates = getattr(result, "top_k_candidates", []) or []
+                gt_in_topk = any(c["l2_id"] == label for c in candidates)
+                print(f"           --- top-{len(candidates)} candidates "
+                      f"(ground truth in list: {'yes' if gt_in_topk else 'NO'}) ---")
+                for c in candidates:
+                    is_domain = c["l2_id"] == domain_top1
+                    is_llm    = c["l2_id"] == result.pred_l2_id
+                    is_gt     = c["l2_id"] == label
+                    tag = " ".join(filter(None, [
+                        "[domain]" if is_domain else None,
+                        "[llm]"    if is_llm    else None,
+                        "[GT]"     if is_gt     else None,
+                    ]))
+                    l1_label = c.get("parent_l1_label", clf._l1_name(c.get("parent_l1_id", -1)))
+                    l2_label = c.get("l2_label",        clf._l2_name(c["l2_id"]))
+                    print(
+                        f"             #{c['rank']:>2} | {l1_label} > {l2_label}"
+                        f" | prob_l2={c['prob_l2']:.4f}"
+                        f" | hier_score={c['hierarchy_score']:.4f}"
+                        + (f"  {tag}" if tag else "")
+                    )
+                print()
 
         if (i + 1) % 500 == 0:
             print(f"  [{i + 1}/{len(texts)}] routed so far: {len(routed_indices)}")
