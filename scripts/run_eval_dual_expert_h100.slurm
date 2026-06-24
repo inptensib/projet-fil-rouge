@@ -46,7 +46,7 @@ CHECKPOINT="${CHECKPOINT:-models/dual_expert_h100}"
 TAXONOMY="${TAXONOMY:-$DATA_DIR/product_classification_taxonomy.csv}"
 OUTPUT_DIR="${OUTPUT_DIR:-results/dual_expert_eval_h100}"
 SPLIT="${SPLIT:-test}"
-TOP_K="${TOP_K:-10}"
+TOP_K="${TOP_K:-5}"
 
 # LLM reranker (provider=none → Domain Expert seul)
 PROVIDER="${PROVIDER:-hf_local}"
