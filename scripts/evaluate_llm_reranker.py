@@ -200,6 +200,7 @@ def main() -> None:
     routed_preds_after: list[int] = []    # LLM output for routed samples
 
     all_preds_l2: list[int] = []
+    all_results: list = []
 
     for i, (text, label) in enumerate(zip(texts, labels_l2)):
         designation = str(text)
@@ -207,6 +208,7 @@ def main() -> None:
         result = clf.predict(product)
 
         all_preds_l2.append(result.pred_l2_id)
+        all_results.append(result)
 
         if result.llm_used:
             routed_indices.append(i)
@@ -246,16 +248,28 @@ def main() -> None:
         json.dump(report, f, indent=2)
 
     # Save per-sample predictions for further analysis
+    routed_set = set(routed_indices)
+    n_fallback = 0
     predictions_path = output_dir / "predictions.jsonl"
     with open(predictions_path, "w") as f:
-        for i, (pred, label) in enumerate(zip(all_preds_l2, labels_l2)):
+        for i, (pred, label, result) in enumerate(zip(all_preds_l2, labels_l2, all_results)):
+            is_routed = i in routed_set
+            fallback = getattr(result, "llm_fallback_used", False) if is_routed else None
+            if fallback:
+                n_fallback += 1
             f.write(json.dumps({
                 "sample_idx": i,
                 "pred_l2": pred,
                 "label_l2": label,
                 "correct": pred == label,
-                "routed": i in set(routed_indices),
+                "routed": is_routed,
+                "llm_fallback_used": fallback,
+                "llm_reason": getattr(result, "llm_reason", None) if is_routed else None,
+                "routing_reasons": getattr(result, "routing_reasons", None) if is_routed else None,
             }) + "\n")
+
+    if routed_indices:
+        print(f"[Eval] LLM fallback rate: {n_fallback}/{len(routed_indices)} ({n_fallback/len(routed_indices):.1%})")
 
     print(f"\n[Eval] Results saved to {output_dir}/")
     print(f"  llm_routing_report.json")
