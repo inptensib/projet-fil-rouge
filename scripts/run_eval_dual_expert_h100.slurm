@@ -59,10 +59,10 @@ LLM_MAX_TOKENS="${LLM_MAX_TOKENS:-512}"
 LLM_TIMEOUT="${LLM_TIMEOUT:-15.0}"
 
 # Modes d'évaluation
-N_SAMPLES="${N_SAMPLES:-}"                             # vide = dataset complet ; ex: 10000
+N_SAMPLES="${N_SAMPLES:-100}"                             # vide = dataset complet ; ex: 10000
 
 # Seuils de routing
-CONFIDENCE_THRESHOLD="${CONFIDENCE_THRESHOLD:-0.75}"         # seuil confiance L2
+CONFIDENCE_THRESHOLD="${CONFIDENCE_THRESHOLD:-0.35}"         # seuil confiance L2
 MIN_L2_MARGIN="${MIN_L2_MARGIN:-0.15}"                       # seuil marge top1−top2
 MIN_PARENT_L1_CONFIDENCE="${MIN_PARENT_L1_CONFIDENCE:-0.50}" # seuil confiance L1 parent
 RARE_CLASS_THRESHOLD="${RARE_CLASS_THRESHOLD:-100}"          # nb exemples train sous lequel une classe est rare
@@ -70,13 +70,14 @@ RARE_CLASS_MIN_CONFIDENCE="${RARE_CLASS_MIN_CONFIDENCE:-0.90}" # confiance minim
 SIBLING_CONFUSION_THRESHOLD="${SIBLING_CONFUSION_THRESHOLD:-5}"  # min siblings dans top-K
 
 # Activation/désactivation des règles (1 = désactiver)
-DISABLE_HIERARCHY_CHECK="${DISABLE_HIERARCHY_CHECK:-0}"
+DISABLE_HIERARCHY_CHECK="${DISABLE_HIERARCHY_CHECK:-1}"
 DISABLE_CONFIDENCE_CHECK="${DISABLE_CONFIDENCE_CHECK:-0}"
 DISABLE_MARGIN_CHECK="${DISABLE_MARGIN_CHECK:-1}"
 DISABLE_RARE_CLASS_CHECK="${DISABLE_RARE_CLASS_CHECK:-1}"
+DISABLE_PARENT_L1_CONFIDENCE_CHECK="${DISABLE_PARENT_L1_CONFIDENCE_CHECK:-1}"
 ENABLE_SHORT_TEXT_CHECK="${ENABLE_SHORT_TEXT_CHECK:-0}"      # désactivé par défaut
 DISABLE_SIBLING_CONFUSION="${DISABLE_SIBLING_CONFUSION:-1}"
-DEBUG="${DEBUG:-0}"                                          # 1 = afficher les top-K candidats par sample routé
+DEBUG="${DEBUG:-1}"                                          # 1 = afficher les top-K candidats par sample routé
 HIERARCHY_ALPHA="${HIERARCHY_ALPHA:-0.5}"                    # 0.0 = ranking L2 pur, 0.5 = défaut hiérarchique
 
 CATEGORY_DEFS="${CATEGORY_DEFS:-/home/telecom-paris/tp-boutrouft-25/projet-fil-rouge/rakuten-classification/models/category_definitions/category_definitions_v1.jsonl}"
@@ -161,8 +162,9 @@ python scripts/evaluate_llm_reranker.py \
     $([ "$DISABLE_HIERARCHY_CHECK"  = "1" ] && echo "--no-hierarchy-check") \
     $([ "$DISABLE_CONFIDENCE_CHECK" = "1" ] && echo "--no-confidence-check") \
     $([ "$DISABLE_MARGIN_CHECK"     = "1" ] && echo "--no-margin-check") \
-    $([ "$DISABLE_RARE_CLASS_CHECK" = "1" ] && echo "--no-rare-class-check") \
-    $([ "$ENABLE_SHORT_TEXT_CHECK"  = "1" ] && echo "--enable-short-text-check") \
+    $([ "$DISABLE_RARE_CLASS_CHECK"          = "1" ] && echo "--no-rare-class-check") \
+    $([ "$DISABLE_PARENT_L1_CONFIDENCE_CHECK" = "1" ] && echo "--no-parent-l1-confidence-check") \
+    $([ "$ENABLE_SHORT_TEXT_CHECK"           = "1" ] && echo "--enable-short-text-check") \
     $([ "$DISABLE_SIBLING_CONFUSION" = "1" ] && echo "--no-sibling-confusion") \
     --hierarchy-alpha "$HIERARCHY_ALPHA" \
     $([ "$DEBUG"                     = "1" ] && echo "--debug") \

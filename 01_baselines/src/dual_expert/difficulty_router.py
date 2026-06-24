@@ -44,6 +44,7 @@ class RoutingRules:
     send_if_low_l2_confidence: bool = True
     send_if_low_l2_margin: bool = True
     send_if_rare_and_not_very_confident: bool = True
+    send_if_low_parent_l1_confidence: bool = True
     send_if_short_text: bool = False
     send_if_sibling_confusion: bool = True
 
@@ -116,7 +117,7 @@ def should_route_to_llm(
     if rules.send_if_rare_and_not_very_confident and is_rare and p1 < t.rare_class_min_confidence:
         reasons.append("rare_l2_not_confident")
 
-    if parent_conf < t.min_parent_l1_confidence:
+    if rules.send_if_low_parent_l1_confidence and parent_conf < t.min_parent_l1_confidence:
         reasons.append("low_parent_l1_confidence")
 
     if rules.send_if_short_text and short_text:

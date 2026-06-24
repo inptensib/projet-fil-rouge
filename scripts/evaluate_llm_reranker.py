@@ -121,6 +121,8 @@ def main() -> None:
                         help="Disable low L2 margin routing rule")
     parser.add_argument("--no-rare-class-check", action="store_true",
                         help="Disable rare class routing rule")
+    parser.add_argument("--no-parent-l1-confidence-check", action="store_true",
+                        help="Disable low parent L1 confidence routing rule")
     parser.add_argument("--enable-short-text-check", action="store_true",
                         help="Enable short text routing rule (off by default)")
     parser.add_argument("--no-sibling-confusion", action="store_true",
@@ -218,6 +220,7 @@ def main() -> None:
             send_if_low_l2_confidence=not args.no_confidence_check,
             send_if_low_l2_margin=not args.no_margin_check,
             send_if_rare_and_not_very_confident=not args.no_rare_class_check,
+            send_if_low_parent_l1_confidence=not args.no_parent_l1_confidence_check,
             send_if_short_text=args.enable_short_text_check,
             send_if_sibling_confusion=not args.no_sibling_confusion,
         ),
