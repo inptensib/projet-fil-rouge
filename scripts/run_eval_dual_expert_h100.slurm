@@ -60,11 +60,24 @@ LLM_TIMEOUT="${LLM_TIMEOUT:-15.0}"
 
 # Modes d'évaluation
 N_SAMPLES="${N_SAMPLES:-}"                             # vide = dataset complet ; ex: 10000
-CONFIDENCE_THRESHOLD="${CONFIDENCE_THRESHOLD:-0.75}"   # seuil routing LLM
-SIBLING_CONFUSION_THRESHOLD="${SIBLING_CONFUSION_THRESHOLD:-5}"  # min siblings dans top-K
-DISABLE_SIBLING_CONFUSION="${DISABLE_SIBLING_CONFUSION:-0}"       # 1 = désactiver la règle
 
-CATEGORY_DEFS="${CATEGORY_DEFS:-}"
+# Seuils de routing
+CONFIDENCE_THRESHOLD="${CONFIDENCE_THRESHOLD:-0.75}"         # seuil confiance L2
+MIN_L2_MARGIN="${MIN_L2_MARGIN:-0.15}"                       # seuil marge top1−top2
+MIN_PARENT_L1_CONFIDENCE="${MIN_PARENT_L1_CONFIDENCE:-0.50}" # seuil confiance L1 parent
+RARE_CLASS_THRESHOLD="${RARE_CLASS_THRESHOLD:-100}"          # nb exemples train sous lequel une classe est rare
+RARE_CLASS_MIN_CONFIDENCE="${RARE_CLASS_MIN_CONFIDENCE:-0.90}" # confiance minimale pour classe rare
+SIBLING_CONFUSION_THRESHOLD="${SIBLING_CONFUSION_THRESHOLD:-5}"  # min siblings dans top-K
+
+# Activation/désactivation des règles (1 = désactiver)
+DISABLE_HIERARCHY_CHECK="${DISABLE_HIERARCHY_CHECK:-0}"
+DISABLE_CONFIDENCE_CHECK="${DISABLE_CONFIDENCE_CHECK:-0}"
+DISABLE_MARGIN_CHECK="${DISABLE_MARGIN_CHECK:-1}"
+DISABLE_RARE_CLASS_CHECK="${DISABLE_RARE_CLASS_CHECK:-1}"
+ENABLE_SHORT_TEXT_CHECK="${ENABLE_SHORT_TEXT_CHECK:-0}"      # désactivé par défaut
+DISABLE_SIBLING_CONFUSION="${DISABLE_SIBLING_CONFUSION:-1}"
+
+CATEGORY_DEFS="${CATEGORY_DEFS:-/home/telecom-paris/tp-boutrouft-25/projet-fil-rouge/rakuten-classification/models/category_definitions/category_definitions_v1.jsonl}"
 
 HF_CACHE="${HF_CACHE:-$HOME/.cache/huggingface}"
 
@@ -90,7 +103,12 @@ echo " Data               : $DATA_DIR ($SPLIT split)"
 echo " Output             : $OUTPUT_DIR"
 echo " Provider           : $PROVIDER"
 echo " N_SAMPLES          : ${N_SAMPLES:-complet}"
-echo " Confidence seuil   : $CONFIDENCE_THRESHOLD"
+echo " Confidence seuil   : $CONFIDENCE_THRESHOLD (disabled=$([ "$DISABLE_CONFIDENCE_CHECK" = "1" ] && echo "oui" || echo "non"))"
+echo " Margin seuil       : $MIN_L2_MARGIN (disabled=$([ "$DISABLE_MARGIN_CHECK" = "1" ] && echo "oui" || echo "non"))"
+echo " L1 parent conf     : $MIN_PARENT_L1_CONFIDENCE"
+echo " Rare class         : threshold=$RARE_CLASS_THRESHOLD min_conf=$RARE_CLASS_MIN_CONFIDENCE (disabled=$([ "$DISABLE_RARE_CLASS_CHECK" = "1" ] && echo "oui" || echo "non"))"
+echo " Hierarchy check    : $([ "$DISABLE_HIERARCHY_CHECK" = "1" ] && echo "disabled" || echo "enabled")"
+echo " Short text check   : $([ "$ENABLE_SHORT_TEXT_CHECK" = "1" ] && echo "enabled" || echo "disabled")"
 echo " Sibling threshold  : $SIBLING_CONFUSION_THRESHOLD (disabled=$([ "$DISABLE_SIBLING_CONFUSION" = "1" ] && echo "oui" || echo "non"))"
 if [ "$PROVIDER" != "none" ]; then
     echo " LLM Model          : $LLM_MODEL"
@@ -133,7 +151,16 @@ python scripts/evaluate_llm_reranker.py \
     --model "$LLM_MODEL" \
     --max-new-tokens "$LLM_MAX_TOKENS" \
     --confidence-threshold "$CONFIDENCE_THRESHOLD" \
+    --min-l2-margin "$MIN_L2_MARGIN" \
+    --min-parent-l1-confidence "$MIN_PARENT_L1_CONFIDENCE" \
+    --rare-class-threshold "$RARE_CLASS_THRESHOLD" \
+    --rare-class-min-confidence "$RARE_CLASS_MIN_CONFIDENCE" \
     --sibling-confusion-threshold "$SIBLING_CONFUSION_THRESHOLD" \
+    $([ "$DISABLE_HIERARCHY_CHECK"  = "1" ] && echo "--no-hierarchy-check") \
+    $([ "$DISABLE_CONFIDENCE_CHECK" = "1" ] && echo "--no-confidence-check") \
+    $([ "$DISABLE_MARGIN_CHECK"     = "1" ] && echo "--no-margin-check") \
+    $([ "$DISABLE_RARE_CLASS_CHECK" = "1" ] && echo "--no-rare-class-check") \
+    $([ "$ENABLE_SHORT_TEXT_CHECK"  = "1" ] && echo "--enable-short-text-check") \
     $([ "$DISABLE_SIBLING_CONFUSION" = "1" ] && echo "--no-sibling-confusion") \
     $LLM_FLAGS \
     $SAMPLE_FLAG \

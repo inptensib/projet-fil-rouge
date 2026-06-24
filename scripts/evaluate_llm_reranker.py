@@ -45,6 +45,13 @@ def _compute_accuracy(preds: list[int], labels: list[int]) -> float:
 
 
 def _compute_f1_macro(preds: list[int], labels: list[int], num_classes: int) -> float:
+    """Macro-F1 averaged over classes present in ground-truth labels only.
+
+    Averaging over all num_classes with a small eval set inflates the
+    denominator with thousands of zero-F1 absent classes, making the
+    metric meaningless.  Restricting to observed classes matches sklearn's
+    default behaviour and gives an interpretable number.
+    """
     from collections import defaultdict
     tp: dict[int, int] = defaultdict(int)
     fp: dict[int, int] = defaultdict(int)
@@ -55,8 +62,9 @@ def _compute_f1_macro(preds: list[int], labels: list[int], num_classes: int) -> 
         else:
             fp[p] += 1
             fn[g] += 1
+    observed_classes = set(labels)
     f1s = []
-    for c in range(num_classes):
+    for c in observed_classes:
         precision = tp[c] / (tp[c] + fp[c]) if (tp[c] + fp[c]) > 0 else 0.0
         recall = tp[c] / (tp[c] + fn[c]) if (tp[c] + fn[c]) > 0 else 0.0
         denom = precision + recall
@@ -94,10 +102,29 @@ def main() -> None:
                         help="Quantize hf_local model to 4-bit (bitsandbytes)")
     parser.add_argument("--confidence-threshold", type=float, default=0.75,
                         help="Route to LLM when L2 confidence < threshold (default 0.75)")
+    parser.add_argument("--min-l2-margin", type=float, default=0.15,
+                        help="Route to LLM when top-1 − top-2 margin < threshold (default 0.15)")
+    parser.add_argument("--min-parent-l1-confidence", type=float, default=0.50,
+                        help="Route to LLM when parent L1 confidence < threshold (default 0.50)")
+    parser.add_argument("--rare-class-threshold", type=int, default=100,
+                        help="L2 classes with fewer train samples than this are considered rare (default 100)")
+    parser.add_argument("--rare-class-min-confidence", type=float, default=0.90,
+                        help="Rare classes must exceed this confidence to skip LLM (default 0.90)")
     parser.add_argument("--sibling-confusion-threshold", type=int, default=5,
                         help="Min siblings in top-K to flag sibling confusion (default 5)")
+    # Per-rule on/off switches
+    parser.add_argument("--no-hierarchy-check", action="store_true",
+                        help="Disable hierarchy inconsistency routing rule")
+    parser.add_argument("--no-confidence-check", action="store_true",
+                        help="Disable low L2 confidence routing rule")
+    parser.add_argument("--no-margin-check", action="store_true",
+                        help="Disable low L2 margin routing rule")
+    parser.add_argument("--no-rare-class-check", action="store_true",
+                        help="Disable rare class routing rule")
+    parser.add_argument("--enable-short-text-check", action="store_true",
+                        help="Enable short text routing rule (off by default)")
     parser.add_argument("--no-sibling-confusion", action="store_true",
-                        help="Disable the sibling confusion routing rule entirely")
+                        help="Disable sibling confusion routing rule")
     parser.add_argument("--prompt-path",
                         default=str(_ROOT / "prompts" / "llm_reranker_fr.txt"),
                         help="Path to LLM reranker prompt template")
@@ -173,9 +200,18 @@ def main() -> None:
         max_llm_pass_through_rate=1.0,  # no cap during evaluation
         thresholds=RoutingThresholds(
             min_l2_confidence=args.confidence_threshold,
+            min_l2_margin=args.min_l2_margin,
+            min_parent_l1_confidence=args.min_parent_l1_confidence,
+            rare_class_threshold=args.rare_class_threshold,
+            rare_class_min_confidence=args.rare_class_min_confidence,
             sibling_confusion_min_count=args.sibling_confusion_threshold,
         ),
         rules=RoutingRules(
+            send_if_hierarchy_inconsistent=not args.no_hierarchy_check,
+            send_if_low_l2_confidence=not args.no_confidence_check,
+            send_if_low_l2_margin=not args.no_margin_check,
+            send_if_rare_and_not_very_confident=not args.no_rare_class_check,
+            send_if_short_text=args.enable_short_text_check,
             send_if_sibling_confusion=not args.no_sibling_confusion,
         ),
     )
