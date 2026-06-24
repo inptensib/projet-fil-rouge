@@ -249,9 +249,22 @@ def main() -> None:
         if result.llm_used:
             routed_indices.append(i)
             routed_labels.append(label)
-            # For hard-path results, domain_top1_l2_id is the "before" prediction
-            routed_preds_before.append(getattr(result, "domain_top1_l2_id", result.pred_l2_id))
+            domain_top1 = getattr(result, "domain_top1_l2_id", result.pred_l2_id)
+            routed_preds_before.append(domain_top1)
             routed_preds_after.append(result.pred_l2_id)
+
+            reasons = getattr(result, "routing_reasons", [])
+            correct_before = domain_top1 == label
+            correct_after  = result.pred_l2_id == label
+            outcome = ("✓→✓" if correct_before and correct_after else
+                       "✗→✓" if not correct_before and correct_after else
+                       "✓→✗" if correct_before and not correct_after else
+                       "✗→✗")
+            print(
+                f"  [Router] #{i:>5} | {outcome} | reasons: {', '.join(reasons)} | "
+                f"conf_l2={result.confidence_l2:.3f} | "
+                f"text: {designation[:60]!r}"
+            )
 
         if (i + 1) % 500 == 0:
             print(f"  [{i + 1}/{len(texts)}] routed so far: {len(routed_indices)}")
@@ -263,6 +276,18 @@ def main() -> None:
     print(f"\n[Eval] Overall accuracy: {overall_acc:.4f}")
     print(f"[Eval] Overall macro-F1 (L2): {overall_f1:.4f}")
     print(f"[Eval] Routed to LLM: {len(routed_indices)} / {len(texts)}")
+
+    # Routing reason breakdown
+    if routed_indices:
+        from collections import Counter
+        reason_counts: Counter = Counter()
+        for result in all_results:
+            if result.llm_used:
+                for r in getattr(result, "routing_reasons", []):
+                    reason_counts[r] += 1
+        print("[Router] Reason breakdown (a sample can have multiple reasons):")
+        for reason, count in reason_counts.most_common():
+            print(f"  {reason:<40} {count:>4} ({count / len(routed_indices):.0%})")
 
     # Build routing report
     report = clf.router.build_routing_report(
