@@ -258,6 +258,10 @@ def main() -> None:
     routed_preds_before: list[int] = []   # domain expert top-1 for routed samples
     routed_preds_after: list[int] = []    # LLM output for routed samples
 
+    llm_confidence_counts: dict[str, int] = {"high": 0, "medium": 0, "low": 0}
+    n_llm_changed: int = 0           # LLM chose differently from domain expert top-1
+    n_gate_triggered: int = 0        # safety gate reverted LLM choice
+
     all_preds_l2: list[int] = []
     all_results: list = []
 
@@ -280,6 +284,14 @@ def main() -> None:
             domain_top1 = getattr(result, "domain_top1_l2_id", result.pred_l2_id)
             routed_preds_before.append(domain_top1)
             routed_preds_after.append(result.pred_l2_id)
+
+            llm_conf = getattr(result, "llm_confidence", "low")
+            llm_confidence_counts[llm_conf] = llm_confidence_counts.get(llm_conf, 0) + 1
+            llm_raw = getattr(result, "llm_selected_l2_id", domain_top1)
+            if llm_raw != domain_top1:
+                n_llm_changed += 1
+            if getattr(result, "safety_gate_triggered", False):
+                n_gate_triggered += 1
 
             reasons = getattr(result, "routing_reasons", [])
             correct_before = domain_top1 == label
@@ -305,6 +317,10 @@ def main() -> None:
 
 
             if args.debug:
+                llm_reason_str = getattr(result, "llm_reason", "") or ""
+                llm_conf_str   = getattr(result, "llm_confidence", "?")
+                gate_fired     = getattr(result, "safety_gate_triggered", False)
+                decision_src   = getattr(result, "decision_source", "?")
                 print(
                     f"  [Router] #{i:>5} | {outcome} | reasons: {', '.join(reasons)} | "
                     f"conf_l2={result.confidence_l2:.3f}"
@@ -316,6 +332,10 @@ def main() -> None:
                       + (" [correct]" if correct_before else " [wrong]"))
                 print(f"           llm expert   : {llm_l1_label} > {llm_l2_label}"
                       + (" [correct]" if correct_after else " [wrong]"))
+                print(f"           llm confidence: {llm_conf_str}"
+                      + (f" | safety gate TRIGGERED → kept domain expert" if gate_fired else ""))
+                print(f"           llm reason   : {llm_reason_str or '(none)'}")
+                print(f"           decision src : {decision_src}")
 
                 candidates = getattr(result, "top_k_candidates", []) or []
                 gt_in_topk = any(c["l2_id"] == label for c in candidates)
@@ -368,6 +388,21 @@ def main() -> None:
         print("[Router] Reason breakdown (a sample can have multiple reasons):")
         for reason, count in reason_counts.most_common():
             print(f"  {reason:<40} {count:>4} ({count / len(routed_indices):.0%})")
+
+    # LLM confidence breakdown
+    if routed_indices:
+        n_routed = len(routed_indices)
+        n_high   = llm_confidence_counts.get("high",   0)
+        n_medium = llm_confidence_counts.get("medium", 0)
+        n_low    = llm_confidence_counts.get("low",    0)
+        print("[LLM] Confidence breakdown (general expert predictions):")
+        print(f"  high   : {n_high:>4} / {n_routed} ({n_high   / n_routed:.1%})")
+        print(f"  medium : {n_medium:>4} / {n_routed} ({n_medium / n_routed:.1%})")
+        print(f"  low    : {n_low:>4} / {n_routed} ({n_low    / n_routed:.1%})")
+        print(f"[LLM] Diverged from domain expert: {n_llm_changed} / {n_routed} ({n_llm_changed / n_routed:.1%})")
+        print(f"[LLM] Safety gate triggered (change reverted): {n_gate_triggered} / {n_routed} ({n_gate_triggered / n_routed:.1%})")
+        accepted = n_llm_changed - n_gate_triggered
+        print(f"[LLM] Changes actually applied: {accepted} / {n_routed} ({accepted / n_routed:.1%})")
 
     # Build routing report
     report = clf.router.build_routing_report(
