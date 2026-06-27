@@ -113,6 +113,7 @@ logs_*.out
 notebooks/baselines/results/
 /models_v2/
 /models_hierarchy/
+*.onnx
 
 # Présentations / slides (binaires, hors dépôt)
 presentation_finale/

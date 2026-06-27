@@ -104,6 +104,29 @@ print(clf.classify("Ballon de football taille 5", "Cuir synthétique, cousu main
 | `--enforce-hierarchy` | Constrain L2 to children of the predicted L1 (single primary parent in `l2_to_l1_mapping.json`). Off by default — the reported metrics are the raw, unconstrained predictions. |
 | `--device cpu\|cuda` | Force device (default: auto). |
 
+## ONNX (portable inference, no torch)
+
+For deployment, the model exports to a single ONNX graph that runs with
+**onnxruntime only** — no torch/transformers model stack at inference (faster
+startup, portable to C++/Java/C#).
+
+```bash
+# 1. export (parity-checked vs PyTorch) -> flat_hydra_v2.onnx (~491 MB)
+python export_onnx.py --model-dir flat-hydra-camembert-v2 \
+    --out flat-hydra-camembert-v2/flat_hydra_v2.onnx
+
+# 2. inference (same I/O as predict.py, no torch)
+python predict_onnx.py --model-dir flat-hydra-camembert-v2 \
+    --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
+```
+
+Verified: ONNX vs PyTorch logits differ by **< 5e-5** and predictions are
+**identical** (15/15 on real test rows). The ONNX file still needs the
+**tokenizer** and the **label files** next to it (pre/post-processing, not part of
+the graph) — ship the same model folder, just `.onnx` instead of `best_model.pt`.
+`predict_onnx.py` needs `onnxruntime` + `transformers` (tokenizer) +
+`scikit-learn` (labels) + `numpy` — **not** torch.
+
 ## Notes
 
 - Self-contained: `predict.py` embeds a copy of the model definition (kept in
