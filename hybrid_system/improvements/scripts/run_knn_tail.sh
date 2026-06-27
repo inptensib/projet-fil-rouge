@@ -10,11 +10,12 @@
 # kNN / class-prototype tail expert — CPU only, reuses cached concat embeddings.
 # Fit on VAL, evaluate net effect on TEST. No GPU, no retraining.
 
-cd ~/Rakuten_Project
-PYTHON=$HOME/Rakuten_Project/.venv/bin/python
-export PYTHONPATH="$HOME/Rakuten_Project/.venv/lib/python3.12/site-packages"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$PROJECT_ROOT"
+PYTHON="${PYTHON:-python}"
+# (PYTHONPATH hard-coding removed for portability)
 mkdir -p logs
 
 echo "Starting kNN tail expert at $(date)"
-$PYTHON eval_knn_tail.py --emb l2 --tail-max 100
+"${PYTHON:-python}" improvements/scripts/eval_knn_tail.py --emb l2 --tail-max 100
 echo "Done at $(date)"

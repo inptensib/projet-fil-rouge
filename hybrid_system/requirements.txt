@@ -1,0 +1,20 @@
+# Dependencies for the hybrid_system/ experimental track (Younes Boutrouft +
+# Amir's improvements). This is SEPARATE from the main `rakuten` package — install
+# it in a dedicated environment:  pip install -r hybrid_system/requirements.txt
+#
+# NOTE: the SetFit specialist (Specialists/, improvements/*setfit*) is version
+# sensitive — the authors pinned: setfit==1.0.3, sentence-transformers==2.7.0,
+# transformers==4.40.2, huggingface_hub==0.20.3. Use a dedicated env for it if the
+# ranges below conflict with the XGBoost/focal steps.
+torch>=2.0
+transformers>=4.40
+sentence-transformers>=2.7
+setfit>=1.0
+peft>=0.10
+xgboost>=2.0
+datasets>=2.20
+scikit-learn>=1.3
+numpy>=1.24
+pandas>=2.0
+tqdm>=4.66
+huggingface_hub>=0.23

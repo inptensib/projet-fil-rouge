@@ -9,21 +9,22 @@
 #SBATCH --error=logs/gen_eval_%j.err
 
 set -e
-cd ~/Rakuten_Project
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$PROJECT_ROOT"
 mkdir -p logs checkpoints/generative_models
 
-PYTHON=$(which python 2>/dev/null || echo "$HOME/Rakuten_Project/.venv/bin/python")
+PYTHON="${PYTHON:-$(command -v python)}"
 echo "Using Python: $PYTHON"
 $PYTHON --version
 
-# Set PYTHONPATH to python3.12 only (NOT python3.10 which has incompatible binaries)
-export PYTHONPATH="$HOME/Rakuten_Project/.venv/lib/python3.12/site-packages"
+
+# (PYTHONPATH hard-coding removed for portability)
 
 # Verify key imports
 $PYTHON -c "from transformers import AutoModelForCausalLM; print('transformers OK')"
 $PYTHON -c "import datasets; print('datasets OK')"
 
 echo "Starting generative fallback evaluation..."
-$PYTHON generative_fallback.py
+"${PYTHON:-python}" Specialists/scripts/generative_fallback.py
 
 echo "Job complete."

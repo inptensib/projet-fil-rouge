@@ -39,8 +39,9 @@ The gains come almost entirely from **better component models**, not the decisio
 Best result = **0.8487 acc / 0.6912 F1-macro** = Focal CamemBERT L2 + XGBoost v3_balanced
 combined by `max_conf`, with the kNN/NCM tail voter on top. Run **in order** — every step
 after the first reuses cached embeddings, so only step 1 is GPU-heavy. All scripts live in
-`improvements/scripts/`; run them from the project root (they `cd ~/Rakuten_Project`
-internally and expect the cached embeddings + base checkpoints there).
+`improvements/scripts/`; just run a script — it auto-detects the `hybrid_system/`
+root (override with `PROJECT_ROOT`) and expects the cached embeddings + base
+checkpoints there. See `../RETRAINING.md` for the full prerequisite list.
 
 | # | Step | Script | Compute | Marginal gain |
 |---|------|--------|---------|---------------|

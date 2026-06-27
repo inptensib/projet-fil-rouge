@@ -8,8 +8,9 @@
 #SBATCH --mem=48G
 #SBATCH --time=12:00:00
 
-cd ~/Rakuten_Project
-source .venv/bin/activate
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$PROJECT_ROOT"
+source "${VENV:-.venv}/bin/activate" 2>/dev/null || true
 mkdir -p logs
 
 # Install setfit with pinned versions compatible with PyTorch 2.2.2 + transformers 4.40.2
@@ -19,6 +20,6 @@ python -c "from setfit import SetFitModel; print('SetFit import OK')" || { echo 
 nvidia-smi
 echo "Starting SetFit training at $(date)"
 
-python train_setfit.py
+"${PYTHON:-python}" Specialists/scripts/train_setfit.py
 
 echo "SetFit training completed at $(date)"

@@ -10,11 +10,12 @@
 # Learned tail detector: NCM features (+ base-confidence features if val cache present),
 # fit on VAL, applied on TEST. CPU only, memmap (low RAM). Actual ~30-60 min.
 
-cd ~/Rakuten_Project
-PYTHON=$HOME/Rakuten_Project/.venv/bin/python
-export PYTHONPATH="$HOME/Rakuten_Project/.venv/lib/python3.12/site-packages"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$PROJECT_ROOT"
+PYTHON="${PYTHON:-python}"
+# (PYTHONPATH hard-coding removed for portability)
 mkdir -p logs
 
 echo "Starting learned detector at $(date)"
-$PYTHON eval_learned_detector.py
+"${PYTHON:-python}" improvements/scripts/eval_learned_detector.py
 echo "Done at $(date)"

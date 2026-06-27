@@ -12,12 +12,13 @@
 # Trains on cached run2 vectors (no transformer fwd passes -> fast), projects
 # train/val/test, saves to embeddings_proj/. Encoder frozen => cannot degrade base.
 
-cd ~/Rakuten_Project
-source .venv/bin/activate
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$PROJECT_ROOT"
+source "${VENV:-.venv}/bin/activate" 2>/dev/null || true
 mkdir -p logs embeddings_proj
 
 python -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available())"
 nvidia-smi
 echo "Starting projection-head train at $(date)"
-python train_proj_head.py
+"${PYTHON:-python}" improvements/scripts/train_proj_head.py
 echo "Done at $(date)"

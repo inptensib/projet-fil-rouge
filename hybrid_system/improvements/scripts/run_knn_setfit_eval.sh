@@ -11,12 +11,13 @@
 # contrastive embeddings (768d), vs the run2 baseline (recall@1 0.704 / +1.0pp f1m).
 # CPU only, memmap (low RAM). Large time limit just for safety — actual ~30-60 min.
 
-cd ~/Rakuten_Project
-PYTHON=$HOME/Rakuten_Project/.venv/bin/python
-export PYTHONPATH="$HOME/Rakuten_Project/.venv/lib/python3.12/site-packages"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$PROJECT_ROOT"
+PYTHON="${PYTHON:-python}"
+# (PYTHONPATH hard-coding removed for portability)
 mkdir -p logs
 
 echo "Starting SetFit tail eval at $(date)"
-$PYTHON eval_knn_tail_whiten.py \
+"${PYTHON:-python}" improvements/scripts/eval_knn_tail_whiten.py \
     --emb-dir embeddings_setfit --emb-name emb_setfit --emb full --configs none
 echo "Done at $(date)"

@@ -9,14 +9,15 @@
 #SBATCH --error=logs/focal_%j.err
 
 set -e
-cd ~/Rakuten_Project
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+cd "$PROJECT_ROOT"
 mkdir -p logs
 
-PYTHON=$HOME/Rakuten_Project/.venv/bin/python
+PYTHON="${PYTHON:-python}"
 echo "Using Python: $PYTHON"
 $PYTHON --version
 
-export PYTHONPATH="$HOME/Rakuten_Project/.venv/lib/python3.12/site-packages"
+# (PYTHONPATH hard-coding removed for portability)
 
 $PYTHON -c "import torch; print(f'torch OK, CUDA={torch.cuda.is_available()}')"
 nvidia-smi
