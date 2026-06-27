@@ -275,13 +275,15 @@ rakuten-classification/
 │   ├── baselines/             flat_hydra*.yaml
 │   └── hlpd/                  hlpd_3090.yaml
 ├── scripts/                   CLI Python, scripts SLURM, évaluation, comparaison
+│   ├── flat_inference/        Inférence standalone du modèle retenu (CamemBERT Flat v2)
+│   └── synthetic_pipeline/    Génération de données synthétiques (LLM + templates + duplication)
 ├── notebooks/
 │   ├── eda/                   Analyse exploratoire
 │   └── baselines/             fastText, TF-IDF, Word2Vec (notebooks)
-├── docs/                      ARCHITECTURE.md, PIPELINE.md, METRICS.md
+├── docs/                      ARCHITECTURE.md, PIPELINE.md, METRICS.md, EXPERIMENTS.md
 ├── results/                   Rapports HTML, métriques par modèle
 ├── tests/                     312 tests pytest (sans données ni GPU)
-├── hybrid_system/             Contribution séparée — hors package (voir README dédié)
+├── hybrid_system/             Contribution expérimentale séparée — hors package, non audité (voir README dédié)
 ├── ONBOARDING.md              Guide de prise en main complet
 └── docker-compose.yml         MLflow, tests, training
 ```

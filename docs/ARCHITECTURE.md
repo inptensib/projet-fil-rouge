@@ -96,6 +96,8 @@ rakuten-classification/
 │   ├── baselines/              # flat_hydra.yaml, flat_hydra_3090.yaml, …
 │   └── hlpd/                   # hlpd_3090.yaml
 ├── scripts/                    # CLI Python + scripts SLURM
+│   ├── flat_inference/         # inférence standalone (CamemBERT Flat v2)
+│   └── synthetic_pipeline/     # génération de données synthétiques
 ├── notebooks/                  # exploration et baselines (hors package)
 │   ├── eda/                    # analyse exploratoire
 │   └── baselines/              # notebooks fastText, TF-IDF, Word2Vec
@@ -103,8 +105,9 @@ rakuten-classification/
 ├── docs/                       # documentation technique
 │   ├── ARCHITECTURE.md         # ce fichier
 │   ├── PIPELINE.md             # matrice script × étape
-│   └── METRICS.md              # définitions métriques, provenance chiffres
-├── hybrid_system/              # contribution séparée (cf. note ci-dessous)
+│   ├── METRICS.md              # définitions métriques, provenance chiffres
+│   └── EXPERIMENTS.md          # récapitulatif consolidé des expériences
+├── hybrid_system/              # contribution expérimentale séparée (cf. note ci-dessous)
 └── results/                    # métriques JSON, rapports HTML
 ```
 

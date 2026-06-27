@@ -78,9 +78,11 @@ configs/baselines/     flat_hydra*.yaml
 configs/hlpd/          hlpd_3090.yaml
 scripts/               run_train.py, generate_comparison.py, generate_f1_per_class.py, eval_hierarchy.py
                        run_train_variant.slurm, run_train_array.slurm, chain_submit_array.sh
+scripts/flat_inference/     inference standalone du modele retenu (CamemBERT Flat v2)
+scripts/synthetic_pipeline/ generation de donnees synthetiques (LLM + templates + duplication)
 notebooks/eda/         analyse exploratoire
 notebooks/baselines/   fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb
-docs/                  ARCHITECTURE.md, PIPELINE.md (matrice scripts), METRICS.md (provenance metriques)
+docs/                  ARCHITECTURE.md, PIPELINE.md (matrice scripts), METRICS.md (provenance), EXPERIMENTS.md (recap expes)
 results/               comparison.html, rapports HTML par modele, metriques JSON
 tests/                 312 tests pytest
 ONBOARDING.md          guide de prise en main pour nouveau developpeur
