@@ -4,7 +4,7 @@
 
 # Rakuten Hierarchical Product Classification
 
-**8M+ produits · 157 catégories · 5 777 sous-catégories · CamemBERT**
+**8M+ products · 157 categories · 5 777 subcategories · CamemBERT**
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
@@ -19,57 +19,57 @@
 
 ---
 
-## Le projet en 30 secondes
+## The project in 30 seconds
 
-Un produit arrive avec un titre et une description en français. Le modèle prédit
-**simultanément** sa catégorie L1 parmi 157 et sa sous-catégorie L2 parmi 5 777 :
+A product arrives with a title and a description in French. The model predicts
+**simultaneously** its L1 category among 157 and its L2 subcategory among 5 777:
 
 ```
-"Coque iPhone 12 silicone transparente"
+"iPhone 12 transparent silicone case"
           │
           ▼
     ┌─ HYDRA ─┐
     │CamemBERT│
-    │  12 couches │
+    │ 12 layers │
     └────┬────┘
     ┌────┴────┐
     ▼         ▼
  L1: 157   L2: 5 777
-Électronique  Coque téléphone
+Electronics  Phone case
 ```
 
-Trois familles de modèles comparées :
+Three model families compared:
 
-| Famille | Approche | Meilleur F1 L2 (v1, test) |
+| Family | Approach | Best F1 L2 (v1, test) |
 |:--------|:---------|:-------------------:|
-| Baselines | TF-IDF, Word2Vec, fastText + classifieurs | 42.9 % |
-| **FlatHydra** | CamemBERT + tête unique L1+L2 | **71.7 %** |
-| HYDRA | CamemBERT multi-têtes (EMNLP 2025) | 66.8 % |
-| HLPD | Décodeur hiérarchique (ECIR 2025) | 61.5 % |
+| Baselines | TF-IDF, Word2Vec, fastText + classifiers | 42.9 % |
+| **FlatHydra** | CamemBERT + single L1+L2 head | **71.7 %** |
+| HYDRA | CamemBERT multi-head (EMNLP 2025) | 66.8 % |
+| HLPD | Hierarchical decoder (ECIR 2025) | 61.5 % |
 
-> **Note v1 → v2 (mesuré)** : ces chiffres sont sur le dataset **v1** (fuite
-> train/test non purgée). Sur le dataset **v2** dé-fuité, FlatHydra CamemBERT
-> ré-évalué donne **78,9 %** de F1 L2 — non directement comparable à v1 (les
-> classes L2 passent de 6 126 à 5 777). L'effet propre de la fuite, mesuré au
-> niveau L1 (mêmes 157 classes), est de **~1 pt** (v1 légèrement gonflé).
-> Détail : [docs/METRICS.md](docs/METRICS.md).
+> **v1 → v2 note (measured)**: these figures are on the **v1** dataset (train/test
+> leakage not purged). On the de-leaked **v2** dataset, the re-evaluated FlatHydra
+> CamemBERT yields **78.9 %** L2 F1 — not directly comparable to v1 (L2 classes
+> go from 6 126 to 5 777). The leakage's own effect, measured at the L1 level
+> (same 157 classes), is **~1 pt** (v1 slightly inflated).
+> Details: [docs/METRICS.md](docs/METRICS.md).
 
 ---
 
-## Architecture HYDRA
+## HYDRA architecture
 
 ```mermaid
 graph TD
-    A["Texte produit (designation + description)"] --> B
+    A["Product text (designation + description)"] --> B
     B["CamemBERT Tokenizer (max_length=256)"] --> C
-    C["CamemBERT (12 couches, 110M params, fine-tuné)"] --> D
+    C["CamemBERT (12 layers, 110M params, fine-tuned)"] --> D
     D["Projection 768 → 1536"] --> E1
     D --> E2
 
-    E1["Head L1 : Linear → LN → ReLU → Drop → Linear → 157 classes"]
-    E2["Head L2 : Linear → LN → ReLU → Drop → Linear → 5 777 classes"]
+    E1["Head L1: Linear → LN → ReLU → Drop → Linear → 157 classes"]
+    E2["Head L2: Linear → LN → ReLU → Drop → Linear → 5 777 classes"]
 
-    E1 --> F["Prédiction"]
+    E1 --> F["Prediction"]
     E2 --> F
 
     style C fill:#4A90D9,color:white
@@ -78,26 +78,26 @@ graph TD
     style F fill:#8E44AD,color:white
 ```
 
-3 variantes testées :
+3 variants tested:
 
-| Variante | Idée | Cohérence L1↔L2 |
+| Variant | Idea | L1↔L2 consistency |
 |:---------|:-----|:----------------|
-| `local` | Têtes L1 et L2 indépendantes | Post-hoc (masque hiérarchique) |
-| `global` | + tête unifiée L1+L2 | Implicite |
-| `nested` | + MLP de raffinement L2 conditionné sur L1 | Par construction |
+| `local` | Independent L1 and L2 heads | Post-hoc (hierarchical mask) |
+| `global` | + unified L1+L2 head | Implicit |
+| `nested` | + L2 refinement MLP conditioned on L1 | By construction |
 
-> **Constat clé** : la tête plate *FlatHydra* (CamemBERT + une seule tête L1+L2) obtient
-> le meilleur F1 L2 du projet, au-dessus des têtes multi-niveaux HYDRA. Malgré son nom,
-> FlatHydra n'est **pas** une variante de HYDRA : c'est une baseline forte (rangée dans
+> **Key finding**: the flat *FlatHydra* head (CamemBERT + a single L1+L2 head) achieves
+> the project's best L2 F1, above the multi-level HYDRA heads. Despite its name,
+> FlatHydra is **not** a HYDRA variant: it is a strong baseline (filed under
 > `rakuten/models/baselines/`).
 
 ---
 
-## Résultats clés (v1, test)
+## Key results (v1, test)
 
-> F1 L1 non rapporté pour les modèles profonds — métrique cible = F1 L2.
+> L1 F1 not reported for the deep models — target metric = L2 F1.
 
-| Modèle | F1 L1 | F1 L2 | HCR |
+| Model | F1 L1 | F1 L2 | HCR |
 |:-------|:-----:|:-----:|:---:|
 | TF-IDF + LinearSVC | 83.26 % | 42.75 % | 63.41 % |
 | FastText Supervised | 82.60 % | 10.01 % | 29.29 % |
@@ -110,114 +110,114 @@ graph TD
 
 ## Quick Start
 
-> **Nouveau sur le projet ?** Suivre [ONBOARDING.md](ONBOARDING.md) — installation,
-> accès aux données et modèles, premier entraînement, SLURM.
-> Référence détaillée : [docs/PIPELINE.md](docs/PIPELINE.md) (quel script pour quel modèle)
-> et [docs/METRICS.md](docs/METRICS.md) (métriques et provenance des résultats).
+> **New to the project?** Follow [ONBOARDING.md](ONBOARDING.md) — installation,
+> access to data and models, first training run, SLURM.
+> Detailed reference: [docs/PIPELINE.md](docs/PIPELINE.md) (which script for which model)
+> and [docs/METRICS.md](docs/METRICS.md) (metrics and provenance of the results).
 
 ```bash
-# 1. Cloner et installer
+# 1. Clone and install
 git clone <repo-url> && cd rakuten-classification
 python -m venv venv && source venv/bin/activate
-# CPU ou autre version CUDA ? Installer torch d'abord via l'index PyTorch adapté
-# (cf. commentaire en tête de requirements.txt), puis :
+# CPU or another CUDA version? Install torch first via the appropriate PyTorch index
+# (see the comment at the top of requirements.txt), then:
 pip install -e .
 
-# 2. Vérifier l'installation — aucune donnée ni GPU requis
-python -m pytest tests/ -q          # 312 tests doivent passer
+# 2. Verify the installation — no data or GPU required
+python -m pytest tests/ -q          # 312 tests should pass
 
-# 3. Télécharger les données (token HF requis — voir section suivante)
+# 3. Download the data (HF token required — see the next section)
 export HF_TOKEN="hf_..."
 python scripts/download_dataset.py
 
-# 4. Smoke test local — nécessite le dataset (étape 3 ci-dessus)
-# Durée : quelques minutes à dizaines de minutes selon la machine
-# Sans token HF : s'arrêter après les 312 tests, c'est la voie de repli normale.
+# 4. Local smoke test — requires the dataset (step 3 above)
+# Duration: a few minutes to tens of minutes depending on the machine
+# Without an HF token: stop after the 312 tests, that is the normal fallback path.
 python scripts/run_train.py --split-dir dataset/ --n-samples 5000 \
     --config configs/hydra/default.yaml
 
-# 5. Entraînement complet sur cluster SLURM
+# 5. Full training on the SLURM cluster
 sbatch --job-name=hydra-local --array=0-9%1 scripts/run_train_variant.slurm local
 ```
 
 ---
 
-## Accès aux données et modèles
+## Access to data and models
 
-> **Repos HuggingFace privés** — un token HF en lecture est requis.
-> Contacter : `TahianaAndriambahoaka` (propriétaire des repos).
+> **Private HuggingFace repos** — a read HF token is required.
+> Contact: `TahianaAndriambahoaka` (owner of the repos).
 
-### Sans accès (voie de repli)
+### Without access (fallback path)
 
-Il est possible d'installer le package et de lancer les 312 tests **sans données ni GPU** :
+You can install the package and run the 312 tests **without data or GPU**:
 
 ```bash
 pip install -e .
 python -m pytest tests/ -q   # 312 passed
 ```
 
-Ce que cela couvre : imports, architecture des modèles, métriques, configs, utilitaires.
-Ce que cela ne couvre pas : entraînements et évaluations réelles.
+What this covers: imports, model architecture, metrics, configs, utilities.
+What this does not cover: real training and evaluation.
 
-### Données (dataset v2)
+### Data (dataset v2)
 
-Repo HF privé : [`TahianaAndriambahoaka/rakuten-dataset`][hf-dataset]
-Sous-dossier : `datasets_finaux/` — splits pré-générés (70/15/15, stratifiés par L2, seed=42).
+Private HF repo: [`TahianaAndriambahoaka/rakuten-dataset`][hf-dataset]
+Subfolder: `datasets_finaux/` — pre-generated splits (70/15/15, stratified by L2, seed=42).
 
-| Fichier | Lignes |
+| File | Lines |
 |:--------|-------:|
 | `train_split.jsonl` | 5 259 035 |
 | `val_split.jsonl` | 1 194 355 |
 | `test_split.jsonl` | 1 194 356 |
 
-Chaque ligne : `{"designation": "...", "description": "...", "typelabel": "L1", "producttype": "L2"}`
+Each line: `{"designation": "...", "description": "...", "typelabel": "L1", "producttype": "L2"}`
 
 ```bash
-export HF_TOKEN="hf_..."           # token read fourni par le propriétaire
-python scripts/download_dataset.py  # télécharge dans <repo>/dataset/
+export HF_TOKEN="hf_..."           # read token provided by the owner
+python scripts/download_dataset.py  # downloads into <repo>/dataset/
 ```
 
-> **Dataset v2** : fuite de doublons purgée (−314 624 lignes de train nettes).
-> Effet mesuré de la fuite (FlatHydra) : ~1 pt au L1 ; au L2 les chiffres v1↔v2
-> ne se comparent pas terme à terme (6 126 → 5 777 classes). Voir
+> **Dataset v2**: duplicate leakage purged (−314 624 net train rows).
+> Measured effect of the leakage (FlatHydra): ~1 pt at L1; at L2 the v1↔v2 figures
+> do not compare term for term (6 126 → 5 777 classes). See
 > [docs/METRICS.md](docs/METRICS.md).
 
-### Modèles entraînés (~63 Go, 22 modèles)
+### Trained models (~63 GB, 22 models)
 
-Repo HF privé : [`TahianaAndriambahoaka/rakuten-models`][hf-models]
+Private HF repo: [`TahianaAndriambahoaka/rakuten-models`][hf-models]
 
-Le plus simple — via le script dédié :
+The simplest way — via the dedicated script:
 
 ```bash
 export HF_TOKEN="hf_..."
-python scripts/download_models.py                      # tous les modèles (~63 Go)
-python scripts/download_models.py flat-hydra-camembert-v2   # un seul modèle
+python scripts/download_models.py                      # all models (~63 GB)
+python scripts/download_models.py flat-hydra-camembert-v2   # a single model
 ```
 
-Ou directement en Python pour un sous-dossier précis :
+Or directly in Python for a specific subfolder:
 
 ```python
 from huggingface_hub import snapshot_download
 snapshot_download(
     repo_id="TahianaAndriambahoaka/rakuten-models",
-    allow_patterns="flat-hydra/*",   # remplacer selon le modèle voulu
+    allow_patterns="flat-hydra/*",   # replace according to the desired model
     token="hf_...",
 )
 ```
 
-Correspondance sous-dossiers HF → chemins locaux attendus par les scripts d'évaluation :
-voir [ONBOARDING.md](ONBOARDING.md) section « Récupérer les modèles entraînés ».
+Mapping of HF subfolders → local paths expected by the evaluation scripts:
+see [ONBOARDING.md](ONBOARDING.md), "Retrieving the trained models" section.
 
-### Cluster SLURM
+### SLURM cluster
 
-Les scripts `scripts/*.slurm` supposent les partitions `P100` (2×16 Go)
-et `3090` (2-4×24 Go) du cluster Télécom Paris.
-Sur une autre infrastructure, adapter les directives `#SBATCH` et les variables :
+The `scripts/*.slurm` scripts assume the `P100` (2×16 GB)
+and `3090` (2-4×24 GB) partitions of the Télécom Paris cluster.
+On a different infrastructure, adapt the `#SBATCH` directives and the variables:
 
 ```bash
-export PROJECT_ROOT="/chemin/vers/rakuten-classification"
-export VENV_ACTIVATE="/chemin/vers/venv/bin/activate"
-export DATA_DIR="/chemin/vers/dataset"
+export PROJECT_ROOT="/path/to/rakuten-classification"
+export VENV_ACTIVATE="/path/to/venv/bin/activate"
+export DATA_DIR="/path/to/dataset"
 ```
 
 [hf-dataset]: https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset
@@ -225,38 +225,38 @@ export DATA_DIR="/chemin/vers/dataset"
 
 ---
 
-## Métriques
+## Metrics
 
-Toutes définies dans `rakuten/common/metrics.py`, documentées dans [docs/METRICS.md](docs/METRICS.md).
+All defined in `rakuten/common/metrics.py`, documented in [docs/METRICS.md](docs/METRICS.md).
 
-| Métrique | Description |
+| Metric | Description |
 |:---------|:------------|
-| `f1_l1_macro` | F1 macro sur les 157 catégories L1 |
-| `f1_l2_macro` | F1 macro sur les 5 777 sous-catégories L2 — **métrique principale** |
-| `HCR` | Taux de cohérence hiérarchique : % de prédictions où L2 est enfant valide de L1 |
-| `constrained_f1` | F1 L2 compté seulement si L1 parent correct |
+| `f1_l1_macro` | Macro F1 over the 157 L1 categories |
+| `f1_l2_macro` | Macro F1 over the 5 777 L2 subcategories — **main metric** |
+| `HCR` | Hierarchical consistency rate: % of predictions where L2 is a valid child of L1 |
+| `constrained_f1` | L2 F1 counted only if the L1 parent is correct |
 
-Objectif : maximiser `f1_l2_macro` avec HCR > 95 %.
+Goal: maximize `f1_l2_macro` with HCR > 95 %.
 
-Chaque epoch logue également : matrices de confusion L1/L2, F1 par classe (barplots triés),
-et un rapport d'explicabilité HTML (Gradient × Input) disponible dans MLflow
+Each epoch also logs: L1/L2 confusion matrices, per-class F1 (sorted barplots),
+and an HTML explainability report (Gradient × Input) available in MLflow
 (`docker compose up mlflow -d`).
 
 ---
 
-## Configuration HYDRA
+## HYDRA configuration
 
-Source de vérité : [`configs/hydra/default.yaml`](configs/hydra/default.yaml)
+Source of truth: [`configs/hydra/default.yaml`](configs/hydra/default.yaml)
 
-| Paramètre | Valeur | | Paramètre | Valeur |
+| Parameter | Value | | Parameter | Value |
 |-----------|--------|-|-----------|--------|
-| Encodeur | `camembert-base` | | `batch_size` | 64 |
+| Encoder | `camembert-base` | | `batch_size` | 64 |
 | `max_length` | 256 | | `lr` | 3.5e-5 |
-| Warmup | 10% (linéaire) | | Weight decay | 0.01 |
+| Warmup | 10% (linear) | | Weight decay | 0.01 |
 | Gradient clip | 1.0 | | Early stop | patience 2 |
 | `dropout` | 0.3 | | `hidden_dim` | 256 |
 
-Variante hiérarchique : [`configs/hydra/hierarchy.yaml`](configs/hydra/hierarchy.yaml) — active `condition_l2_on_l1` (teacher forcing) et `check_hierarchy` (masque à l'inférence)
+Hierarchical variant: [`configs/hydra/hierarchy.yaml`](configs/hydra/hierarchy.yaml) — enables `condition_l2_on_l1` (teacher forcing) and `check_hierarchy` (mask at inference)
 
 ---
 
@@ -264,42 +264,42 @@ Variante hiérarchique : [`configs/hydra/hierarchy.yaml`](configs/hydra/hierarch
 
 ```
 rakuten-classification/
-├── rakuten/                   Package Python installable (pip install -e .)
+├── rakuten/                   Installable Python package (pip install -e .)
 │   ├── common/                data_loader, metrics, training_utils, utils
 │   └── models/
 │       ├── baselines/         TF-IDF, Word2Vec, fastText, FlatHydra
-│       ├── hydra/             HYDRA (EMNLP 2025) : models, losses, trainer, config
+│       ├── hydra/             HYDRA (EMNLP 2025): models, losses, trainer, config
 │       └── hlpd/              HLPD (ECIR 2025) — Mehdi Aithamma
-├── configs/                   YAML hors package (source de vérité)
+├── configs/                   YAML outside the package (source of truth)
 │   ├── hydra/                 default.yaml, hierarchy.yaml, title_only*.yaml
 │   ├── baselines/             flat_hydra*.yaml
 │   └── hlpd/                  hlpd_3090.yaml
-├── scripts/                   CLI Python, scripts SLURM, évaluation, comparaison
-│   ├── flat_inference/        Inférence standalone du modèle retenu (CamemBERT Flat v2)
-│   └── synthetic_pipeline/    Génération de données synthétiques (LLM + templates + duplication)
+├── scripts/                   Python CLI, SLURM scripts, evaluation, comparison
+│   ├── flat_inference/        Standalone inference of the selected model (CamemBERT Flat v2)
+│   └── synthetic_pipeline/    Synthetic data generation (LLM + templates + duplication)
 ├── notebooks/
-│   ├── eda/                   Analyse exploratoire
+│   ├── eda/                   Exploratory analysis
 │   └── baselines/             fastText, TF-IDF, Word2Vec (notebooks)
 ├── docs/                      ARCHITECTURE.md, PIPELINE.md, METRICS.md, EXPERIMENTS.md
-├── results/                   Rapports HTML, métriques par modèle
-├── tests/                     312 tests pytest (sans données ni GPU)
-├── hybrid_system/             Contribution expérimentale séparée — hors package, non audité (voir README dédié)
-├── ONBOARDING.md              Guide de prise en main complet
+├── results/                   HTML reports, per-model metrics
+├── tests/                     312 pytest tests (no data or GPU)
+├── hybrid_system/             Separate experimental contribution — outside the package, not audited (see its own README)
+├── ONBOARDING.md              Complete getting-started guide
 └── docker-compose.yml         MLflow, tests, training
 ```
 
-Architecture détaillée et table de correspondance ancien → nouveau :
+Detailed architecture and old → new mapping table:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## Contribuer
+## Contributing
 
-Voir [CONTRIBUTING.md](CONTRIBUTING.md) — branchement, pipeline qualité (tests + lint), format de commit.
+See [CONTRIBUTING.md](CONTRIBUTING.md) — branching, quality pipeline (tests + lint), commit format.
 
 ---
 
-## Références
+## References
 
 - **HYDRA** — Karl et al., *Hierarchical Multi-label Classification*, EMNLP 2025 [[GitHub]](https://github.com/FKarl/HYDRA)
 - **HLPD** — Torba, Laclau et al., *Hierarchical Label Pre-populated Decoder*, ECIR 2025

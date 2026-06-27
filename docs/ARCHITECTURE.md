@@ -1,139 +1,138 @@
-# Architecture du projet
+# Project Architecture
 
-Ce document décrit la narration du projet, la structure du package Python
-`rakuten` et la table de correspondance entre l'ancienne organisation et la
-nouvelle.
+This document describes the project narrative, the structure of the `rakuten`
+Python package, and the mapping table between the old organization and the new
+one.
 
-## Table des Matières
+## Table of Contents
 
-1. [Narration du projet](#narration-du-projet)
-1. [Structure du package](#structure-du-package)
-1. [Table de correspondance ancien → nouveau](#table-de-correspondance-ancien--nouveau)
-1. [Imports cibles](#imports-cibles)
-1. [Note sur le pipeline distribué](#note-sur-le-pipeline-distribué)
-1. [Note sur `hybrid_system/`](#note-sur-hybrid_system)
+1. [Project Narrative](#project-narrative)
+1. [Package Structure](#package-structure)
+1. [Old → New Mapping Table](#old--new-mapping-table)
+1. [Target Imports](#target-imports)
+1. [Note on the Distributed Pipeline](#note-on-the-distributed-pipeline)
+1. [Note on `hybrid_system/`](#note-on-hybrid_system)
 
 ---
 
-## Narration du Projet
+## Project Narrative
 
-Le projet suit une progression classique en machine learning supervisé :
-exploration des données, établissement de baselines, puis montée en complexité
-vers des architectures plus expressives.
+The project follows a classic supervised machine learning progression: data
+exploration, establishing baselines, then increasing complexity toward more
+expressive architectures.
 
-### Étape 1 — Analyse Exploratoire (EDA)
+### Step 1 — Exploratory Data Analysis (EDA)
 
-Avant tout modèle, les notebooks `notebooks/eda/` ont caractérisé le dataset
-Rakuten France : distribution des 157 catégories L1, longue traîne des 5 777
-sous-catégories L2, longueur des textes (`designation` + `description`), et
-déséquilibre de classes. L'EDA a motivé plusieurs choix techniques : le
-macro-averaging des métriques (pour donner autant de poids aux classes rares),
-le `max_length=256` (couvre 95 % des produits), et la stratification par L2
-lors des splits.
+Before any model, the `notebooks/eda/` notebooks characterized the Rakuten
+France dataset: distribution of the 157 L1 categories, long tail of the 5,777
+L2 subcategories, text length (`designation` + `description`), and class
+imbalance. The EDA motivated several technical choices: macro-averaging of the
+metrics (to give equal weight to rare classes), `max_length=256` (covers 95 % of
+products), and stratification by L2 when generating the splits.
 
-### Étape 2 — Baselines
+### Step 2 — Baselines
 
-Les notebooks `notebooks/baselines/` et le code `rakuten/models/baselines/`
-implémentent trois familles de baselines classiques :
+The `notebooks/baselines/` notebooks and the `rakuten/models/baselines/` code
+implement three families of classic baselines:
 
-- **TF-IDF + LinearSVC** : sac de mots TF-IDF, SVM linéaire. Référence la plus
-  forte (F1 L2 = 42.9 %).
-- **Word2Vec + LinearSVC** : embeddings Word2Vec pré-entraînés, SVM.
-- **fastText** : classification supervisée (mode supervised de fastText).
-- **FlatHydra** : CamemBERT avec une unique tête plate L1+L2 (5 934 sorties en
-  v2 = 157 + 5 777 ; 6 283 sur le dataset v1 d'origine). C'est la meilleure
-  baseline (F1 L2 = 71.7 % en v1, 78,9 % en v2) et le point de départ naturel pour
-  HYDRA. **Constat clé** : FlatHydra obtient le meilleur F1 L2 du projet, au-dessus
-  des têtes multi-niveaux HYDRA. Malgré son nom, FlatHydra n'est **pas** une variante
-  de HYDRA : c'est une baseline forte (rangée dans `rakuten/models/baselines/`).
+- **TF-IDF + LinearSVC**: TF-IDF bag of words, linear SVM. Strongest reference
+  (F1 L2 = 42.9 %).
+- **Word2Vec + LinearSVC**: pre-trained Word2Vec embeddings, SVM.
+- **fastText**: supervised classification (fastText's supervised mode).
+- **FlatHydra**: CamemBERT with a single flat L1+L2 head (5,934 outputs in
+  v2 = 157 + 5,777; 6,283 on the original v1 dataset). It is the best baseline
+  (F1 L2 = 71.7 % in v1, 78.9 % in v2) and the natural starting point for HYDRA.
+  **Key finding**: FlatHydra achieves the best F1 L2 of the project, above the
+  HYDRA multi-level heads. Despite its name, FlatHydra is **not** a HYDRA variant:
+  it is a strong baseline (filed under `rakuten/models/baselines/`).
 
-### Étape 3 — HYDRA (EMNLP 2025)
+### Step 3 — HYDRA (EMNLP 2025)
 
-`rakuten/models/hydra/` implémente **HYDRA** (Hierarchical YDRA), un encodeur
-CamemBERT à deux têtes de classification indépendantes : une pour les 157
-classes L1, une pour les 5 777 classes L2. Trois variantes ont été comparées :
+`rakuten/models/hydra/` implements **HYDRA** (Hierarchical YDRA), a CamemBERT
+encoder with two independent classification heads: one for the 157 L1 classes,
+one for the 5,777 L2 classes. Three variants were compared:
 
-| Variante | Idée | Cohérence L1↔L2 |
+| Variant | Idea | L1↔L2 consistency |
 |:---------|:-----|:----------------|
-| `local`  | Têtes L1 et L2 indépendantes | Post-hoc (masque hiérarchique à l'inférence) |
-| `global` | + tête unifiée L1+L2 | Implicite (représentation partagée) |
-| `nested` | + MLP de raffinement L2 conditionné sur L1 | Par construction |
+| `local`  | Independent L1 and L2 heads | Post-hoc (hierarchical mask at inference) |
+| `global` | + unified L1+L2 head | Implicit (shared representation) |
+| `nested` | + L2 refinement MLP conditioned on L1 | By construction |
 
-La variante hiérarchique (`configs/hydra/hierarchy.yaml`) ajoute le
-*teacher forcing* (`condition_l2_on_l1`) pendant l'entraînement et le masque
-hiérarchique à l'inférence (`check_hierarchy`).
+The hierarchical variant (`configs/hydra/hierarchy.yaml`) adds *teacher forcing*
+(`condition_l2_on_l1`) during training and the hierarchical mask at inference
+(`check_hierarchy`).
 
-### Étape 4 — HLPD (ECIR 2025)
+### Step 4 — HLPD (ECIR 2025)
 
-`rakuten/models/hlpd/` implémente **HLPD** (Hierarchical Label Pre-populated
-Decoder), une architecture encode–décode non-autorégressive développée par
-Mehdi Aithamma. Le décodeur reçoit en entrée les embeddings des étiquettes L2
-et les raffine via une attention hiérarchique biaisée par la structure
-parent-enfant. HLPD atteint F1 L2 = 61.5 % en utilisant les mêmes données.
+`rakuten/models/hlpd/` implements **HLPD** (Hierarchical Label Pre-populated
+Decoder), a non-autoregressive encode–decode architecture developed by
+Mehdi Aithamma. The decoder takes the L2 label embeddings as input and refines
+them through a hierarchical attention biased by the parent-child structure.
+HLPD reaches F1 L2 = 61.5 % using the same data.
 
 ---
 
-## Structure du Package
+## Package Structure
 
 ```
 rakuten-classification/
-├── pyproject.toml              # packaging setuptools, dépendances, ruff
+├── pyproject.toml              # setuptools packaging, dependencies, ruff
 ├── README.md  ONBOARDING.md  CLAUDE.md
-├── rakuten/                    # package installable (pip install -e .)
+├── rakuten/                    # installable package (pip install -e .)
 │   ├── __init__.py
-│   ├── common/                 # briques partagées par tous les modèles
-│   │   ├── data_loader.py      # chargement JSONL + splits
+│   ├── common/                 # building blocks shared by all models
+│   │   ├── data_loader.py      # JSONL loading + splits
 │   │   ├── metrics.py          # f1_l1_macro, f1_l2_macro, HCR, constrained_f1
 │   │   ├── training_utils.py   # EarlyStopping, compute_class_weights
 │   │   ├── text_normalization.py
 │   │   └── utils.py
 │   └── models/
 │       ├── baselines/          # TF-IDF, Word2Vec, fastText, FlatHydra
-│       ├── hydra/              # HYDRA (EMNLP 2025) : models, losses, trainer, config
-│       └── hlpd/               # HLPD (ECIR 2025) : models, losses, attention_bias, trainer
-├── configs/                    # YAML hors package (non importés en Python)
+│       ├── hydra/              # HYDRA (EMNLP 2025): models, losses, trainer, config
+│       └── hlpd/               # HLPD (ECIR 2025): models, losses, attention_bias, trainer
+├── configs/                    # YAML outside the package (not imported in Python)
 │   ├── hydra/                  # default.yaml, hierarchy.yaml, title_only*.yaml, mbert_default.yaml
 │   ├── baselines/              # flat_hydra.yaml, flat_hydra_3090.yaml, …
 │   └── hlpd/                   # hlpd_3090.yaml
-├── scripts/                    # CLI Python + scripts SLURM
-│   ├── flat_inference/         # inférence standalone (CamemBERT Flat v2)
-│   └── synthetic_pipeline/     # génération de données synthétiques
-├── notebooks/                  # exploration et baselines (hors package)
-│   ├── eda/                    # analyse exploratoire
-│   └── baselines/              # notebooks fastText, TF-IDF, Word2Vec
-├── tests/                      # 312 tests pytest (sans données ni GPU)
-├── docs/                       # documentation technique
-│   ├── ARCHITECTURE.md         # ce fichier
-│   ├── PIPELINE.md             # matrice script × étape
-│   ├── METRICS.md              # définitions métriques, provenance chiffres
-│   └── EXPERIMENTS.md          # récapitulatif consolidé des expériences
-├── hybrid_system/              # contribution expérimentale séparée (cf. note ci-dessous)
-└── results/                    # métriques JSON, rapports HTML
+├── scripts/                    # Python CLI + SLURM scripts
+│   ├── flat_inference/         # standalone inference (CamemBERT Flat v2)
+│   └── synthetic_pipeline/     # synthetic data generation
+├── notebooks/                  # exploration and baselines (outside the package)
+│   ├── eda/                    # exploratory analysis
+│   └── baselines/              # fastText, TF-IDF, Word2Vec notebooks
+├── tests/                      # 312 pytest tests (no data, no GPU)
+├── docs/                       # technical documentation
+│   ├── ARCHITECTURE.md         # this file
+│   ├── PIPELINE.md             # script × step matrix
+│   ├── METRICS.md              # metric definitions, figures provenance
+│   └── EXPERIMENTS.md          # consolidated experiments summary
+├── hybrid_system/              # separate experimental contribution (see note below)
+└── results/                    # JSON metrics, HTML reports
 ```
 
 ---
 
-## Table de Correspondance Ancien → Nouveau
+## Old → New Mapping Table
 
-| Ancien chemin | Nouveau chemin | Remarque |
+| Old path | New path | Note |
 |:--------------|:---------------|:---------|
-| `shared/` | `rakuten/common/` | Briques partagées |
-| `02_hydra/src/` | `rakuten/models/hydra/` | Imports relatifs internes préservés |
-| `01_baselines/src/` | `rakuten/models/baselines/` | FlatHydra inclus |
-| `02b_hlpd/src/` | `rakuten/models/hlpd/` | Contribution Mehdi Aithamma |
-| `03_distributed/src/` | **exclu du livrable** | Voir note ci-dessous |
-| `02_hydra/configs/` | `configs/hydra/` | YAML hors package |
+| `shared/` | `rakuten/common/` | Shared building blocks |
+| `02_hydra/src/` | `rakuten/models/hydra/` | Internal relative imports preserved |
+| `01_baselines/src/` | `rakuten/models/baselines/` | FlatHydra included |
+| `02b_hlpd/src/` | `rakuten/models/hlpd/` | Mehdi Aithamma's contribution |
+| `03_distributed/src/` | **excluded from the deliverable** | See note below |
+| `02_hydra/configs/` | `configs/hydra/` | YAML outside the package |
 | `01_baselines/configs/` | `configs/baselines/` | |
 | `02b_hlpd/configs/` | `configs/hlpd/` | |
-| `00_eda/` | `notebooks/eda/` | Hors package |
-| `01_baselines/notebooks/` | `notebooks/baselines/` | Hors package |
+| `00_eda/` | `notebooks/eda/` | Outside the package |
+| `01_baselines/notebooks/` | `notebooks/baselines/` | Outside the package |
 
 ---
 
-## Imports Cibles
+## Target Imports
 
-Après `pip install -e .` (ou installation dans le venv), les imports sont
-propres depuis n'importe quel répertoire de travail :
+After `pip install -e .` (or installation in the venv), imports are clean from
+any working directory:
 
 ```python
 from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
@@ -153,31 +152,31 @@ from rakuten.models.hlpd.losses import ZLPRLoss
 
 ---
 
-## Ajouter une Variante HYDRA
+## Adding a HYDRA Variant
 
-Pour intégrer une nouvelle variante (ex. `bilinear`) :
+To integrate a new variant (e.g. `bilinear`):
 
-- Créer la classe dans `rakuten/models/hydra/models.py` en héritant de `HYDRABase`,
-  puis l'enregistrer dans le dictionnaire `HYDRA_VARIANTS` (ligne ~249).
-- Si la variante produit une sortie unifiée (comme `global`/`nested`), gérer le cas
-  dans `HYDRALoss.__init__` et `forward` (`rakuten/models/hydra/losses.py`) via le
-  paramètre `architecture`.
-- Ajouter un test dans `tests/test_hydra_models.py` (forward pass, dimensions de sortie).
-- Déclarer une config YAML dans `configs/hydra/` si les hyperparamètres divergent de `default.yaml`.
+- Create the class in `rakuten/models/hydra/models.py` by inheriting from `HYDRABase`,
+  then register it in the `HYDRA_VARIANTS` dictionary (line ~249).
+- If the variant produces a unified output (like `global`/`nested`), handle the case
+  in `HYDRALoss.__init__` and `forward` (`rakuten/models/hydra/losses.py`) via the
+  `architecture` parameter.
+- Add a test in `tests/test_hydra_models.py` (forward pass, output dimensions).
+- Declare a YAML config in `configs/hydra/` if the hyperparameters differ from `default.yaml`.
 
 ---
 
-## Note sur le Pipeline Distribué
+## Note on the Distributed Pipeline
 
-L'entraînement distribué (DDP, DistributedDataParallel) a été exploré pendant
-le projet (`03_distributed/`) mais **écarté du livrable** au profit du
-DataParallel single-node, qui s'est avéré suffisant sur les nœuds GPU
-disponibles (P100 2×16 Go, 3090 2-4×24 Go) et bien plus simple à maintenir.
+Distributed training (DDP, DistributedDataParallel) was explored during the
+project (`03_distributed/`) but **left out of the deliverable** in favor of
+single-node DataParallel, which proved sufficient on the available GPU nodes
+(P100 2×16 GB, 3090 2-4×24 GB) and far simpler to maintain.
 
-Le code DDP (~2 000 lignes : `trainer_ddp.py`, `ddp_utils.py`,
-`data_sharding.py`, `error_analysis.py`, `predict.py`, `main.py`) est
-**disponible au tag git `archive/distributed-pipeline`** et peut être
-récupéré à tout moment via :
+The DDP code (~2,000 lines: `trainer_ddp.py`, `ddp_utils.py`,
+`data_sharding.py`, `error_analysis.py`, `predict.py`, `main.py`) is
+**available at the git tag `archive/distributed-pipeline`** and can be
+retrieved at any time via:
 
 ```bash
 git checkout archive/distributed-pipeline -- 03_distributed/
@@ -185,10 +184,10 @@ git checkout archive/distributed-pipeline -- 03_distributed/
 
 ---
 
-## Note sur `hybrid_system/`
+## Note on `hybrid_system/`
 
-Le dossier `hybrid_system/` est la **contribution séparée d'un coéquipier**
-(CamemBERT + XGBoost), développée en parallèle du package `rakuten`. Il n'est
-**pas intégré au package** (`pip install -e .` ne l'expose pas) et ne dépend
-pas du code de `rakuten/`. Son évaluation et ses résultats sont documentés
-dans ses propres fichiers.
+The `hybrid_system/` folder is the **separate contribution of a teammate**
+(CamemBERT + XGBoost), developed in parallel with the `rakuten` package. It is
+**not integrated into the package** (`pip install -e .` does not expose it) and
+does not depend on the `rakuten/` code. Its evaluation and results are documented
+in its own files.

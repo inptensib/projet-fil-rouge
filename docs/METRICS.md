@@ -1,160 +1,160 @@
-# Métriques et Provenance des Résultats
+# Metrics and Provenance of Results
 
-Définitions des métriques du projet, explication des deux modes
-d'évaluation (le piège classique du repo) et traçabilité de chaque chiffre
-publié dans `results/`.
+Definitions of the project's metrics, an explanation of the two evaluation
+modes (the repo's classic pitfall) and traceability of every figure published
+in `results/`.
 
-> **Warning — fuite de données dans les benchmarks v1 (12/06/2026)** :
-> un audit du dataset a révélé que **11,2 % des lignes de val et de test
-> avaient un jumeau exact dans le train** (même fiche produit scrapée
-> plusieurs fois, 98 % avec le même label). Tous les résultats de `results/`
-> et `comparison.html` ont été entraînés et évalués sur ce dataset « v1 »
-> (fuite non purgée). Les comparaisons *entre* modèles restent valides
-> (même fuite pour tous).
+> **Warning — data leakage in the v1 benchmarks (12/06/2026)**:
+> a dataset audit revealed that **11.2 % of the val and test rows
+> had an exact twin in the train set** (the same product listing scraped
+> several times, 98 % with the same label). All the results in `results/`
+> and `comparison.html` were trained and evaluated on this "v1" dataset
+> (leakage not purged). Comparisons *between* models remain valid
+> (the same leakage for all).
 >
-> Le dataset redressé (« v2 », fuite purgée : **−314 624 lignes de train
-> nettes**, 6 126 → 5 777 classes L2) est sur HuggingFace dans
+> The corrected dataset ("v2", leakage purged: **−314,624 net train
+> rows**, 6,126 → 5,777 L2 classes) is on HuggingFace in
 > `datasets_finaux/`.
 >
-> **Effet réel mesuré (≠ l'estimation initiale de +1,5–3 pts).** FlatHydra a
-> été ré-entraîné + ré-évalué sur v2 (CamemBERT **et** mBERT, méthode naïve
-> identique à v1, seule la donnée change) :
-> - **L1 (mêmes 157 classes — comparaison propre)** : v2 est **0,8 à 1,3 pt
->   plus bas** que v1 → c'est le vrai effet de la fuite, qui gonflait v1
->   d'**~1 pt**.
-> - **L2** : v2 est *plus haut* (CamemBERT 71,7 → 78,9 ; mBERT 71,8 → 77,4),
->   mais **pas directement comparable** : ~3 pts viennent mécaniquement des 351
->   classes droppées (F1 moyen 0,20), et le reste du fait que dé-fuiter a
->   *amélioré* l'entraînement (doublons retirés), pas gonflé le test.
+> **Measured real effect (≠ the initial estimate of +1.5–3 pts).** FlatHydra
+> was re-trained + re-evaluated on v2 (CamemBERT **and** mBERT, naive method
+> identical to v1, only the data changes):
+> - **L1 (same 157 classes — clean comparison)**: v2 is **0.8 to 1.3 pts
+>   lower** than v1 → this is the real effect of the leakage, which inflated v1
+>   by **~1 pt**.
+> - **L2**: v2 is *higher* (CamemBERT 71.7 → 78.9; mBERT 71.8 → 77.4),
+>   but **not directly comparable**: ~3 pts come mechanically from the 351
+>   dropped classes (mean F1 0.20), and the rest from the fact that de-leaking
+>   *improved* training (duplicates removed), it did not inflate the test.
 >
-> Conclusion : l'inflation v1 réelle est **~1 pt** (mesurée au L1), bien en
-> deçà de l'estimation initiale ; au L2 les chiffres v1 et v2 ne se comparent
-> pas terme à terme. (Mesuré sur FlatHydra / 2 encodeurs ; HYDRA et HLPD n'ont
-> pas été ré-entraînés sur v2.) Détail des 4 évals : `results/flat_hydra*/`.
+> Conclusion: the real v1 inflation is **~1 pt** (measured at L1), well below
+> the initial estimate; at L2 the v1 and v2 figures do not compare term by
+> term. (Measured on FlatHydra / 2 encoders; HYDRA and HLPD were not
+> re-trained on v2.) Details of the 4 evaluations: `results/flat_hydra*/`.
 >
-> *Note : les modèles v2 ont **5 775** têtes L2 (et non 5 777) — 2 classes L2 du
-> dataset n'ont aucun échantillon en train après purge, le nombre de têtes étant
-> dérivé des données à l'exécution. D'où `num_classes_l2: 5775` dans
+> *Note: the v2 models have **5,775** L2 heads (not 5,777) — 2 L2 classes in the
+> dataset have no train sample after purging, the number of heads being derived
+> from the data at runtime. Hence `num_classes_l2: 5775` in
 > `results/flat_hydra_v2/test_metrics.json`.*
 
-## Table des Matières
+## Table of Contents
 
-1. [Définitions](#définitions)
-1. [Les deux modes d'évaluation](#les-deux-modes-dévaluation)
-1. [L'incident mBERT et le mode auto](#lincident-mbert-et-le-mode-auto)
-1. [Provenance des chiffres publiés](#provenance-des-chiffres-publiés)
-1. [Reproduire une évaluation](#reproduire-une-évaluation)
-1. [Évaluer un nouveau modèle](#évaluer-un-nouveau-modèle)
+1. [Definitions](#definitions)
+1. [The two evaluation modes](#the-two-evaluation-modes)
+1. [The mBERT incident and the auto mode](#the-mbert-incident-and-the-auto-mode)
+1. [Provenance of the published figures](#provenance-of-the-published-figures)
+1. [Reproducing an evaluation](#reproducing-an-evaluation)
+1. [Evaluating a new model](#evaluating-a-new-model)
 
-## Définitions
+## Definitions
 
-Toutes les métriques sont implémentées dans `rakuten/common/metrics.py` :
+All the metrics are implemented in `rakuten/common/metrics.py`:
 
-| Métrique               | Définition                                            |
+| Metric                 | Definition                                             |
 |:-----------------------|:-------------------------------------------------------|
-| `f1_l1_macro`          | F1 macro sur les 157 classes L1 (chaque classe pèse 1) |
-| `f1_l2_macro`          | F1 macro sur les 5 777 classes L2 — **métrique cible** |
-| `constrained_f1_macro` | F1 L2 compté correct seulement si le parent L1 l'est   |
-| `hcr`                  | % de prédictions où L2 est un enfant valide de L1      |
+| `f1_l1_macro`          | Macro F1 over the 157 L1 classes (each class weighs 1) |
+| `f1_l2_macro`          | Macro F1 over the 5,777 L2 classes — **target metric** |
+| `constrained_f1_macro` | L2 F1 counted correct only if the L1 parent is correct |
+| `hcr`                  | % of predictions where L2 is a valid child of L1       |
 
-Le **macro**-averaging donne le même poids aux classes rares qu'aux
-classes fréquentes — c'est voulu : la longue traîne des 5 777 classes L2
-est l'enjeu du projet. Objectif global : maximiser `f1_l2_macro` en
-maintenant un HCR > 95 % pour les variantes hiérarchiques.
+**Macro**-averaging gives the same weight to rare classes as to frequent
+classes — this is intentional: the long tail of the 5,777 L2 classes
+is the heart of the project. Overall goal: maximize `f1_l2_macro` while
+maintaining an HCR > 95 % for the hierarchical variants.
 
-## Les Deux Modes d'Évaluation
+## The Two Evaluation Modes
 
-Un même modèle HYDRA peut être évalué de deux façons :
+A single HYDRA model can be evaluated in two ways:
 
-| Mode   | Mécanisme                                        | HCR typique |
+| Mode   | Mechanism                                        | Typical HCR |
 |:-------|:--------------------------------------------------|:-----------:|
-| `base` | Têtes L1 et L2 indépendantes, aucune contrainte    | ~0.86       |
-| `hier` | Masque hiérarchique : L2 restreint aux enfants du L1 prédit | ~0.997 |
+| `base` | Independent L1 and L2 heads, no constraint         | ~0.86       |
+| `hier` | Hierarchical mask: L2 restricted to children of the predicted L1 | ~0.997 |
 
-> **Warning** : les chiffres des deux modes ne sont **pas comparables**.
-> Le mode `hier` donne un HCR ≈ 0.997 *par construction* et change le
-> F1 L2. Comparer un modèle évalué en `base` avec un autre en `hier`
-> n'a aucun sens.
+> **Warning**: the figures from the two modes are **not comparable**.
+> The `hier` mode gives an HCR ≈ 0.997 *by construction* and changes the
+> L2 F1. Comparing a model evaluated in `base` with another in `hier`
+> makes no sense.
 
-Règle de publication du projet :
+The project's publication rule:
 
-- Modèles **standards** (entraînés sans hiérarchie) → publier le mode `base`
-- Modèles **hierarchy** (`condition_l2_on_l1` + `check_hierarchy`) →
-  publier le mode `hier` (c'est leur régime de fonctionnement nominal)
+- **Standard** models (trained without hierarchy) → publish the `base` mode
+- **hierarchy** models (`condition_l2_on_l1` + `check_hierarchy`) →
+  publish the `hier` mode (this is their nominal operating regime)
 
-## L'Incident mBERT et le Mode Auto
+## The mBERT Incident and the Auto Mode
 
-Historique : `scripts/eval_hierarchy.py` sérialisait systématiquement le
-mode `hier` dans son JSON de sortie. Pour HYDRA Local mBERT (modèle
-standard), cela a publié F1 L2 = 60.7 % / HCR = 99.7 % au lieu des vraies
-valeurs 66.8 % / 85.8 % — corrigées ensuite à la main dans
-`results/hydra_eval_test_metrics_mbert.json` (champs `_note`).
+Background: `scripts/eval_hierarchy.py` systematically serialized the
+`hier` mode in its output JSON. For HYDRA Local mBERT (a standard model),
+this published L2 F1 = 60.7 % / HCR = 99.7 % instead of the true
+values 66.8 % / 85.8 % — later corrected by hand in
+`results/hydra_eval_test_metrics_mbert.json` (`_note` fields).
 
-Depuis, le script choisit le bon mode automatiquement :
+Since then, the script chooses the right mode automatically:
 
 ```bash
 python scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
     --config configs/hydra/mbert_default.yaml \
     --output-json results/eval.json
-# → mode "base" car la config n'a ni check_hierarchy ni condition_l2_on_l1
+# → "base" mode because the config has neither check_hierarchy nor condition_l2_on_l1
 ```
 
-Le flag `--output-mode {auto,base,hier}` permet l'override explicite, et
-le JSON produit contient les métadonnées `_mode`, `_config` et `_date`.
+The `--output-mode {auto,base,hier}` flag allows an explicit override, and
+the produced JSON contains the `_mode`, `_config` and `_date` metadata.
 
-## Provenance des Chiffres Publiés
+## Provenance of the Published Figures
 
-Chaque fichier de `results/` consommé par `generate_comparison.py` :
+Each `results/` file consumed by `generate_comparison.py`:
 
-| Fichier                              | Modèles               | Source                      | Mode  |
+| File                                 | Models                | Source                      | Mode  |
 |:--------------------------------------|:----------------------|:-----------------------------|:------|
-| `hydra_eval_test_metrics.json`         | HYDRA std CamemBERT ×3 | Job SLURM 772505             | base  |
+| `hydra_eval_test_metrics.json`         | HYDRA std CamemBERT ×3 | SLURM job 772505             | base  |
 | `hydra_eval_hierarchy_metrics.json`    | HYDRA hierarchy ×3     | Jobs 772228/229/230          | hier  |
-| `hydra_eval_test_metrics_mbert.json`   | HYDRA Local mBERT      | Log training job 813697_5    | base  |
+| `hydra_eval_test_metrics_mbert.json`   | HYDRA Local mBERT      | Training log job 813697_5    | base  |
 | `flat_hydra/test_metrics.json`         | FlatHydra              | `run_eval_flat_hydra.slurm`  | base  |
 | `flat_hydra_title/test_metrics.json`   | FlatHydra title        | `run_eval_flat_hydra_title.slurm` | base |
-| `hlpd/test_metrics.json`               | HLPD                   | Rapporté (best @ step 345k)  | natif |
-| `baselines/baseline_results.json`      | TF-IDF, W2V, fastText  | Scripts/notebooks baselines  | base  |
-| `baselines/baseline_results_title.json`| Idem, title-only       | Idem                         | base  |
-| `<modele>/f1_per_class_l{1,2}.json`    | F1 par classe          | `generate_f1_per_class.py`   | base  |
-| `class_metadata.json`                  | Support par classe     | `build_class_metadata.py`    | —     |
+| `hlpd/test_metrics.json`               | HLPD                   | Reported (best @ step 345k)  | native |
+| `baselines/baseline_results.json`      | TF-IDF, W2V, fastText  | Baseline scripts/notebooks   | base  |
+| `baselines/baseline_results_title.json`| Same, title-only       | Same                         | base  |
+| `<modele>/f1_per_class_l{1,2}.json`    | Per-class F1           | `generate_f1_per_class.py`   | base  |
+| `class_metadata.json`                  | Per-class support      | `build_class_metadata.py`    | —     |
 
-Particularités à connaître :
+Particularities to be aware of:
 
-- Les JSON marqués d'un champ `_source` ou `_note` ont été **curés à la
-  main** après coup (notamment le mBERT) — ne pas les régénérer sans
-  relire leur en-tête.
-- Les métriques des HYDRA **title-only standard** proviennent du logging
-  MLflow en fin d'entraînement (pas de JSON d'évaluation dédié) ;
-  `generate_comparison.py` les lit directement dans `mlflow.db`.
-- `mlflow.db` (racine, ignoré par git) contient l'historique complet des
+- JSON files marked with a `_source` or `_note` field were **curated by
+  hand** afterwards (notably the mBERT one) — do not regenerate them without
+  re-reading their header.
+- The metrics of the **standard title-only** HYDRA models come from MLflow
+  logging at the end of training (no dedicated evaluation JSON);
+  `generate_comparison.py` reads them directly from `mlflow.db`.
+- `mlflow.db` (repo root, git-ignored) contains the full history of the
   runs — interface via `docker compose up mlflow -d`.
 
-## Reproduire une Évaluation
+## Reproducing an Evaluation
 
 ```bash
-# HYDRA standard (3 variantes, les deux modes affichés en console)
+# HYDRA standard (3 variants, both modes shown in the console)
 sbatch scripts/run_eval.slurm
 
-# HYDRA hierarchy (modèles dans models_hierarchy/)
+# HYDRA hierarchy (models in models_hierarchy/)
 sbatch scripts/run_eval.slurm models_hierarchy
 
-# Une seule variante, en local avec GPU
+# A single variant, locally with GPU
 python scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
     --variant local --eval-batch-size 2048 \
     --output-json results/hydra_eval_test_metrics.json
 ```
 
-L'affichage console montre toujours les deux modes avec leurs deltas —
-seul le JSON suit `--output-mode`.
+The console output always shows both modes with their deltas —
+only the JSON follows `--output-mode`.
 
-## Évaluer un Nouveau Modèle
+## Evaluating a New Model
 
-1. **Consulter MLflow avant d'entraîner** : `search_best_runs("f1_l2_macro")`
-   pour connaître la référence à battre (pas de run en double)
-1. **Comparer systématiquement** au baseline TF-IDF (F1 L2 = 42.8 %) et au
-   meilleur modèle (FlatHydra, F1 L2 = 71.7 %)
-1. **Vérifier le HCR** en plus du F1 — un modèle hiérarchique doit tenir
+1. **Check MLflow before training**: `search_best_runs("f1_l2_macro")`
+   to know the reference to beat (no duplicate run)
+1. **Systematically compare** against the TF-IDF baseline (L2 F1 = 42.8 %) and
+   the best model (FlatHydra, L2 F1 = 71.7 %)
+1. **Check the HCR** in addition to the F1 — a hierarchical model must hold
    HCR > 95 %
-1. **Publier le bon mode** (`--output-mode auto` fait le bon choix) et
-   regénérer `results/comparison.html` via `generate_comparison.py`
+1. **Publish the right mode** (`--output-mode auto` makes the right choice) and
+   regenerate `results/comparison.html` via `generate_comparison.py`

@@ -1,71 +1,71 @@
-# Pipeline d'Expérimentation
+# Experimentation Pipeline
 
-Carte de référence : quel script et quelle config pour entraîner, évaluer
-et publier chaque modèle du projet.
+Reference map: which script and which config to train, evaluate,
+and publish each model in the project.
 
-## Table des Matières
+## Table of Contents
 
-1. [Vue d'ensemble](#vue-densemble)
-1. [Matrice modèle × étape](#matrice-modèle--étape)
-1. [Configs YAML](#configs-yaml)
-1. [Scripts SLURM](#scripts-slurm)
-1. [Génération des rapports](#génération-des-rapports)
-1. [Utilitaires](#utilitaires)
-1. [Dettes techniques connues](#dettes-techniques-connues)
+1. [Overview](#overview)
+1. [Model × Step Matrix](#model--step-matrix)
+1. [YAML Configs](#yaml-configs)
+1. [SLURM Scripts](#slurm-scripts)
+1. [Report Generation](#report-generation)
+1. [Utilities](#utilities)
+1. [Known Technical Debt](#known-technical-debt)
 
-## Vue d'Ensemble
+## Overview
 
 ```text
-dataset HF (splits JSONL)
+HF dataset (JSONL splits)
         |
         v
-   entraînement  ----->  models*/...                (best_model.pt + checkpoint)
+   training      ----->  models*/...                (best_model.pt + checkpoint)
         |                   |
         v                   v
-   MLflow (mlflow.db)   évaluation  ----->  results/*.json   (métriques test)
+   MLflow (mlflow.db)   evaluation  ----->  results/*.json   (test metrics)
                             |
                             v
-                  F1 par classe  ----->  results/<modele>/f1_per_class_l*.json
+                  per-class F1  ----->  results/<modele>/f1_per_class_l*.json
                             |
                             v
             generate_comparison.py  ----->  results/comparison.html
 ```
 
-## Matrice Modèle × Étape
+## Model × Step Matrix
 
-Commandes depuis la racine du repo.
+Commands from the repo root.
 
-> **Prérequis** : exporter `PROJECT_ROOT`, `VENV_ACTIVATE` et `DATA_DIR`
-> avant tout `sbatch` (voir [ONBOARDING.md](../ONBOARDING.md)) ;
-> `--array=0-9%1` = reprise automatique sur checkpoint, une tâche à la fois.
+> **Prerequisites**: export `PROJECT_ROOT`, `VENV_ACTIVATE`, and `DATA_DIR`
+> before any `sbatch` (see [ONBOARDING.md](../ONBOARDING.md));
+> `--array=0-9%1` = automatic checkpoint resume, one task at a time.
 
-### HYDRA CamemBERT standard (local, nested, global)
+### Standard HYDRA CamemBERT (local, nested, global)
 
 ```bash
-# Entraîner (une variante, job array auto-reprise)
+# Train (single variant, auto-resume job array)
 sbatch --job-name=hydra-local --array=0-9%1 \
     scripts/run_train_variant.slurm local configs/hydra/default.yaml
 
-# Ou les 3 variantes en parallèle (1 GPU chacune)
+# Or all 3 variants in parallel (1 GPU each)
 sbatch scripts/run_train_array.slurm configs/hydra/default.yaml
 
-# Évaluer (3 variantes, avec/sans masque)
+# Evaluate (3 variants, with/without mask)
 sbatch scripts/run_eval.slurm
 
-# F1 par classe
+# Per-class F1
 sbatch scripts/run_f1_perclass.slurm
 ```
 
-### HYDRA hierarchy (teacher forcing + masque)
+### HYDRA hierarchy (teacher forcing + mask)
 
 ```bash
-# Entraîner — chaînage de N arrays si > 36 h
+# Train — chain N arrays if > 36 h
 ./scripts/chain_submit_array.sh 3 configs/hydra/hierarchy.yaml
 
-# Évaluer (les modèles sont dans models_hierarchy/)
+# Evaluate (models are in models_hierarchy/)
 sbatch scripts/run_eval.slurm models_hierarchy
 
-# F1 par classe
+# Per-class F1
 sbatch scripts/run_f1_perclass_hierarchy.slurm
 ```
 
@@ -78,15 +78,15 @@ sbatch scripts/run_eval_hydra_mbert.slurm
 sbatch scripts/run_f1_perclass_mbert.slurm
 ```
 
-### HYDRA title-only (designation seule)
+### HYDRA title-only (designation only)
 
 ```bash
 sbatch scripts/run_hydra_title_3090.slurm             # standard
-sbatch scripts/run_hydra_title_hierarchy_3090.slurm    # + hiérarchie
-sbatch scripts/run_eval_hydra_title_hierarchy.slurm     # évaluation
+sbatch scripts/run_hydra_title_hierarchy_3090.slurm    # + hierarchy
+sbatch scripts/run_eval_hydra_title_hierarchy.slurm     # evaluation
 ```
 
-### FlatHydra (tête unique L1+L2)
+### FlatHydra (single L1+L2 head)
 
 ```bash
 sbatch --job-name=flat --array=0-9%1 scripts/run_flat_3090.slurm     # 2×3090 (v1)
@@ -94,22 +94,22 @@ sbatch --job-name=flat --array=0-9%1 scripts/run_flat_p100.slurm     # 2×P100 (
 sbatch --job-name=flat-mbert --array=0-9%1 scripts/run_flat_mbert.slurm
 sbatch scripts/run_flat_hydra_title_3090.slurm                       # title-only
 
-sbatch scripts/run_eval_flat_hydra.slurm          # éval full-text (v1)
-sbatch scripts/run_eval_flat_hydra_title.slurm     # éval title-only
+sbatch scripts/run_eval_flat_hydra.slurm          # full-text eval (v1)
+sbatch scripts/run_eval_flat_hydra_title.slurm     # title-only eval
 ```
 
-**Modèle phare v2 (référence 78,9 % F1 L2) :**
+**Flagship v2 model (78.9% L2 F1 reference):**
 
 ```bash
-# Entraînement CamemBERT v2 (méthode naïve — config flat_hydra_camembert_v2.yaml)
+# CamemBERT v2 training (naive method — flat_hydra_camembert_v2.yaml config)
 sbatch --array=0-9%1 scripts/run_flat_camembert_v2.slurm
 
-# Entraînement mBERT v2 (77,4 % F1 L2)
+# mBERT v2 training (77.4% L2 F1)
 sbatch --array=0-9%1 scripts/run_flat_mbert_v2.slurm
 
-# Évaluation test (générique, paramétrable via --export)
+# Test evaluation (generic, configurable via --export)
 sbatch scripts/run_eval_flat_hydra_generic.slurm
-# Exemple pour mBERT v2 :
+# Example for mBERT v2:
 # sbatch --job-name=eval-mbert-v2 \
 #   --export=ALL,MODEL_PT=models_v2/flat_hydra_mbert/best_model.pt,\
 #   EVAL_CONFIG=configs/baselines/flat_hydra_mbert_v2.yaml,\
@@ -121,7 +121,7 @@ sbatch scripts/run_eval_flat_hydra_generic.slurm
 
 ```bash
 sbatch --job-name=hlpd --array=0-9%1 scripts/run_hlpd_3090.slurm
-# Config : configs/hlpd/hlpd_3090.yaml
+# Config: configs/hlpd/hlpd_3090.yaml
 ```
 
 ### Baselines
@@ -133,110 +133,110 @@ sbatch scripts/run_baseline_word2vec.slurm                 # Word2Vec
 sbatch scripts/run_baseline_word2vec_title.slurm           # Word2Vec title
 sbatch scripts/run_baseline_fasttext_softmax_title.slurm   # fastText title
 
-# fastText full-text : machine directe (lame10, 80 CPUs), PAS SLURM
+# fastText full-text: direct machine (lame10, 80 CPUs), NOT SLURM
 bash scripts/run_fasttext_softmax.sh
 bash scripts/run_fasttext_eval.sh
 ```
 
-## Configs YAML
+## YAML Configs
 
-`configs/hydra/default.yaml` est la **source de vérité**. Divergences
-des autres configs :
+`configs/hydra/default.yaml` is the **source of truth**. Divergences of
+the other configs:
 
-| Config                       | Batch | LR        | Divergences clés                          |
+| Config                       | Batch | LR        | Key divergences                            |
 |:-----------------------------|:-----:|:----------|:-------------------------------------------|
-| `default.yaml`               | 64    | 3.5e-5    | Référence (dropout 0.3, hidden 256)         |
-| `hierarchy.yaml`             | 128   | 5.0e-5    | `use_focal`, `condition_l2_on_l1`, masque   |
-| `title_only.yaml`            | 320   | 7.8e-5    | Title seul, `save_dir: models_title`        |
-| `title_only_hierarchy.yaml`  | 640   | 1.12e-4   | Title + hiérarchie                          |
-| `mbert_default.yaml`         | 64    | 3.5e-5    | Encodeur mBERT, reste identique             |
+| `default.yaml`               | 64    | 3.5e-5    | Reference (dropout 0.3, hidden 256)        |
+| `hierarchy.yaml`             | 128   | 5.0e-5    | `use_focal`, `condition_l2_on_l1`, mask    |
+| `title_only.yaml`            | 320   | 7.8e-5    | Title only, `save_dir: models_title`       |
+| `title_only_hierarchy.yaml`  | 640   | 1.12e-4   | Title + hierarchy                          |
+| `mbert_default.yaml`         | 64    | 3.5e-5    | mBERT encoder, rest identical              |
 
-> **Note — règle de scaling** : quand le batch augmente, le LR suit la
-> racine carrée du facteur : `lr = 3.5e-5 × √(batch/64)`. Vérification :
+> **Note — scaling rule**: when the batch grows, the LR follows the
+> square root of the factor: `lr = 3.5e-5 × √(batch/64)`. Check:
 > batch 128 → ×1.41 (5e-5), batch 320 → ×2.24 (7.8e-5), batch 640 → ×3.2
-> (1.12e-4). Les configs title-only supportent de gros batches car les
-> séquences (titre seul) sont bien plus courtes.
+> (1.12e-4). The title-only configs support large batches because the
+> sequences (title only) are much shorter.
 
-Configs FlatHydra (`configs/baselines/`) : `dropout: 0.2` (fidélité au
-papier, ≠ 0.3 HYDRA) ; le batch varie selon le GPU — `flat_hydra.yaml`
+FlatHydra configs (`configs/baselines/`): `dropout: 0.2` (faithful to the
+paper, ≠ 0.3 HYDRA); the batch varies by GPU — `flat_hydra.yaml`
 (64, CPU/debug), `flat_hydra_3090.yaml` (256), `flat_hydra_title_3090.yaml`
-(512), `flat_hydra_mbert.yaml` (128, mBERT plus lourd).
+(512), `flat_hydra_mbert.yaml` (128, heavier mBERT).
 
-> **Configs dataset v2 — attention aux confusions** :
+> **Dataset v2 configs — beware of confusion**:
 >
-> - `configs/baselines/flat_hydra_camembert_v2.yaml` = méthode **naïve** (identique v1, sans
->   rééquilibrage). Lancée via `run_flat_camembert_v2.slurm` → produit le **78,9 % de F1 L2**
->   de référence sur le dataset v2 (CamemBERT).
-> - `configs/baselines/flat_hydra_mbert_v2.yaml` = mBERT naïf v2, lancée via
->   `run_flat_mbert_v2.slurm` → 77,4 % F1 L2.
-> - `configs/baselines/flat_hydra_v2.yaml` et `configs/hydra/v2_default.yaml` portent le
->   **kit de rééquilibrage** (`normalize_text`, `synthetic_policy: drop_oversampled`,
->   `class_weighting: inv_sqrt`, `logit_adjustment`) — ces deux configs **n'ont jamais été
->   lancées** et constituent une expérience future, pas la référence du 78,9 %.
-> - Les configs sans suffixe `v2` correspondent aux entraînements v1 historiques.
+> - `configs/baselines/flat_hydra_camembert_v2.yaml` = **naive** method (identical to v1, no
+>   rebalancing). Launched via `run_flat_camembert_v2.slurm` → produces the reference **78.9% L2 F1**
+>   on the v2 dataset (CamemBERT).
+> - `configs/baselines/flat_hydra_mbert_v2.yaml` = naive mBERT v2, launched via
+>   `run_flat_mbert_v2.slurm` → 77.4% L2 F1.
+> - `configs/baselines/flat_hydra_v2.yaml` and `configs/hydra/v2_default.yaml` carry the
+>   **rebalancing kit** (`normalize_text`, `synthetic_policy: drop_oversampled`,
+>   `class_weighting: inv_sqrt`, `logit_adjustment`) — these two configs **have never been
+>   launched** and constitute a future experiment, not the 78.9% reference.
+> - Configs without the `v2` suffix correspond to the historical v1 trainings.
 
-## Scripts SLURM
+## SLURM Scripts
 
-Conventions communes : job arrays `--array=0-9%1` (reprise automatique
-sur `checkpoint_latest.pt`, skip si `training_complete.txt`), limite 36 h
-par tâche, partitions `P100` (2×16 Go) et `3090` (2-4×24 Go).
+Common conventions: `--array=0-9%1` job arrays (automatic resume from
+`checkpoint_latest.pt`, skip if `training_complete.txt`), 36 h limit
+per task, `P100` (2×16 GB) and `3090` (2-4×24 GB) partitions.
 
-| Script                         | Rôle                            | GPU       |
+| Script                         | Role                            | GPU       |
 |:-------------------------------|:--------------------------------|:----------|
-| `run_train_variant.slurm`      | 1 variante HYDRA, 1 config      | 1-2 GPU   |
-| `run_train_array.slurm`        | 3 variantes en parallèle        | 1 GPU/var |
-| `chain_submit_array.sh`        | N arrays chaînés (`afterany`)   | —         |
-| `run_flat_*.slurm`             | FlatHydra par GPU/encodeur      | 2 GPU     |
+| `run_train_variant.slurm`      | 1 HYDRA variant, 1 config       | 1-2 GPU   |
+| `run_train_array.slurm`        | 3 variants in parallel          | 1 GPU/var |
+| `chain_submit_array.sh`        | N chained arrays (`afterany`)   | —         |
+| `run_flat_*.slurm`             | FlatHydra per GPU/encoder       | 2 GPU     |
 | `run_hlpd_3090.slurm`          | HLPD                            | 2×3090    |
-| `run_eval*.slurm`              | Évaluations sur test            | 1-2 GPU   |
-| `run_f1_perclass*.slurm`       | F1 par classe                   | 1 GPU     |
-| `run_baseline_*.slurm`         | Baselines CPU                   | —         |
-| `cluster_status.sh`            | État GPU/CPU/RAM des nœuds      | —         |
+| `run_eval*.slurm`              | Test evaluations                | 1-2 GPU   |
+| `run_f1_perclass*.slurm`       | Per-class F1                    | 1 GPU     |
+| `run_baseline_*.slurm`         | CPU baselines                   | —         |
+| `cluster_status.sh`            | Node GPU/CPU/RAM status         | —         |
 
-> **Warning** : ne jamais soumettre de jobs en boucle ni recréer de
-> script de surveillance auto-resoumission (incident des 110 jobs,
-> avertissement admin). Les job arrays `%1` couvrent le besoin.
+> **Warning**: never submit jobs in a loop or recreate an
+> auto-resubmission monitoring script (the 110-job incident,
+> admin warning). The `%1` job arrays cover the need.
 
-## Génération des Rapports
+## Report Generation
 
 ```bash
-# Page de comparaison globale (lit mlflow.db + tous les results/*.json)
+# Global comparison page (reads mlflow.db + all results/*.json)
 python scripts/generate_comparison.py        # → results/comparison.html
 
-# F1 par classe d'un modèle déjà entraîné
+# Per-class F1 of an already-trained model
 python scripts/generate_f1_per_class.py \
     --split-dir "$DATA_DIR" --config configs/hydra/default.yaml \
     --variant local --results-dir hydra-local-camembert
 
-# Rapports HTML par modèle (confusion, courbes)
+# Per-model HTML reports (confusion, curves)
 python scripts/generate_report.py
 
-# Métadonnées de classes (support test, parent L1)
+# Class metadata (test support, L1 parent)
 python scripts/build_class_metadata.py --dataset-dir "$DATA_DIR"
 ```
 
-La provenance de chaque JSON consommé est tracée dans
+The provenance of each consumed JSON is traced in
 [METRICS.md](METRICS.md).
 
-## Utilitaires
+## Utilities
 
-| Script                    | Rôle                                          |
-|:--------------------------|:----------------------------------------------|
-| `download_dataset.py`     | Télécharge les splits depuis HuggingFace       |
-| `split_dataset.py`        | Régénère des splits 70/15/15 stratifiés L2     |
-| `upload_models_hf.py`     | Archive les poids vers HF (`--dry-run` dispo)  |
-| `eval_hierarchy.py`       | Éval avec/sans masque (`--output-mode auto`)   |
+| Script                    | Role                                               |
+|:--------------------------|:---------------------------------------------------|
+| `download_dataset.py`     | Downloads the splits from HuggingFace              |
+| `split_dataset.py`        | Regenerates L2-stratified 70/15/15 splits          |
+| `upload_models_hf.py`     | Archives the weights to HF (`--dry-run` available) |
+| `eval_hierarchy.py`       | Eval with/without mask (`--output-mode auto`)      |
 
-## Dettes Techniques Connues
+## Known Technical Debt
 
-- **Duplication des trainers** : `rakuten/models/hydra/trainer.py`,
-  `rakuten/models/baselines/flat_trainer.py` et le trainer HLPD partagent
-  beaucoup de logique train/eval sans factorisation commune. La
-  `rakuten/common/training_utils.py` fournit les briques partagées
+- **Trainer duplication**: `rakuten/models/hydra/trainer.py`,
+  `rakuten/models/baselines/flat_trainer.py`, and the HLPD trainer share
+  a lot of train/eval logic without common factoring.
+  `rakuten/common/training_utils.py` provides the shared building blocks
   (EarlyStopping, compute_class_weights).
-- **Structures JSON hétérogènes dans `results/`** : trois formats
-  coexistent selon la famille de modèle (voir [METRICS.md](METRICS.md)) ;
-  harmoniser exigerait de régénérer toutes les évaluations.
-- **Pipeline DDP** : exploré pendant le projet mais écarté du livrable au
-  profit du DataParallel single-node. Disponible au tag git
-  `archive/distributed-pipeline` — voir [docs/ARCHITECTURE.md](ARCHITECTURE.md).
+- **Heterogeneous JSON structures in `results/`**: three formats
+  coexist depending on the model family (see [METRICS.md](METRICS.md));
+  harmonizing would require regenerating all the evaluations.
+- **DDP pipeline**: explored during the project but dropped from the
+  deliverable in favor of single-node DataParallel. Available at the git
+  tag `archive/distributed-pipeline` — see [docs/ARCHITECTURE.md](ARCHITECTURE.md).

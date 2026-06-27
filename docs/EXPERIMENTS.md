@@ -1,179 +1,179 @@
-# Expériences — récapitulatif consolidé
+# Experiments — consolidated summary
 
-Vue d'ensemble de **toutes** les expériences du projet (baselines, HYDRA, HLPD,
-FlatHydra), avec les chiffres de **test** tracés à leur fichier source. Pour les
-définitions de métriques, les deux modes d'évaluation et la provenance détaillée,
-voir [`METRICS.md`](METRICS.md). Pour la conception du modèle retenu, voir
-[`flat_hydra_conception.md`](flat_hydra_conception.md). Pour reproduire, voir
+Overview of **all** the project's experiments (baselines, HYDRA, HLPD,
+FlatHydra), with the **test** figures traced to their source file. For metric
+definitions, the two evaluation modes and detailed provenance, see
+[`METRICS.md`](METRICS.md). For the design of the selected model, see
+[`flat_hydra_conception.md`](flat_hydra_conception.md). To reproduce, see
 [`PIPELINE.md`](PIPELINE.md).
 
-> **Tâche** : classer un produit Rakuten (texte français) en **157 classes L1**
-> (`typelabel`) et **5 777 classes L2** (`producttype`). Métrique cible :
-> `f1_l2_macro` (chaque classe pèse 1 — la longue traîne est l'enjeu).
+> **Task**: classify a Rakuten product (French text) into **157 L1 classes**
+> (`typelabel`) and **5,777 L2 classes** (`producttype`). Target metric:
+> `f1_l2_macro` (each class weighs 1 — the long tail is the challenge).
 
-## Modèle retenu
+## Selected model
 
-**FlatHydra — CamemBERT, dataset v2** : une seule tête unifiée, **F1 L2 macro =
-78,9 %** sur le test. C'est le meilleur F1 L2 mesuré, avec l'architecture la plus
-simple (pas de têtes multiples ni de masque hiérarchique). Source :
+**FlatHydra — CamemBERT, dataset v2**: a single unified head, **F1 L2 macro =
+78.9%** on the test set. This is the best F1 L2 measured, with the simplest
+architecture (no multiple heads, no hierarchical mask). Source:
 `results/flat_hydra_v2/test_metrics.json`.
 
-| Métrique | Valeur |
+| Metric | Value |
 |:---------|-------:|
-| F1 L1 macro | 92,47 % |
-| **F1 L2 macro** | **78,93 %** |
-| Constrained F1 | 79,90 % |
-| HCR | 85,17 % |
+| F1 L1 macro | 92.47% |
+| **F1 L2 macro** | **78.93%** |
+| Constrained F1 | 79.90% |
+| HCR | 85.17% |
 
-## Lire ce document (comparabilité)
+## Reading this document (comparability)
 
-Trois axes rendent certaines lignes **non comparables terme à terme** :
+Three axes make some rows **not directly comparable**:
 
-- **Dataset `v1` vs `v2`** : `v1` contenait une fuite (11,2 % de val/test
-  dupliqués dans le train) ; `v2` est purgé et rééquilibré (synthétique).
-  L'inflation v1 réelle est **~1 pt** (mesurée au L1) ; au L2 v1 et v2 ne se
-  comparent pas directement (voir le warning de [`METRICS.md`](METRICS.md)).
-- **Mode `base` vs `hier`** : `hier` applique un masque hiérarchique → HCR ≈ 99,7 %
-  *par construction* et modifie le F1 L2. Ne pas comparer un `base` à un `hier`.
-- **Plein texte vs titre seul** : `titre` = `designation` uniquement ;
-  `plein texte` = `designation + ". " + description`.
+- **Dataset `v1` vs `v2`**: `v1` contained a leak (11.2% of val/test
+  duplicated in the train set); `v2` is purged and rebalanced (synthetic).
+  The actual v1 inflation is **~1 pt** (measured at L1); at L2, v1 and v2 do not
+  compare directly (see the warning in [`METRICS.md`](METRICS.md)).
+- **Mode `base` vs `hier`**: `hier` applies a hierarchical mask → HCR ≈ 99.7%
+  *by construction* and changes the F1 L2. Do not compare a `base` run to a `hier` run.
+- **Full text vs title only**: `title` = `designation` only;
+  `full text` = `designation + ". " + description`.
 
-Tous les chiffres sont en **% sur le test**. Tableaux groupés par comparabilité.
+All figures are in **% on the test set**. Tables are grouped by comparability.
 
-## 1. Baselines classiques (dataset v1, mode base, plein texte)
+## 1. Classic baselines (dataset v1, base mode, full text)
 
-| Modèle | F1 L1 | F1 L2 | HCR | Constr. F1 |
+| Model | F1 L1 | F1 L2 | HCR | Constr. F1 |
 |:-------|------:|------:|----:|-----------:|
-| TF-IDF (50K, 1-2grammes) + LinearSVC | 83,26 | 42,75 | 63,41 | 42,23 |
-| fastText (L1 softmax, L2 softmax) | 82,61 | 42,87 | 67,41 | 42,59 |
-| fastText (L1 softmax, L2 OVA) | 82,60 | 10,01 | 29,29 | 9,79 |
-| Word2Vec (200d, skip-gram) + LinearSVC | 60,24 | 22,27 | 25,06 | — |
+| TF-IDF (50K, 1-2 n-grams) + LinearSVC | 83.26 | 42.75 | 63.41 | 42.23 |
+| fastText (L1 softmax, L2 softmax) | 82.61 | 42.87 | 67.41 | 42.59 |
+| fastText (L1 softmax, L2 OVA) | 82.60 | 10.01 | 29.29 | 9.79 |
+| Word2Vec (200d, skip-gram) + LinearSVC | 60.24 | 22.27 | 25.06 | — |
 
-Source : `results/baselines/baseline_results.json`. Le L2 plafonne à **~43 %** :
-les méthodes sac-de-mots ne tiennent pas la longue traîne.
+Source: `results/baselines/baseline_results.json`. L2 plateaus at **~43%**:
+bag-of-words methods cannot handle the long tail.
 
 ## 2. HYDRA — CamemBERT (dataset v1)
 
-Multi-têtes encoder-only (3 variantes). Mode `base` = têtes indépendantes ;
-mode `hier` = masque hiérarchique.
+Encoder-only multi-head (3 variants). Mode `base` = independent heads;
+mode `hier` = hierarchical mask.
 
-**Standard, mode base** — `results/hydra_eval_test_metrics.json` (job 772505) :
+**Standard, base mode** — `results/hydra_eval_test_metrics.json` (job 772505):
 
-| Variante | F1 L1 | F1 L2 | HCR |
+| Variant | F1 L1 | F1 L2 | HCR |
 |:---------|------:|------:|----:|
-| local | 93,50 | 66,65 | 85,82 |
-| nested | 93,62 | 64,26 | 85,83 |
-| global | 93,56 | 66,20 | 85,87 |
+| local | 93.50 | 66.65 | 85.82 |
+| nested | 93.62 | 64.26 | 85.83 |
+| global | 93.56 | 66.20 | 85.87 |
 
-**Standard mBERT, mode base** — `results/hydra_eval_test_metrics_mbert.json` (nested/global promus depuis les logs le 27/06) :
+**Standard mBERT, base mode** — `results/hydra_eval_test_metrics_mbert.json` (nested/global promoted from the logs on June 27):
 
-| Variante | F1 L1 | F1 L2 | HCR |
+| Variant | F1 L1 | F1 L2 | HCR |
 |:---------|------:|------:|----:|
-| local | 93,04 | 66,80 | 85,81 |
-| nested | 93,03 | 64,27 | 85,83 |
-| global | 92,93 | 66,05 | 85,87 |
+| local | 93.04 | 66.80 | 85.81 |
+| nested | 93.03 | 64.27 | 85.83 |
+| global | 92.93 | 66.05 | 85.87 |
 
-À architecture égale, mBERT est quasi équivalent à CamemBERT sur HYDRA (F1 L2 ≈ 66 % des deux côtés), cohérent avec le constat côté FlatHydra (§5).
+At equal architecture, mBERT is nearly equivalent to CamemBERT on HYDRA (F1 L2 ≈ 66% on both sides), consistent with the finding on the FlatHydra side (§5).
 
-**Hierarchy, mode hier** — `results/hydra_eval_hierarchy_metrics.json` :
+**Hierarchy, hier mode** — `results/hydra_eval_hierarchy_metrics.json`:
 
-| Variante | F1 L1 | F1 L2 | HCR |
+| Variant | F1 L1 | F1 L2 | HCR |
 |:---------|------:|------:|----:|
-| local | 91,33 | 61,18 | 99,74 |
-| nested | 92,06 | 61,14 | 99,74 |
-| global | 92,59 | 62,70 | 99,74 |
+| local | 91.33 | 61.18 | 99.74 |
+| nested | 92.06 | 61.14 | 99.74 |
+| global | 92.59 | 62.70 | 99.74 |
 
-Le masque pousse le HCR à ~99,7 % mais **fait baisser le F1 L2** (~−4 pts vs
-standard) : il interdit des L2 hors de la L1 prédite, y compris des bonnes.
+The mask pushes HCR to ~99.7% but **lowers the F1 L2** (~−4 pts vs
+standard): it forbids L2s outside the predicted L1, including correct ones.
 
-## 3. HYDRA — dataset v2 (mode hier)
+## 3. HYDRA — dataset v2 (hier mode)
 
-Ré-entraîné sur v2 avec le correctif du **masque multi-parents** (une L2 à
-plusieurs parents L1 n'est plus masquée à tort). Source :
+Re-trained on v2 with the **multi-parent mask** fix (an L2 with several L1
+parents is no longer wrongly masked). Source:
 `results/hydra_hierarchy_v2_metrics.json` (2026-06-25).
 
-| Variante | F1 L1 | F1 L2 | HCR | HCR multi-parents | Constr. F1 |
+| Variant | F1 L1 | F1 L2 | HCR | Multi-parent HCR | Constr. F1 |
 |:---------|------:|------:|----:|------------------:|-----------:|
-| local | 92,60 | 77,38 | 87,04 | 100,0 | 79,31 |
-| nested | 92,59 | 76,41 | 87,02 | 100,0 | 78,56 |
-| global | 92,91 | 77,29 | 86,99 | 100,0 | 79,17 |
+| local | 92.60 | 77.38 | 87.04 | 100.0 | 79.31 |
+| nested | 92.59 | 76.41 | 87.02 | 100.0 | 78.56 |
+| global | 92.91 | 77.29 | 86.99 | 100.0 | 79.17 |
 
-Sur v2, HYDRA hierarchy monte à ~77 % de F1 L2 (vs ~61 % en v1) et atteint un
-**HCR multi-parents de 100 %**, mais reste **sous le FlatHydra v2 (78,9 %)** en
-F1 L2 pour une architecture bien plus lourde.
+On v2, HYDRA hierarchy rises to ~77% F1 L2 (vs ~61% on v1) and reaches a
+**multi-parent HCR of 100%**, but remains **below FlatHydra v2 (78.9%)** on
+F1 L2 for a much heavier architecture.
 
-## 4. FlatHydra (tête unifiée, mode base)
+## 4. FlatHydra (unified head, base mode)
 
-| Modèle | Dataset | Texte | F1 L1 | F1 L2 | HCR | Constr. F1 | Source |
+| Model | Dataset | Text | F1 L1 | F1 L2 | HCR | Constr. F1 | Source |
 |:-------|:-------:|:-----:|------:|------:|----:|-----------:|:-------|
-| CamemBERT | v1 | plein | 93,24 | 71,70 | 85,49 | 72,19 | `flat_hydra/` |
-| CamemBERT | v1 | titre | 92,13 | 69,53 | 85,00 | 70,00 | `flat_hydra_title/` |
-| **CamemBERT** | **v2** | **plein** | **92,47** | **78,93** | **85,17** | **79,90** | `flat_hydra_v2/` ★ |
-| mBERT | v1 | plein | 93,38 | 71,78 | 85,61 | 72,43 | `flat_hydra_mbert/` |
-| mBERT | v2 | plein | 92,09 | 77,40 | 85,20 | 78,34 | `flat_hydra_mbert_v2/` |
+| CamemBERT | v1 | full | 93.24 | 71.70 | 85.49 | 72.19 | `flat_hydra/` |
+| CamemBERT | v1 | title | 92.13 | 69.53 | 85.00 | 70.00 | `flat_hydra_title/` |
+| **CamemBERT** | **v2** | **full** | **92.47** | **78.93** | **85.17** | **79.90** | `flat_hydra_v2/` ★ |
+| mBERT | v1 | full | 93.38 | 71.78 | 85.61 | 72.43 | `flat_hydra_mbert/` |
+| mBERT | v2 | full | 92.09 | 77.40 | 85.20 | 78.34 | `flat_hydra_mbert_v2/` |
 
-★ = modèle retenu. Tous les fichiers : `results/<dir>/test_metrics.json`.
+★ = selected model. All files: `results/<dir>/test_metrics.json`.
 
-## 5. Comparaison des encodeurs (CamemBERT vs mBERT)
+## 5. Encoder comparison (CamemBERT vs mBERT)
 
-À méthode identique (FlatHydra), les deux encodeurs sont **quasi équivalents** :
+With an identical method (FlatHydra), the two encoders are **nearly equivalent**:
 
-| Dataset | CamemBERT (F1 L2) | mBERT (F1 L2) | Écart |
+| Dataset | CamemBERT (F1 L2) | mBERT (F1 L2) | Gap |
 |:-------:|------------------:|--------------:|------:|
-| v1 | 71,70 | 71,78 | −0,08 |
-| v2 | 78,93 | 77,40 | +1,53 |
+| v1 | 71.70 | 71.78 | −0.08 |
+| v2 | 78.93 | 77.40 | +1.53 |
 
-Le multilingue (mBERT) n'apporte pas d'avantage décisif sur un corpus français ;
-**CamemBERT** est retenu (léger gain sur v2, monolingue français natif).
+Multilingual (mBERT) brings no decisive advantage on a French corpus;
+**CamemBERT** is selected (slight gain on v2, natively monolingual French).
 
-## 6. HLPD (décodeur hiérarchique)
+## 6. HLPD (hierarchical decoder)
 
-`results/hlpd/test_metrics.json` (dataset v1, mode natif) : F1 L1 = 80,70,
-F1 L2 = 61,50, **HCR = 97,80**. Le décodeur garantit une forte cohérence
-hiérarchique mais reste en retrait sur le F1 (cible du projet).
+`results/hlpd/test_metrics.json` (dataset v1, native mode): F1 L1 = 80.70,
+F1 L2 = 61.50, **HCR = 97.80**. The decoder guarantees strong hierarchical
+consistency but lags on F1 (the project's target).
 
-## Enseignements
+## Lessons learned
 
-1. **Les modèles profonds écrasent les baselines** sur le L2 : 78,9 %
-   (FlatHydra v2) contre ~43 % (meilleure baseline TF-IDF/fastText) — +36 pts.
-2. **La description compte** : plein texte > titre seul (FlatHydra CamemBERT v1
-   71,7 vs 69,5 ; écart bien plus marqué sur les baselines).
-3. **Le masque hiérarchique est un compromis** : HCR ~99,7 % *par construction*
-   mais F1 L2 plafonné. Le FlatHydra (sans masque) garde un HCR ~85 % « appris »
-   tout en maximisant le F1 L2.
-4. **Simple gagne** : une tête unifiée (FlatHydra) égale ou dépasse HYDRA
-   (3 têtes + masque) en F1 L2, pour une complexité moindre → modèle retenu.
-5. **CamemBERT ≈ mBERT** ; CamemBERT légèrement devant sur v2.
-6. **v2 (purgé + rééquilibré)** porte le F1 L2 du FlatHydra à 78,9 % — le
-   rééquilibrage de la longue traîne (données synthétiques, voir
-   [`../scripts/synthetic_pipeline/`](../scripts/synthetic_pipeline/)) tire le
-   macro vers le haut.
+1. **Deep models crush the baselines** on L2: 78.9%
+   (FlatHydra v2) vs ~43% (best TF-IDF/fastText baseline) — +36 pts.
+2. **The description matters**: full text > title only (FlatHydra CamemBERT v1
+   71.7 vs 69.5; the gap is far more pronounced on the baselines).
+3. **The hierarchical mask is a trade-off**: HCR ~99.7% *by construction*
+   but capped F1 L2. FlatHydra (no mask) keeps a "learned" HCR ~85%
+   while maximizing F1 L2.
+4. **Simple wins**: a unified head (FlatHydra) matches or beats HYDRA
+   (3 heads + mask) on F1 L2, for lower complexity → selected model.
+5. **CamemBERT ≈ mBERT**; CamemBERT slightly ahead on v2.
+6. **v2 (purged + rebalanced)** brings FlatHydra's F1 L2 to 78.9% — the
+   long-tail rebalancing (synthetic data, see
+   [`../scripts/synthetic_pipeline/`](../scripts/synthetic_pipeline/)) pulls the
+   macro upward.
 
-## Annexe — variantes « titre seul » (designation uniquement, dataset v1)
+## Appendix — "title only" variants (designation only, dataset v1)
 
-Baselines (mode base) — `results/baselines/baseline_results_title.json` :
+Baselines (base mode) — `results/baselines/baseline_results_title.json`:
 
-| Modèle | F1 L1 | F1 L2 | HCR | Constr. F1 |
+| Model | F1 L1 | F1 L2 | HCR | Constr. F1 |
 |:-------|------:|------:|----:|-----------:|
-| TF-IDF + LinearSVC | 82,55 | 41,10 | 61,38 | 40,69 |
-| fastText (softmax) | 72,94 | 34,32 | 64,29 | 32,17 |
-| Word2Vec + LinearSVC | 64,02 | 28,16 | 27,55 | 21,83 |
+| TF-IDF + LinearSVC | 82.55 | 41.10 | 61.38 | 40.69 |
+| fastText (softmax) | 72.94 | 34.32 | 64.29 | 32.17 |
+| Word2Vec + LinearSVC | 64.02 | 28.16 | 27.55 | 21.83 |
 
-HYDRA hierarchy (mode hier) — `results/hydra_eval_title_hierarchy_metrics.json` :
+HYDRA hierarchy (hier mode) — `results/hydra_eval_title_hierarchy_metrics.json`:
 
-| Variante | F1 L1 | F1 L2 | HCR | Constr. F1 |
+| Variant | F1 L1 | F1 L2 | HCR | Constr. F1 |
 |:---------|------:|------:|----:|-----------:|
-| local | 89,72 | 58,94 | 99,75 | 60,79 |
-| nested | 90,79 | 58,67 | 99,75 | 60,41 |
-| global | 91,63 | 60,49 | 99,74 | 62,16 |
+| local | 89.72 | 58.94 | 99.75 | 60.79 |
+| nested | 90.79 | 58.67 | 99.75 | 60.41 |
+| global | 91.63 | 60.49 | 99.74 | 62.16 |
 
-Le FlatHydra CamemBERT titre seul (92,13 / 69,53 / 85,00) figure au §4. Partout,
-le titre seul reste sous le plein texte — la description apporte du signal.
+The title-only FlatHydra CamemBERT (92.13 / 69.53 / 85.00) appears in §4.
+Everywhere, title only remains below full text — the description provides signal.
 
-## Reproduire
+## Reproduce
 
-- Évaluations HYDRA / FlatHydra : voir [`PIPELINE.md`](PIPELINE.md) (matrice
-  modèle × commande) et [`METRICS.md`](METRICS.md) (modes, provenance).
-- Rapport HTML comparatif : `results/comparison.html`
+- HYDRA / FlatHydra evaluations: see [`PIPELINE.md`](PIPELINE.md) (model ×
+  command matrix) and [`METRICS.md`](METRICS.md) (modes, provenance).
+- Comparative HTML report: `results/comparison.html`
   (`scripts/generate_comparison.py`).
-- Historique complet des runs : `mlflow.db` (`docker compose up mlflow -d`).
+- Full run history: `mlflow.db` (`docker compose up mlflow -d`).

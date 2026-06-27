@@ -1,55 +1,55 @@
-# Guide d'Onboarding
+# Onboarding Guide
 
-Ce guide permet à un nouveau développeur de passer de zéro à un premier
-entraînement reproductible. Suivre les sections dans l'ordre.
+This guide takes a new developer from zero to a first reproducible training
+run. Follow the sections in order.
 
-## Table des Matières
+## Table of Contents
 
-1. [Le projet en 5 minutes](#le-projet-en-5-minutes)
-1. [Prérequis](#prérequis)
+1. [The project in 5 minutes](#the-project-in-5-minutes)
+1. [Prerequisites](#prerequisites)
 1. [Installation](#installation)
-1. [Récupérer le dataset](#récupérer-le-dataset)
-1. [Récupérer les modèles entraînés](#récupérer-les-modèles-entraînés)
-1. [Premier entraînement](#premier-entraînement)
-1. [Travailler sur le cluster SLURM](#travailler-sur-le-cluster-slurm)
-1. [Carte du dépôt](#carte-du-dépôt)
-1. [Pièges connus](#pièges-connus)
-1. [Pour aller plus loin](#pour-aller-plus-loin)
+1. [Getting the dataset](#getting-the-dataset)
+1. [Getting the trained models](#getting-the-trained-models)
+1. [First training run](#first-training-run)
+1. [Working on the SLURM cluster](#working-on-the-slurm-cluster)
+1. [Repository map](#repository-map)
+1. [Known pitfalls](#known-pitfalls)
+1. [Going further](#going-further)
 
-## Le Projet en 5 Minutes
+## The Project in 5 Minutes
 
-Classification hiérarchique de **8M+ produits Rakuten France** à partir de
-leur texte (`designation` + `description`, en français) :
+Hierarchical classification of **8M+ Rakuten France products** from their
+text (`designation` + `description`, in French):
 
-- **Niveau 1 (L1)** : 157 catégories parentes
-- **Niveau 2 (L2)** : 5 777 catégories feuilles, chacune fille d'une L1
+- **Level 1 (L1)**: 157 parent categories
+- **Level 2 (L2)**: 5 777 leaf categories, each a child of an L1
 
-Trois familles de modèles sont comparées :
+Three model families are compared:
 
-| Famille    | Approche                                  | Meilleur F1 L2 |
+| Family     | Approach                                  | Best F1 L2     |
 |:-----------|:------------------------------------------|:--------------:|
-| Baselines  | TF-IDF, Word2Vec, fastText + classifieurs | 42.9 %         |
-| FlatHydra  | CamemBERT + tête unique L1+L2             | **71.7 %**     |
-| HYDRA      | CamemBERT multi-têtes (EMNLP 2025)        | 66.8 %         |
-| HLPD       | Décodeur hiérarchique (ECIR 2025)         | 61.5 %         |
+| Baselines  | TF-IDF, Word2Vec, fastText + classifiers  | 42.9 %         |
+| FlatHydra  | CamemBERT + single L1+L2 head             | **71.7 %**     |
+| HYDRA      | CamemBERT multi-head (EMNLP 2025)         | 66.8 %         |
+| HLPD       | Hierarchical decoder (ECIR 2025)          | 61.5 %         |
 
-Les métriques principales sont `f1_l1_macro`, `f1_l2_macro` et le **HCR**
-(taux de cohérence hiérarchique) — définies dans `rakuten/common/metrics.py`
-et documentées dans [docs/METRICS.md](docs/METRICS.md). Le livrable de
-comparaison est `results/comparison.html`.
+The main metrics are `f1_l1_macro`, `f1_l2_macro` and the **HCR**
+(hierarchical consistency rate) — defined in `rakuten/common/metrics.py`
+and documented in [docs/METRICS.md](docs/METRICS.md). The comparison
+deliverable is `results/comparison.html`.
 
-## Prérequis
+## Prerequisites
 
-- Python 3.11+ (environnement validé : 3.13) — le plancher 3.11 est imposé par
-  les versions épinglées de `numpy` et `scikit-learn`
-- GPU optionnel en local (obligatoire pour le full training — cluster SLURM)
-- **Token HuggingFace en lecture** pour accéder aux repos privés
-  (`TahianaAndriambahoaka/rakuten-dataset` et `TahianaAndriambahoaka/rakuten-models`) :
-  à demander au propriétaire (`TahianaAndriambahoaka`)
+- Python 3.11+ (validated environment: 3.13) — the 3.11 floor is imposed by
+  the pinned versions of `numpy` and `scikit-learn`
+- GPU optional locally (required for full training — SLURM cluster)
+- **Read-access HuggingFace token** to access the private repos
+  (`TahianaAndriambahoaka/rakuten-dataset` and `TahianaAndriambahoaka/rakuten-models`):
+  request it from the owner (`TahianaAndriambahoaka`)
 
-> **Sans ce token** : le package s'installe et les 312 tests passent, mais il est
-> impossible de reproduire les entraînements ou évaluations (pas de données locales).
-> C'est la voie de repli recommandée pour une prise en main initiale du code.
+> **Without this token**: the package installs and the 312 tests pass, but it is
+> impossible to reproduce the training runs or evaluations (no local data).
+> This is the recommended fallback path for an initial walkthrough of the code.
 
 ## Installation
 
@@ -59,79 +59,79 @@ cd rakuten-classification
 
 python -m venv ../venv
 source ../venv/bin/activate
-# CPU ou autre version CUDA ? Installer torch d'abord via l'index PyTorch adapté
-# (cf. commentaire en tête de requirements.txt), puis :
+# CPU or another CUDA version? Install torch first via the appropriate PyTorch index
+# (see the comment at the top of requirements.txt), then:
 pip install -e .
 
-# Smoke test : la suite complète passe sans données ni GPU
+# Smoke test: the full suite passes without data or GPU
 python -m pytest tests/ -q
 ```
 
-Les 312 tests doivent passer. Alternative Docker :
+All 312 tests should pass. Docker alternative:
 
 ```bash
 docker compose run --rm --profile test test
 ```
 
-Pour entraîner localement sur GPU : `docker compose run --rm --profile gpu train`
+To train locally on GPU: `docker compose run --rm --profile gpu train`
 
-## Récupérer le Dataset
+## Getting the Dataset
 
-Les splits pré-générés (70/15/15, stratifiés par classe L2) sont hébergés
-sur le repo privé HuggingFace [`TahianaAndriambahoaka/rakuten-dataset`][hf-dataset] :
+The pre-generated splits (70/15/15, stratified by L2 class) are hosted
+on the private HuggingFace repo [`TahianaAndriambahoaka/rakuten-dataset`][hf-dataset]:
 
-| Fichier             | Lignes    |
+| File                | Lines     |
 |:--------------------|:----------|
 | `train_split.jsonl` | 5 259 035 |
 | `val_split.jsonl`   | 1 194 355 |
 | `test_split.jsonl`  | 1 194 356 |
 
-> **Dataset v2** : fuite de doublons purgée (−314 624 lignes de train nettes).
-> Voir [docs/METRICS.md](docs/METRICS.md) pour l'historique v1 → v2 et l'effet mesuré.
+> **Dataset v2**: duplicate leakage purged (−314 624 net train lines).
+> See [docs/METRICS.md](docs/METRICS.md) for the v1 → v2 history and the measured effect.
 
 ```bash
-export HF_TOKEN="hf_..."          # token read fourni par le propriétaire
-python scripts/download_dataset.py # télécharge dans <repo>/dataset/
+export HF_TOKEN="hf_..."          # read token provided by the owner
+python scripts/download_dataset.py # downloads into <repo>/dataset/
 ```
 
-Chaque ligne est un objet JSON avec les champs `designation`,
-`description`, `typelabel` (label L1) et `producttype` (label L2).
+Each line is a JSON object with the fields `designation`,
+`description`, `typelabel` (L1 label) and `producttype` (L2 label).
 
-> **Note** : les scripts SLURM cherchent les données dans
-> `$HOME/fil_rouge/dataset` par défaut. Si vous les téléchargez ailleurs,
-> exportez `DATA_DIR=/chemin/vers/dataset` avant tout `sbatch`.
+> **Note**: the SLURM scripts look for the data in
+> `$HOME/fil_rouge/dataset` by default. If you download it elsewhere,
+> export `DATA_DIR=/path/to/dataset` before any `sbatch`.
 
-> **Attention** : vérifier `ls -lh "$DATA_DIR/train_split.jsonl"` avant
-> tout `sbatch` — un chemin erroné produit "ERROR: Split file not found".
+> **Warning**: check `ls -lh "$DATA_DIR/train_split.jsonl"` before
+> any `sbatch` — a wrong path produces "ERROR: Split file not found".
 
-## Récupérer les Modèles Entraînés
+## Getting the Trained Models
 
-Tous les poids entraînés (~63 Go, 22 modèles) sont archivés sur le repo privé
-[`TahianaAndriambahoaka/rakuten-models`][hf-models] — ils ne sont **pas**
-dans ce dépôt git. Le plus simple, via le script dédié :
+All trained weights (~63 GB, 22 models) are archived on the private repo
+[`TahianaAndriambahoaka/rakuten-models`][hf-models] — they are **not**
+in this git repository. The easiest way is via the dedicated script:
 
 ```bash
 export HF_TOKEN="hf_..."
-python scripts/download_models.py                          # tous (~63 Go)
-python scripts/download_models.py flat-hydra-camembert-v2  # un seul modèle
+python scripts/download_models.py                          # all (~63 GB)
+python scripts/download_models.py flat-hydra-camembert-v2  # a single model
 ```
 
-Ou directement en Python pour un sous-dossier précis :
+Or directly in Python for a specific subfolder:
 
 ```python
 from huggingface_hub import snapshot_download
 
 local_dir = snapshot_download(
     repo_id="TahianaAndriambahoaka/rakuten-models",
-    allow_patterns="hydra-local-camembert/*",   # un seul sous-dossier
+    allow_patterns="hydra-local-camembert/*",   # a single subfolder
     token="hf_...",
 )
 ```
 
-Correspondance entre les sous-dossiers HF et les chemins locaux attendus
-par les scripts d'évaluation :
+Mapping between the HF subfolders and the local paths expected
+by the evaluation scripts:
 
-| Sous-dossier HF                     | Chemin local attendu                          |
+| HF subfolder                        | Expected local path                           |
 |:------------------------------------|:----------------------------------------------|
 | `hydra-{variante}-camembert/`        | `models/HYDRA_{variante}_CamemBERT/`           |
 | `hydra-local-mbert/`                 | `models/HYDRA_local_mBERT/`                    |
@@ -142,17 +142,17 @@ par les scripts d'évaluation :
 | `hlpd/`                              | `models/hlpd/`                                 |
 | `baselines/{tfidf,word2vec,...}/`    | `models/baselines/{...}/`                      |
 
-Chaque dossier contient `best_model.pt` (poids d'inférence, ~440 Mo) et
-`checkpoint_latest.pt` (état complet avec optimiseur, pour reprendre un
-entraînement). La carte du repo HF (scores, structure) est dans la
-constante `MODEL_CARD` de `scripts/upload_models_hf.py`.
+Each folder contains `best_model.pt` (inference weights, ~440 MB) and
+`checkpoint_latest.pt` (full state with optimizer, to resume a training
+run). The HF repo card (scores, structure) is in the
+`MODEL_CARD` constant of `scripts/upload_models_hf.py`.
 
-## Premier Entraînement
+## First Training Run
 
-Smoke test local sur un sous-échantillon — **nécessite le dataset** (section précédente).
-Durée : quelques minutes à dizaines de minutes selon la machine.
+Local smoke test on a subsample — **requires the dataset** (previous section).
+Duration: a few minutes to tens of minutes depending on the machine.
 
-> **Sans token HF** : s'arrêter après les 312 tests, c'est la voie de repli normale.
+> **Without an HF token**: stop after the 312 tests; that's the normal fallback path.
 
 ```bash
 python scripts/run_train.py \
@@ -161,99 +161,99 @@ python scripts/run_train.py \
     --config configs/hydra/default.yaml
 ```
 
-Les hyperparamètres viennent du YAML (source de vérité :
-`configs/hydra/default.yaml`). Le suivi des runs est dans MLflow
-(`mlflow.db` à la racine, interface via `docker compose up mlflow -d`).
+The hyperparameters come from the YAML (source of truth:
+`configs/hydra/default.yaml`). Run tracking is in MLflow
+(`mlflow.db` at the root, UI via `docker compose up mlflow -d`).
 
-## Travailler sur le Cluster SLURM
+## Working on the SLURM Cluster
 
-Tous les scripts `scripts/*.slurm` utilisent quatre variables
-d'environnement surchargeables (valeurs par défaut basées sur `$HOME`) :
+All `scripts/*.slurm` scripts use four overridable environment
+variables (defaults based on `$HOME`):
 
 ```bash
 export PROJECT_ROOT="$HOME/fil_rouge/rakuten-classification"
 export VENV_ACTIVATE="$HOME/fil_rouge/venv/bin/activate"
 export DATA_DIR="$HOME/fil_rouge/dataset"
-# HF_HOME : cache HuggingFace (défaut ~/.cache/huggingface)
+# HF_HOME: HuggingFace cache (default ~/.cache/huggingface)
 ```
 
-Lancement type d'un entraînement HYDRA (job array avec auto-reprise) :
+Typical launch of a HYDRA training run (job array with auto-resume):
 
 ```bash
 sbatch --job-name=hydra-local --array=0-9%1 \
     scripts/run_train_variant.slurm local configs/hydra/default.yaml
 ```
 
-Le motif `--array=0-9%1` enchaîne jusqu'à 10 tâches de 36 h maximum,
-une seule à la fois : chaque tâche reprend `checkpoint_latest.pt` et
-s'arrête proprement quand `training_complete.txt` apparaît.
+The `--array=0-9%1` pattern chains up to 10 tasks of 36 h max,
+one at a time: each task resumes from `checkpoint_latest.pt` and
+stops cleanly when `training_complete.txt` appears.
 
-> **Warning** : règles du cluster (héritées d'un avertissement admin) —
-> toujours des job arrays `%1`, jamais de soumission en boucle ni de
-> script de surveillance qui resoumets automatiquement. Partitions GPU :
-> `P100` (2×16 Go) et `3090` (2-4×24 Go), limite 36 h, QOS 10 CPUs/job.
+> **Warning**: cluster rules (inherited from an admin warning) —
+> always `%1` job arrays, never loop submissions nor a monitoring
+> script that automatically resubmits. GPU partitions:
+> `P100` (2×16 GB) and `3090` (2-4×24 GB), 36 h limit, QOS 10 CPUs/job.
 
-> **Autre infrastructure ?** Les directives `#SBATCH` (partition, mémoire, temps)
-> sont en tête de chaque fichier `.slurm` et s'adaptent facilement.
-> Les variables `PROJECT_ROOT`, `VENV_ACTIVATE` et `DATA_DIR` sont paramétrables
-> via `export` avant chaque `sbatch`.
+> **Different infrastructure?** The `#SBATCH` directives (partition, memory, time)
+> are at the top of each `.slurm` file and adapt easily.
+> The `PROJECT_ROOT`, `VENV_ACTIVATE` and `DATA_DIR` variables are configurable
+> via `export` before each `sbatch`.
 
-La matrice complète « quel script pour quel modèle » est dans
+The complete "which script for which model" matrix is in
 [docs/PIPELINE.md](docs/PIPELINE.md).
 
-## Carte du Dépôt
+## Repository Map
 
 ```text
-rakuten/                Package Python installable (pip install -e .)
-  common/               data_loader, métriques, training_utils, utilitaires
+rakuten/                Installable Python package (pip install -e .)
+  common/               data_loader, metrics, training_utils, utilities
   models/baselines/     TF-IDF, Word2Vec, fastText, FlatHydra
-  models/hydra/         HYDRA (EMNLP 2025) : models, losses, trainer, config
+  models/hydra/         HYDRA (EMNLP 2025): models, losses, trainer, config
   models/hlpd/          HLPD (ECIR 2025) — Mehdi Aithamma
 configs/hydra/          default.yaml, hierarchy.yaml, title_only*.yaml, mbert_default.yaml
 configs/baselines/      flat_hydra*.yaml
 configs/hlpd/           hlpd_3090.yaml
-scripts/                CLI Python + scripts SLURM (voir docs/PIPELINE.md)
-notebooks/eda/          Analyse exploratoire
+scripts/                Python CLI + SLURM scripts (see docs/PIPELINE.md)
+notebooks/eda/          Exploratory data analysis
 notebooks/baselines/    fastText, TF-IDF, Word2Vec (notebooks)
-tests/                  312 tests pytest (sans données ni GPU)
-results/                Métriques JSON, rapports HTML, comparison.html
+tests/                  312 pytest tests (no data, no GPU)
+results/                JSON metrics, HTML reports, comparison.html
 docs/                   ARCHITECTURE.md, PIPELINE.md, METRICS.md
-hybrid_system/          Contribution séparée (CamemBERT + XGBoost)
+hybrid_system/          Separate contribution (CamemBERT + XGBoost)
 ```
 
-Architecture détaillée et table de correspondance : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Detailed architecture and mapping table: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-## Pièges Connus
+## Known Pitfalls
 
-- **Deux modes d'évaluation non comparables** : avec ou sans masque
-  hiérarchique. `scripts/eval_hierarchy.py --output-mode auto` choisit le
-  bon mode selon la config — lire [docs/METRICS.md](docs/METRICS.md)
-  avant de publier des chiffres.
-- **`TRANSFORMERS_OFFLINE=1`** dans les scripts SLURM : les nœuds GPU
-  n'ont pas d'accès internet. Pré-télécharger les poids des encodeurs en
-  local (`AutoModel.from_pretrained(...)` une fois) pour peupler le cache.
-- **`_ensure_l2_coverage()`** duplique ~923 échantillons (valeur
-  indicative, recalculée à chaque chargement) pour garantir chaque classe
-  L2 dans chaque split — comportement normal.
-- **Configs title-only** : `batch_size`/`lr` plus élevés que `default.yaml`
-  (scaling en racine carrée, séquences plus courtes) — justifié dans
+- **Two non-comparable evaluation modes**: with or without the hierarchical
+  mask. `scripts/eval_hierarchy.py --output-mode auto` picks the
+  right mode based on the config — read [docs/METRICS.md](docs/METRICS.md)
+  before publishing figures.
+- **`TRANSFORMERS_OFFLINE=1`** in the SLURM scripts: the GPU nodes
+  have no internet access. Pre-download the encoder weights
+  locally (`AutoModel.from_pretrained(...)` once) to populate the cache.
+- **`_ensure_l2_coverage()`** duplicates ~923 samples (indicative
+  value, recomputed on each load) to guarantee every L2 class
+  in each split — normal behavior.
+- **Title-only configs**: higher `batch_size`/`lr` than `default.yaml`
+  (square-root scaling, shorter sequences) — justified in
   [docs/PIPELINE.md](docs/PIPELINE.md).
-- **Dataset v1 vs v2** : les chiffres publiés sont sur v1 (fuité). Effet mesuré
-  de la fuite : ~1 pt au L1 ; au L2 v1↔v2 ne se comparent pas (6 126 → 5 777
-  classes) — voir [docs/METRICS.md](docs/METRICS.md).
+- **Dataset v1 vs v2**: the published figures are on v1 (leaked). Measured effect
+  of the leakage: ~1 pt on L1; on L2, v1↔v2 are not comparable (6 126 → 5 777
+  classes) — see [docs/METRICS.md](docs/METRICS.md).
 
-## Pour Aller Plus Loin
+## Going Further
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — narration du projet,
-  table de correspondance ancien → nouveau, imports cibles
-- [docs/PIPELINE.md](docs/PIPELINE.md) — matrice modèle × étape, configs,
-  scripts SLURM, dettes techniques connues
-- [docs/METRICS.md](docs/METRICS.md) — définitions, modes d'évaluation,
-  provenance de chaque chiffre publié
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — project narrative,
+  old → new mapping table, target imports
+- [docs/PIPELINE.md](docs/PIPELINE.md) — model × step matrix, configs,
+  SLURM scripts, known technical debt
+- [docs/METRICS.md](docs/METRICS.md) — definitions, evaluation modes,
+  provenance of every published figure
 - [docs/flat_hydra_conception.md](docs/flat_hydra_conception.md) —
-  conception de la baseline FlatHydra
-- [CONTRIBUTING.md](CONTRIBUTING.md) — branchement, pipeline qualité (tests + lint),
-  format de commit Conventional Commits
+  design of the FlatHydra baseline
+- [CONTRIBUTING.md](CONTRIBUTING.md) — branching, quality pipeline (tests + lint),
+  Conventional Commits commit format
 
 [hf-dataset]: https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset
 [hf-models]: https://huggingface.co/TahianaAndriambahoaka/rakuten-models

@@ -1,43 +1,43 @@
-# Guide de contribution
+# Contributing guide
 
-## Branches et commits
+## Branches and commits
 
-- Créer une branche depuis `main` avant toute modification ; **ne jamais committer directement sur `main`**.
-- Format de commit : **Conventional Commits en français**
+- Create a branch from `main` before making any change; **never commit directly to `main`**.
+- Commit format: **Conventional Commits in French**
   ```
   feat(scope): ajouter la variante nested hiérarchique
   fix(hydra): corriger le masque d'inférence pour les classes rares
   docs(pipeline): ajouter les commandes FlatHydra v2
   chore(deps): mettre à jour torch vers 2.7
   ```
-  Types courants : `feat`, `fix`, `docs`, `chore`, `refactor`, `test`.
+  Common types: `feat`, `fix`, `docs`, `chore`, `refactor`, `test`.
 
-## Pipeline qualité avant commit
+## Quality pipeline before committing
 
-Installer les outils de développement :
+Install the development tools:
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-Puis, avant tout commit :
+Then, before any commit:
 
 ```bash
-# 1. Tests (obligatoire — 312 tests doivent passer)
+# 1. Tests (mandatory — 312 tests must pass)
 python -m pytest tests/ -q
 
-# 2. Lint (optionnel mais recommandé)
+# 2. Lint (optional but recommended)
 ruff check .
 ruff format --check .
 ```
 
-## Ouvrir une Pull Request
+## Opening a Pull Request
 
-Pousser la branche et ouvrir une PR vers `main` via l'interface GitHub (ou `gh pr create`).
-La PR doit préciser : contexte, changements apportés, métriques impactées si applicable.
+Push the branch and open a PR against `main` through the GitHub interface (or `gh pr create`).
+The PR must specify: context, changes made, and impacted metrics if applicable.
 
-## Note sur les outils Claude Code
+## Note on Claude Code tooling
 
-Les skills `/pre-commit`, `/sync-check`, etc. mentionnés dans `CLAUDE.md` et le « hook
-auto-test » sont propres à l'agent **Claude Code** — un contributeur humain lance les
-commandes manuelles ci-dessus à la place.
+The `/pre-commit`, `/sync-check`, and similar skills mentioned in `CLAUDE.md`, along with the
+"auto-test hook", are specific to the **Claude Code** agent — a human contributor runs the
+manual commands above instead.
