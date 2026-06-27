@@ -65,6 +65,16 @@ mode `hier` = masque hiérarchique.
 | nested | 93,62 | 64,26 | 85,83 |
 | global | 93,56 | 66,20 | 85,87 |
 
+**Standard mBERT, mode base** — `results/hydra_eval_test_metrics_mbert.json` (nested/global promus depuis les logs le 27/06) :
+
+| Variante | F1 L1 | F1 L2 | HCR |
+|:---------|------:|------:|----:|
+| local | 93,04 | 66,80 | 85,81 |
+| nested | 93,03 | 64,27 | 85,83 |
+| global | 92,93 | 66,05 | 85,87 |
+
+À architecture égale, mBERT est quasi équivalent à CamemBERT sur HYDRA (F1 L2 ≈ 66 % des deux côtés), cohérent avec le constat côté FlatHydra (§5).
+
 **Hierarchy, mode hier** — `results/hydra_eval_hierarchy_metrics.json` :
 
 | Variante | F1 L1 | F1 L2 | HCR |
