@@ -114,7 +114,9 @@ notebooks/baselines/results/
 /models_v2/
 /models_hierarchy/
 
+# Présentations / slides (binaires, hors dépôt)
+presentation_finale/
+
 # Clés de service Google — ne jamais committer
-presentation_finale/*.json
 *service-account*.json
 gcp_sa_key.json
