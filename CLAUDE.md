@@ -82,7 +82,7 @@ notebooks/eda/         analyse exploratoire
 notebooks/baselines/   fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb
 docs/                  ARCHITECTURE.md, PIPELINE.md (matrice scripts), METRICS.md (provenance metriques)
 results/               comparison.html, rapports HTML par modele, metriques JSON
-tests/                 305 tests pytest
+tests/                 312 tests pytest
 ONBOARDING.md          guide de prise en main pour nouveau developpeur
 docker-compose.yml     services : test, training, baselines, mlflow
 ```

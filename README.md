@@ -10,7 +10,7 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-yellow?logo=huggingface&logoColor=white)
 ![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?logo=mlflow&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-305%20passed-brightgreen?logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-312%20passed-brightgreen?logo=pytest&logoColor=white)
 ![SLURM](https://img.shields.io/badge/SLURM-Multi--GPU-orange)
 
 > **Télécom Paris** (IP Paris) × **Rakuten France**
@@ -124,7 +124,7 @@ python -m venv venv && source venv/bin/activate
 pip install -e .
 
 # 2. Vérifier l'installation — aucune donnée ni GPU requis
-python -m pytest tests/ -q          # 305 tests doivent passer
+python -m pytest tests/ -q          # 312 tests doivent passer
 
 # 3. Télécharger les données (token HF requis — voir section suivante)
 export HF_TOKEN="hf_..."
@@ -132,7 +132,7 @@ python scripts/download_dataset.py
 
 # 4. Smoke test local — nécessite le dataset (étape 3 ci-dessus)
 # Durée : quelques minutes à dizaines de minutes selon la machine
-# Sans token HF : s'arrêter après les 305 tests, c'est la voie de repli normale.
+# Sans token HF : s'arrêter après les 312 tests, c'est la voie de repli normale.
 python scripts/run_train.py --split-dir dataset/ --n-samples 5000 \
     --config configs/hydra/default.yaml
 
@@ -149,11 +149,11 @@ sbatch --job-name=hydra-local --array=0-9%1 scripts/run_train_variant.slurm loca
 
 ### Sans accès (voie de repli)
 
-Il est possible d'installer le package et de lancer les 305 tests **sans données ni GPU** :
+Il est possible d'installer le package et de lancer les 312 tests **sans données ni GPU** :
 
 ```bash
 pip install -e .
-python -m pytest tests/ -q   # 305 passed
+python -m pytest tests/ -q   # 312 passed
 ```
 
 Ce que cela couvre : imports, architecture des modèles, métriques, configs, utilitaires.
@@ -280,7 +280,7 @@ rakuten-classification/
 │   └── baselines/             fastText, TF-IDF, Word2Vec (notebooks)
 ├── docs/                      ARCHITECTURE.md, PIPELINE.md, METRICS.md
 ├── results/                   Rapports HTML, métriques par modèle
-├── tests/                     305 tests pytest (sans données ni GPU)
+├── tests/                     312 tests pytest (sans données ni GPU)
 ├── hybrid_system/             Contribution séparée — hors package (voir README dédié)
 ├── ONBOARDING.md              Guide de prise en main complet
 └── docker-compose.yml         MLflow, tests, training

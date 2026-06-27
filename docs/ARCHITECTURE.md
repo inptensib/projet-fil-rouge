@@ -99,7 +99,7 @@ rakuten-classification/
 ├── notebooks/                  # exploration et baselines (hors package)
 │   ├── eda/                    # analyse exploratoire
 │   └── baselines/              # notebooks fastText, TF-IDF, Word2Vec
-├── tests/                      # 305 tests pytest (sans données ni GPU)
+├── tests/                      # 312 tests pytest (sans données ni GPU)
 ├── docs/                       # documentation technique
 │   ├── ARCHITECTURE.md         # ce fichier
 │   ├── PIPELINE.md             # matrice script × étape

@@ -4,6 +4,11 @@ Standalone inference package for the **retained model** of the Télécom Paris �
 Rakuten project: hierarchical classification of French product listings into
 **157 L1 categories** (`typelabel`) and **5 775 L2 categories** (`producttype`).
 
+> **Note on class counts:** the model has **5 775** L2 heads — 2 of the dataset's
+> 5 777 L2 classes have no training sample after de-duplication, so the head count
+> is derived from the data. See [`docs/METRICS.md`](../../docs/METRICS.md) for the
+> v1 → v2 dataset history.
+
 ## Performance (test set, dataset v2)
 
 | Metric | Value |
