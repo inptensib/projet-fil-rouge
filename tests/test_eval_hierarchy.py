@@ -51,11 +51,11 @@ class TestSerializeResults:
         "local": {
             "base": {
                 "f1_l1_macro": 0.93, "f1_l2_macro": 0.66,
-                "hcr": 0.86, "constrained_f1_macro": 0.65,
+                "hcr": 0.86, "hcr_multiparent": 0.90, "constrained_f1_macro": 0.65,
             },
             "hier": {
                 "f1_l1_macro": 0.91, "f1_l2_macro": 0.61,
-                "hcr": 0.997, "constrained_f1_macro": 0.61,
+                "hcr": 0.997, "hcr_multiparent": 1.0, "constrained_f1_macro": 0.61,
             },
             "time_base": 100.04,
             "time_hier": 200.06,
@@ -67,6 +67,7 @@ class TestSerializeResults:
         out = mod._serialize_results(self._RESULTS, "base", "cfg.yaml")
         assert out["local"]["f1_l2_macro"] == 0.66
         assert out["local"]["hcr"] == 0.86
+        assert out["local"]["hcr_multiparent"] == 0.90
         assert out["local"]["eval_time_s"] == 100.0
 
     def test_mode_hier_picks_hier_metrics(self):
@@ -74,6 +75,7 @@ class TestSerializeResults:
         out = mod._serialize_results(self._RESULTS, "hier", "cfg.yaml")
         assert out["local"]["f1_l2_macro"] == 0.61
         assert out["local"]["hcr"] == 0.997
+        assert out["local"]["hcr_multiparent"] == 1.0
         assert out["local"]["eval_time_s"] == 200.1
 
     def test_metadata_keys_present_and_prefixed(self):
@@ -86,5 +88,6 @@ class TestSerializeResults:
         non_meta = [k for k in out if not k.startswith("_")]
         assert non_meta == ["local"]
         assert set(out["local"]) == {
-            "f1_l1_macro", "f1_l2_macro", "hcr", "constrained_f1_macro", "eval_time_s",
+            "f1_l1_macro", "f1_l2_macro", "hcr", "hcr_multiparent",
+            "constrained_f1_macro", "eval_time_s",
         }

@@ -78,6 +78,7 @@ def _serialize_results(all_results: dict, mode: str, config_path: str) -> dict:
             "f1_l1_macro": m.get("f1_l1_macro"),
             "f1_l2_macro": m.get("f1_l2_macro"),
             "hcr": m.get("hcr"),
+            "hcr_multiparent": m.get("hcr_multiparent"),
             "constrained_f1_macro": m.get("constrained_f1_macro"),
             "eval_time_s": round(r.get(time_key, 0), 1),
         }
@@ -149,8 +150,8 @@ def evaluate_variant(
 
 def print_results(all_results: dict):
     """Affiche le tableau comparatif."""
-    keys = ["f1_l1_macro", "f1_l2_macro", "hcr", "constrained_f1_macro"]
-    labels = ["F1 L1", "F1 L2", "HCR", "Constr. F1"]
+    keys = ["f1_l1_macro", "f1_l2_macro", "hcr", "hcr_multiparent", "constrained_f1_macro"]
+    labels = ["F1 L1", "F1 L2", "HCR", "HCR-MP", "Constr. F1"]
 
     header = f"{'Variante':<16} {'Mode':<10}"
     for lbl in labels:
