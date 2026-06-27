@@ -34,6 +34,8 @@ _DIRECT_KEYS = (
     "gradient_accumulation_steps",
     "warmup_ratio",
     "fp16",
+    "num_workers",
+    "pin_memory",
     "experiment_suffix",
     "max_grad_norm",
     "dropout",

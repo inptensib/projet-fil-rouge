@@ -32,7 +32,7 @@ torch.backends.cudnn.allow_tf32 = True
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-from rakuten.common.data_loader import build_parent_child_matrix, build_parent_child_matrix_from_labels
+from rakuten.common.data_loader import build_parent_child_matrix_from_labels
 from rakuten.common.metrics import compute_all_metrics, compute_f1_by_tranche
 from rakuten.common.training_utils import (
     EarlyStopping,
@@ -122,6 +122,8 @@ class HYDRATrainer:
         seed: int = 42,
         warmup_ratio: float = 0.1,
         fp16: bool = True,
+        num_workers: int = 4,
+        pin_memory: bool = True,
         resume_from: str | None = None,
         checkpoint_every_n_steps: int = 10_000,
         condition_l2_on_l1: bool = False,
@@ -140,6 +142,8 @@ class HYDRATrainer:
         self.variant = variant
         self.encoder_name = encoder_name
         self.batch_size = batch_size
+        self.num_workers = num_workers
+        self.pin_memory = pin_memory
         self.epochs = epochs
         self.max_length = max_length
         self.weight_decay = weight_decay
@@ -239,8 +243,8 @@ class HYDRATrainer:
             max_length=self.max_length,
             batch_size=self.batch_size,
             shuffle=shuffle,
-            num_workers=8,
-            pin_memory=True,
+            num_workers=self.num_workers,
+            pin_memory=self.pin_memory,
             drop_last=shuffle,
         )
 
