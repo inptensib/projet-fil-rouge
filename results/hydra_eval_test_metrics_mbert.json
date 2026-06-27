@@ -1,10 +1,22 @@
 {
-  "_note": "Métriques SANS masque hiérarchique — cohérentes avec les autres modèles HYDRA standard. Source : log entraînement job 813697_5 (trainer.evaluate() sans check_hierarchy).",
-  "_eval_hier_json": "eval_hierarchy.py sauvegarde le mode 'hier' (avec masque), ce qui donne F1 L2=0.607 / HCR=0.997 non comparables aux HYDRA std.",
+  "_note": "Métriques SANS masque hiérarchique (mode base) — comparables aux autres HYDRA standard. Sources : logs d'entraînement, trainer.evaluate() sans check_hierarchy, test set — local job 813697_5, nested job 841799_6, global job 841800_7. Les valeurs nested/global ont été promues depuis les logs (archivés) le 27/06/2026 (elles n'étaient publiées nulle part ailleurs).",
+  "_eval_hier_json": "eval_hierarchy.py sauvegarde le mode 'hier' (avec masque) -> F1 L2 et HCR (~0.997) non comparables aux HYDRA std.",
   "local": {
     "f1_l1_macro": 0.9304,
     "f1_l2_macro": 0.6680,
     "hcr": 0.8581,
     "eval_source": "training log — job 813697_5, epoch 10, test set"
+  },
+  "nested": {
+    "f1_l1_macro": 0.9303,
+    "f1_l2_macro": 0.6427,
+    "hcr": 0.8583,
+    "eval_source": "training log — job 841799_6, test set"
+  },
+  "global": {
+    "f1_l1_macro": 0.9293,
+    "f1_l2_macro": 0.6605,
+    "hcr": 0.8587,
+    "eval_source": "training log — job 841800_7, test set"
   }
 }
