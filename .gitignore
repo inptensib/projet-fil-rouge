@@ -120,3 +120,8 @@ presentation_finale/
 # Clés de service Google — ne jamais committer
 *service-account*.json
 gcp_sa_key.json
+
+# Outillage IA local (chemins machine ; hors dépôt transmis). CLAUDE.md racine reste suivi.
+.claude/
+.mcp.json
+docs/superpowers/
