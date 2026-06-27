@@ -1,0 +1,2 @@
+anthropic>=0.40.0   # steps 01-02 (LLM); not needed when RAKUTEN_LLM_OFFLINE=1
+orjson>=3.9.0       # optional speed-up; stdlib json fallback is used if absent
