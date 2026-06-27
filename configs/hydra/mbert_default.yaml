@@ -11,7 +11,6 @@ freeze_encoder: false
 
 # --- Architecture ---
 variant: local            # local | global | nested
-num_levels: 2
 hidden_dim: 256
 dropout: 0.3
 pooling: cls              # cls | mean | max | last
@@ -23,7 +22,6 @@ epochs: 10
 lr: 3.5e-5
 weight_decay: 0.01
 warmup_ratio: 0.1
-scheduler: linear
 max_grad_norm: 1.0
 gradient_accumulation_steps: 1
 
@@ -46,13 +44,9 @@ num_workers: 4
 pin_memory: true
 
 # --- Logging ---
-mlflow_tracking_uri: ../mlruns
-experiment_name: hydra
 
 # --- Reproducibility ---
 seed: 42
-deterministic: true
 
 # --- Hardware ---
-device: auto              # auto | cpu | cuda
 fp16: true
