@@ -538,6 +538,21 @@ def build_parent_child_matrix(
     return matrix
 
 
+def build_parent_child_matrix_from_labels(
+    level_1_labels, level_2_labels, num_l1_classes: int, num_l2_classes: int
+) -> torch.Tensor:
+    """Matrice binaire [num_l1, num_l2] marquant TOUTES les aretes (L1, L2) vues.
+
+    Une L2 a plusieurs parents L1 reste valide sous chacun -> en teacher forcing
+    la vraie classe n'est jamais masquee a -1e9 (corrige la loss qui explosait).
+    """
+    matrix = torch.zeros(num_l1_classes, num_l2_classes)
+    l1_t = torch.as_tensor(np.asarray(level_1_labels), dtype=torch.long)
+    l2_t = torch.as_tensor(np.asarray(level_2_labels), dtype=torch.long)
+    matrix[l1_t, l2_t] = 1.0
+    return matrix
+
+
 class HierarchicalProductDataset(Dataset):
     """PyTorch Dataset for hierarchical product classification.
 

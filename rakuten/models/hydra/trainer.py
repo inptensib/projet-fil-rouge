@@ -19,15 +19,20 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import yaml
 from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
+
+# H100/3090 (Ampere+): TF32 (matmul/cudnn plus rapides, effet negligeable)
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
 from tqdm import tqdm
 from transformers import AutoTokenizer
 
-from rakuten.common.data_loader import build_parent_child_matrix
+from rakuten.common.data_loader import build_parent_child_matrix, build_parent_child_matrix_from_labels
 from rakuten.common.metrics import compute_all_metrics, compute_f1_by_tranche
 from rakuten.common.training_utils import (
     EarlyStopping,
@@ -176,8 +181,10 @@ class HYDRATrainer:
         }
 
         # Parent-child matrix for hierarchy enforcement
-        self.parent_child_matrix = build_parent_child_matrix(
-            self.l2_to_l1_mapping, self.num_classes_l1, self.num_classes_l2
+        _all_l1 = np.concatenate([data["y_l1_train"], data["y_l1_val"], data["y_l1_test"]])
+        _all_l2 = np.concatenate([data["y_l2_train"], data["y_l2_val"], data["y_l2_test"]])
+        self.parent_child_matrix = build_parent_child_matrix_from_labels(
+            _all_l1, _all_l2, self.num_classes_l1, self.num_classes_l2
         ).to(self.device)
 
         # Tokenizer
@@ -232,7 +239,7 @@ class HYDRATrainer:
             max_length=self.max_length,
             batch_size=self.batch_size,
             shuffle=shuffle,
-            num_workers=4,
+            num_workers=8,
             pin_memory=True,
             drop_last=shuffle,
         )
@@ -278,6 +285,16 @@ class HYDRATrainer:
             all_labels_l2, all_preds_l2,
             self.l2_to_l1_mapping,
         )
+        # HCR multi-parents : mesuré sur les prédictions réelles via la matrice
+        # multi-parents (pred_l2 est-il un enfant valide de pred_l1 sous TOUTES
+        # les arêtes (L1,L2) observées, pas seulement le premier parent ?).
+        if len(all_preds_l1):
+            pcm = self.parent_child_matrix.detach().cpu().numpy()
+            _pl1 = np.asarray(all_preds_l1)
+            _pl2 = np.asarray(all_preds_l2)
+            metrics["hcr_multiparent"] = float((pcm[_pl1, _pl2] > 0).mean())
+        else:
+            metrics["hcr_multiparent"] = 0.0
         real_counts_l2 = self.data.get("real_class_counts_l2")
         if real_counts_l2 is not None:
             metrics["f1_l2_by_tranche"] = compute_f1_by_tranche(
