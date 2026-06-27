@@ -112,3 +112,9 @@ logs_*.out
 # Résultats générés par les notebooks baselines
 notebooks/baselines/results/
 /models_v2/
+/models_hierarchy/
+
+# Clés de service Google — ne jamais committer
+presentation_finale/*.json
+*service-account*.json
+gcp_sa_key.json
