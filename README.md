@@ -208,6 +208,39 @@ snapshot_download(
 Mapping of HF subfolders → local paths expected by the evaluation scripts:
 see [ONBOARDING.md](ONBOARDING.md), "Retrieving the trained models" section.
 
+### Delivery bundle (ONNX — offline inference)
+
+For a one-shot handoff, everything needed to **run** the models — plus the v2
+dataset — is bundled in a single private repo:
+[`TahianaAndriambahoaka/rakuten-delivery`][hf-delivery] (~9 GB).
+
+| Folder | Content |
+|:--------|:---------|
+| `onnx/flat_v2/` | Retained model (CamemBERT Flat v2) in ONNX + tokenizer, label encoders, standalone `predict_onnx.py` |
+| `onnx/hydra_v2/` | The 3 HYDRA hierarchy models in ONNX + hierarchical mask matrix + `predict_onnx.py` |
+| `dataset_v2/` | train / val / test splits (JSONL) + `synthetic_ids.txt` |
+
+```bash
+export HF_TOKEN="hf_..."                            # read token provided by the owner
+python scripts/download_delivery.py                 # everything (~9 GB)
+python scripts/download_delivery.py --onnx-only     # ONNX models only (~1.8 GB)
+python scripts/download_delivery.py --dataset-only  # dataset v2 only (~7.2 GB)
+```
+
+**Inference is fully offline** — `onnxruntime` only, no PyTorch and no Hugging
+Face at runtime (the tokenizer and label encoders are bundled):
+
+```bash
+cd rakuten-delivery/onnx/flat_v2
+pip install -r requirements.txt
+python predict_onnx.py --model-dir . \
+    --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
+```
+
+The same export/inference code lives in the repo under
+[`scripts/flat_inference/`](scripts/flat_inference/) (retained model) and
+[`scripts/hydra_inference/`](scripts/hydra_inference/) (HYDRA + hierarchical mask).
+
 ### SLURM cluster
 
 The `scripts/*.slurm` scripts assume the `P100` (2×16 GB)
@@ -222,6 +255,7 @@ export DATA_DIR="/path/to/dataset"
 
 [hf-dataset]: https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset
 [hf-models]: https://huggingface.co/TahianaAndriambahoaka/rakuten-models
+[hf-delivery]: https://huggingface.co/TahianaAndriambahoaka/rakuten-delivery
 
 ---
 
@@ -275,7 +309,8 @@ rakuten-classification/
 │   ├── baselines/             flat_hydra*.yaml
 │   └── hlpd/                  hlpd_3090.yaml
 ├── scripts/                   Python CLI, SLURM scripts, evaluation, comparison
-│   ├── flat_inference/        Standalone inference of the selected model (CamemBERT Flat v2)
+│   ├── flat_inference/        Standalone + ONNX inference of the selected model (CamemBERT Flat v2)
+│   ├── hydra_inference/       ONNX inference of the 3 HYDRA hierarchy models (+ hierarchical mask)
 │   └── synthetic_pipeline/    Synthetic data generation (LLM + templates + duplication)
 ├── notebooks/
 │   ├── eda/                   Exploratory analysis

@@ -39,6 +39,8 @@ ENV/
 shards/
 # Dossier de données téléchargé localement (racine uniquement, ancré)
 /dataset/
+# Bundle de livraison téléchargé localement (ONNX + dataset v2, ~9 Go)
+/rakuten-delivery/
 
 # ==============================================================================
 # Models (weights only -- code IS tracked)
