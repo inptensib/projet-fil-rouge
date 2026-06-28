@@ -1,0 +1,16 @@
+# Dépendances pour exécuter les notebooks (notebooks/eda/ + notebooks/baselines/),
+# EN COMPLÉMENT du requirements.txt racine + `pip install -e .` (qui fournissent
+# déjà numpy, pandas, polars, scikit-learn, gensim, nltk, matplotlib, seaborn).
+
+# --- Jupyter (inclut ipython + nbconvert, utilisé par les scripts SLURM baselines) ---
+jupyter>=1.1.0
+
+# --- EDA (notebooks/eda/) ---
+langdetect>=1.0.9      # détection de langue
+plotly>=6.0            # graphiques interactifs
+wordcloud>=1.9.6       # nuages de mots
+
+# --- Baselines fastText (notebooks/baselines/) ---
+# fastText : baselines exécutées sur lame10 (CPU). L'install pip nécessite un
+# compilateur C++ (version au choix ; testé avec la release stable 0.9.x).
+fasttext

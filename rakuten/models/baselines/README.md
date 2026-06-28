@@ -5,8 +5,9 @@ Classification « à plat » (non-hiérarchique) L1+L2. Ce package contient
 F1 L2 macro du projet).
 
 Les baselines classiques de comparaison (TF-IDF, Word2Vec, fastText) vivent dans
-[`notebooks/baselines/`](../../../notebooks/baselines/) ; leurs chiffres
-canoniques sont dans `results/baselines/baseline_results.json` (cf.
+[`notebooks/baselines/`](../../../notebooks/baselines/) (dépendances :
+[`notebooks/requirements.txt`](../../../notebooks/requirements.txt)) ; leurs
+chiffres canoniques sont dans `results/baselines/baseline_results.json` (cf.
 [docs/EXPERIMENTS.md](../../../docs/EXPERIMENTS.md)).
 
 ## FlatHydra
