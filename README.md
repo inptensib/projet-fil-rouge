@@ -273,12 +273,6 @@ Detailed tree + old → new mapping: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md
 
 ---
 
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) — branching, quality pipeline (tests + lint), commit format.
-
----
-
 ## References
 
 - **HYDRA** — Karl & Scherp, *Hierarchical Multi-label Classification*, EMNLP 2025 [[GitHub]](https://github.com/FKarl/HYDRA)
