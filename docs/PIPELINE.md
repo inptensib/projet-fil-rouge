@@ -30,7 +30,7 @@ HF dataset (JSONL splits)
 Commands from the repo root.
 
 > **Prerequisites**: export `PROJECT_ROOT`, `VENV_ACTIVATE`, and `DATA_DIR`
-> before any `sbatch` (see [ONBOARDING.md](../ONBOARDING.md));
+> before any `sbatch` (see [REPRODUCE.md](../REPRODUCE.md));
 > `--array=0-9%1` = automatic checkpoint resume, one task at a time.
 
 ### Standard HYDRA CamemBERT (local, nested, global)

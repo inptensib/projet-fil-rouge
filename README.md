@@ -174,8 +174,7 @@ The whole chain runs **without an LLM** for testing (`RAKUTEN_LLM_OFFLINE=1`); s
 
 ## Quick Start
 
-> **New here?** [ONBOARDING.md](ONBOARDING.md) covers install, data/model access,
-> first run and SLURM; [docs/PIPELINE.md](docs/PIPELINE.md) is the script × model
+> **New here?** [docs/PIPELINE.md](docs/PIPELINE.md) is the script × model
 > matrix. **To re-train or re-test the delivered models → [REPRODUCE.md](REPRODUCE.md).**
 
 ```bash
@@ -229,9 +228,9 @@ python predict_onnx.py --model-dir . --designation "Cage à hamster 3 étages" -
 ```
 
 The same export/inference code is in [`scripts/flat_inference/`](scripts/flat_inference/)
-and [`scripts/hydra_inference/`](scripts/hydra_inference/). HF→local model mapping:
-[ONBOARDING.md](ONBOARDING.md). SLURM jobs (`scripts/slurm/*.slurm`) override paths
-via `PROJECT_ROOT` / `VENV_ACTIVATE` / `DATA_DIR`.
+and [`scripts/hydra_inference/`](scripts/hydra_inference/). HF→local model mapping is in
+[`scripts/upload_models_hf.py`](scripts/upload_models_hf.py). SLURM jobs (`scripts/slurm/*.slurm`)
+override paths via `PROJECT_ROOT` / `VENV_ACTIVATE` / `DATA_DIR`.
 
 [hf-dataset]: https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset
 [hf-models]: https://huggingface.co/TahianaAndriambahoaka/rakuten-models

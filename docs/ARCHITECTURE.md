@@ -77,7 +77,7 @@ HLPD reaches F1 L2 = 61.5 % using the same data.
 ```
 rakuten-classification/
 ├── pyproject.toml              # setuptools packaging, dependencies, ruff
-├── README.md  ONBOARDING.md  CLAUDE.md
+├── README.md  CONTRIBUTING.md  REPRODUCE.md
 ├── rakuten/                    # installable package (pip install -e .)
 │   ├── __init__.py
 │   ├── common/                 # building blocks shared by all models
