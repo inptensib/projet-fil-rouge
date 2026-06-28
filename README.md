@@ -56,40 +56,75 @@ Three model families compared:
 
 ---
 
-## HYDRA architecture
+## Architecture
 
-```mermaid
-graph TD
-    A["Product text (designation + description)"] --> B
-    B["CamemBERT Tokenizer (max_length=256)"] --> C
-    C["CamemBERT (12 layers, 110M params, fine-tuned)"] --> D
-    D["Projection 768 → 1536"] --> E1
-    D --> E2
+Three architecture families were explored — all built on a fine-tuned
+**CamemBERT** encoder: the retained **CamemBERT Flat** (single unified head), the
+multi-head **HYDRA**, and a separate **hybrid** track (CamemBERT + per-L1
+specialists).
 
-    E1["Head L1: Linear → LN → ReLU → Drop → Linear → 157 classes"]
-    E2["Head L2: Linear → LN → ReLU → Drop → Linear → 5 777 classes"]
+### Retained model — CamemBERT Flat
 
-    E1 --> F["Prediction"]
-    E2 --> F
+A **single unified head** predicts L1 + L2 jointly. The projection is applied on
+the token sequence **before** pooling (faithful to the official HYDRA baseline),
+and the 5 934 output logits are sliced into L1 (`[0:157]`) and L2 (`[157:]`).
 
-    style C fill:#4A90D9,color:white
-    style E1 fill:#27AE60,color:white
-    style E2 fill:#E67E22,color:white
-    style F fill:#8E44AD,color:white
-```
+![CamemBERT Flat — retained model](docs/diagrams/arch_flat.png)
 
-3 variants tested:
+### HYDRA (multi-head) + hierarchical masking
 
-| Variant | Idea | L1↔L2 consistency |
+Faithful to **HYDRA** (Karl & Scherp, EMNLP 2025): a shared **text encoder** feeds
+**k local heads** (one per hierarchy level — here **k = 2**: L1 and L2). Two of the
+three variants add an optional **(k+1)-th head** that predicts the flat union of
+all labels (training only). A CLS pool + a 768→1536 projection build the shared
+embedding the heads sit on.
+
+![HYDRA — local heads + optional (k+1)-th head](docs/diagrams/arch_hydra.png)
+
+**3 variants**, mapping directly to the paper's (a)/(b)/(c) — they differ only in
+the optional **Head k+1** (training only); inference always uses the two local
+heads + the mask below:
+
+| Variant | Head k+1 (training only) | Paper |
 |:---------|:-----|:----------------|
-| `local` | Independent L1 and L2 heads | Post-hoc (hierarchical mask) |
-| `global` | + unified L1+L2 head | Implicit |
-| `nested` | + L2 refinement MLP conditioned on L1 | By construction |
+| `local` | none | (a) Local Heads Only |
+| `global` | predicts all 5 934 labels from the embedding | (b) Local + Global Head |
+| `nested` | predicts all 5 934 labels from the `[L1;L2]` logits | (c) Local + Nested Head |
 
-> **Key finding**: the flat *FlatHydra* head (CamemBERT + a single L1+L2 head) achieves
-> the project's best L2 F1, above the multi-level HYDRA heads. Despite its name,
-> FlatHydra is **not** a HYDRA variant: it is a strong baseline (filed under
-> `rakuten/models/baselines/`).
+At **inference** (all variants use the two local heads), a **hierarchical mask**
+keeps only the L2 children of the predicted L1 — lifting the hierarchical
+consistency rate (HCR) to ~100 %:
+
+![HYDRA — hierarchical masking at inference](docs/diagrams/arch_hydra_mask.png)
+
+The mask uses a `parent_child_matrix` (157 × 5 777), **multi-parent aware**:
+545 L2 classes have more than one valid L1 parent.
+
+### Explored alternatives — hybrid systems
+
+A separate experimental track ([`hybrid_system/`](hybrid_system/), unaudited)
+combined CamemBERT with per-L1 specialists. Two designs were explored, both ruled
+out in favour of the simpler CamemBERT Flat.
+
+**Gated routing** — route each product to a single per-L1 specialist, gated by L1
+confidence + class frequency. A wrong L1 route hands the product to the wrong
+specialist, so L2 collapses: the L1 prediction decides everything, no recourse —
+the L1 route is the bottleneck.
+
+![Hybrid gated routing](docs/diagrams/arch_hybrid_gated.png)
+
+**Max-confidence** — two flat experts run in parallel (CamemBERT-L2 + per-L1
+XGBoost on 1536-d embeddings), combined by keeping the more confident; a kNN tail
+expert overrides on confident rare-class hits. A wrong L1 route only makes XGBoost
+abstain, so the routing-free flat predictor still stands. Competitive, but heavier
+for no gain over the plain CamemBERT Flat.
+
+![Hybrid max-confidence](docs/diagrams/arch_hybrid_maxconf.png)
+
+> **Key finding**: the flat *FlatHydra* head (CamemBERT + a single L1+L2 head)
+> achieves the project's best L2 F1 — above the multi-level HYDRA heads **and the
+> hybrid systems**. Despite its name, FlatHydra is **not** a HYDRA variant: it is a
+> strong baseline (filed under `rakuten/models/baselines/`).
 
 ---
 
@@ -105,6 +140,42 @@ graph TD
 | **FlatHydra CamemBERT** | **—** | **71.7 %** | — |
 | HYDRA local CamemBERT | — | 66.8 % | > 95 % |
 | HLPD CamemBERT | — | 61.5 % | — |
+
+---
+
+## Synthetic data pipeline
+
+Rakuten's catalogue has a heavy **long tail**: many L2 classes hold very few
+products, which caps the macro-F1. The pipeline
+([`scripts/synthetic_pipeline/`](scripts/synthetic_pipeline/)) rebalances **train
+only** so every L1 (157) and every L2 (5 777) class reaches **≥ 100 products** —
+**val and test stay frozen** (every generated row is hash-checked against them, so
+nothing leaks).
+
+The **LLM (Claude Opus) is in the loop at generation time**: it reads each class
+and decides its vocabulary (keywords) and its listing shapes (templates). Python then does the
+mechanical work — filling templates, duplicating real rows for raw volume, and
+validating.
+
+![Synthetic data — generation pipeline](docs/diagrams/pipeline_synth_generation.png)
+
+![Synthetic data — template variants](docs/diagrams/pipeline_synth_templates.png)
+
+Two strategies, composed to exactly 100 rows per class (generated first, then
+duplication to top up):
+
+| Kind | Rows | How |
+|:------|-----:|:----|
+| `SYNTH-OVS` | 119 510 | duplication (L2) |
+| `SYNTH-GEN` | 7 044 | LLM templates, anchored in the class's real vocabulary |
+| `SYNTH-ORPH` | 2 900 | LLM templates, 29 orphan classes (no real rows) × 100 |
+| `SYNTH-OVL` | 187 | duplication (L1) |
+| **Total** | **129 641** | added on top of the real training data |
+
+Synthetic rows are identifiable by the non-numeric `SYNTH-` prefix on `productid`.
+The whole chain runs **without an LLM** for testing (`RAKUTEN_LLM_OFFLINE=1`); see
+[`scripts/synthetic_pipeline/README.md`](scripts/synthetic_pipeline/README.md) and
+[`WORKED_EXAMPLE.md`](scripts/synthetic_pipeline/WORKED_EXAMPLE.md).
 
 ---
 
@@ -336,7 +407,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) — branching, quality pipeline (tests + 
 
 ## References
 
-- **HYDRA** — Karl et al., *Hierarchical Multi-label Classification*, EMNLP 2025 [[GitHub]](https://github.com/FKarl/HYDRA)
+- **HYDRA** — Karl & Scherp, *Hierarchical Multi-label Classification*, EMNLP 2025 [[GitHub]](https://github.com/FKarl/HYDRA)
 - **HLPD** — Torba, Laclau et al., *Hierarchical Label Pre-populated Decoder*, ECIR 2025
 
 ---
