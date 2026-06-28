@@ -32,8 +32,8 @@ products), and stratification by L2 when generating the splits.
 
 ### Step 2 — Baselines
 
-The `notebooks/baselines/` notebooks and the `rakuten/models/baselines/` code
-implement three families of classic baselines:
+The three classic baselines live in [`notebooks/baselines/`](../notebooks/baselines/);
+**FlatHydra** is the package code in `rakuten/models/baselines/`:
 
 - **TF-IDF + LinearSVC**: TF-IDF bag of words, linear SVM. Strongest reference
   (F1 L2 = 42.9 %).
@@ -87,7 +87,7 @@ rakuten-classification/
 │   │   ├── text_normalization.py
 │   │   └── utils.py
 │   └── models/
-│       ├── baselines/          # TF-IDF, Word2Vec, BERT-flat, FlatHydra
+│       ├── baselines/          # FlatHydra (retained flat L1+L2 model)
 │       ├── hydra/              # HYDRA (EMNLP 2025): models, losses, trainer, config
 │       └── hlpd/               # HLPD (ECIR 2025): models, losses, attention_bias, trainer
 ├── configs/                    # YAML outside the package (not imported in Python)
@@ -120,7 +120,7 @@ rakuten-classification/
 |:--------------|:---------------|:---------|
 | `shared/` | `rakuten/common/` | Shared building blocks |
 | `02_hydra/src/` | `rakuten/models/hydra/` | Internal relative imports preserved |
-| `01_baselines/src/` | `rakuten/models/baselines/` | FlatHydra included |
+| `01_baselines/src/` | `rakuten/models/baselines/` | FlatHydra (classic baselines → notebooks/) |
 | `02b_hlpd/src/` | `rakuten/models/hlpd/` | Mehdi Aithamma's contribution |
 | `03_distributed/src/` | **excluded from the deliverable** | See note below |
 | `02_hydra/configs/` | `configs/hydra/` | YAML outside the package |
