@@ -124,7 +124,8 @@ results/class_metadata.json
 *service-account*.json
 gcp_sa_key.json
 
-# Outillage IA local (chemins machine ; hors dépôt transmis). CLAUDE.md racine reste suivi.
+# Outillage IA local (hors dépôt transmis)
 .claude/
+CLAUDE.md
 .mcp.json
 docs/superpowers/
