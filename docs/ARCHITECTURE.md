@@ -102,7 +102,7 @@ rakuten-classification/
 ├── notebooks/                  # exploration and baselines (outside the package)
 │   ├── eda/                    # exploratory analysis
 │   └── baselines/              # fastText, TF-IDF, Word2Vec notebooks
-├── tests/                      # 312 pytest tests (no data, no GPU)
+├── tests/                      # syntax + import smoke tests (no data, no GPU)
 ├── docs/                       # technical documentation
 │   ├── ARCHITECTURE.md         # this file
 │   ├── PIPELINE.md             # script × step matrix

@@ -47,7 +47,7 @@ be regenerated with `scripts/generate_comparison.py` (→ `results/comparison.ht
   (`TahianaAndriambahoaka/rakuten-dataset` and `TahianaAndriambahoaka/rakuten-models`):
   request it from the owner (`TahianaAndriambahoaka`)
 
-> **Without this token**: the package installs and the 312 tests pass, but it is
+> **Without this token**: the package installs and the smoke tests (syntax + imports) pass, but it is
 > impossible to reproduce the training runs or evaluations (no local data).
 > This is the recommended fallback path for an initial walkthrough of the code.
 
@@ -67,7 +67,7 @@ pip install -e .
 python -m pytest tests/ -q
 ```
 
-All 312 tests should pass. Docker alternative:
+All smoke tests (syntax + imports) should pass. Docker alternative:
 
 ```bash
 docker compose run --rm --profile test test
@@ -152,7 +152,7 @@ run). The HF repo card (scores, structure) is in the
 Local smoke test on a subsample — **requires the dataset** (previous section).
 Duration: a few minutes to tens of minutes depending on the machine.
 
-> **Without an HF token**: stop after the 312 tests; that's the normal fallback path.
+> **Without an HF token**: stop after the smoke tests (syntax + imports); that's the normal fallback path.
 
 ```bash
 python scripts/run_train.py \
@@ -215,7 +215,7 @@ configs/hlpd/           hlpd_3090.yaml
 scripts/                Python CLI (root); SLURM jobs in scripts/slurm/ (see docs/PIPELINE.md)
 notebooks/eda/          Exploratory data analysis
 notebooks/baselines/    fastText, TF-IDF, Word2Vec (notebooks)
-tests/                  312 pytest tests (no data, no GPU)
+tests/                  syntax + import smoke tests (no data, no GPU)
 results/                JSON metrics (HTML/PNG reports regenerated, gitignored)
 docs/                   ARCHITECTURE.md, PIPELINE.md, METRICS.md
 hybrid_system/          Separate contribution (CamemBERT + XGBoost)

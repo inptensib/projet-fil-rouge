@@ -23,7 +23,7 @@ pip install -e ".[dev]"
 Then, before any commit:
 
 ```bash
-# 1. Tests (mandatory — 312 tests must pass)
+# 1. Tests (mandatory — syntax + import smoke tests must pass)
 python -m pytest tests/ -q
 
 # 2. Lint (optional but recommended)

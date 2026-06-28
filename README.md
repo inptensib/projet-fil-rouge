@@ -10,7 +10,7 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-yellow?logo=huggingface&logoColor=white)
 ![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?logo=mlflow&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-312%20passed-brightgreen?logo=pytest&logoColor=white)
+![Tests](https://img.shields.io/badge/Tests-passing-brightgreen?logo=pytest&logoColor=white)
 ![SLURM](https://img.shields.io/badge/SLURM-Multi--GPU-orange)
 
 > **Télécom Paris** (IP Paris) × **Rakuten France**
@@ -185,7 +185,7 @@ git clone <repo-url> && cd rakuten-classification
 python -m venv venv && source venv/bin/activate && pip install -e .
 
 # Verify — no data or GPU needed
-python -m pytest tests/ -q                     # 312 tests pass
+python -m pytest tests/ -q                     # syntax + import smoke tests pass
 
 # Download data + local smoke test (HF token required — see below)
 export HF_TOKEN="hf_..."
@@ -201,7 +201,7 @@ sbatch --job-name=hydra-local --array=0-9%1 scripts/slurm/run_train_variant.slur
 ## Access to data and models
 
 Three **private** HuggingFace repos (owner `TahianaAndriambahoaka` — ask for a read
-token). Without a token you can still `pip install -e .` and run the 312 tests
+token). Without a token you can still `pip install -e .` and run the smoke tests (syntax + imports)
 (no data, no GPU) — the normal fallback path.
 
 | Repo | Download with | Content |
@@ -268,7 +268,7 @@ configs/         YAML, source of truth — hydra/, baselines/, hlpd/
 scripts/         CLI entry points (root) + slurm/ · flat_inference/ · hydra_inference/ · synthetic_pipeline/
 notebooks/       eda/ + baselines/
 docs/            ARCHITECTURE · PIPELINE · METRICS · EXPERIMENTS
-results/         per-model metrics + HTML reports     ·     tests/  312 pytest (no data/GPU)
+results/         per-model metrics + HTML reports     ·     tests/  syntax + import smoke tests
 hybrid_system/   separate experimental track (CamemBERT + XGBoost, unaudited)
 ```
 
