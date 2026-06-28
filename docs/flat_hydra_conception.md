@@ -449,10 +449,10 @@ Each slot checks:
 3. Otherwise → start from scratch
 
 ```bash
-sbatch --job-name=flat-hydra --array=0-9%1 scripts/run_flat_variant.slurm
+sbatch --job-name=flat-hydra --array=0-9%1 scripts/slurm/run_flat_variant.slurm
 # Smoke test:
 sbatch --job-name=flat-hydra-smoke --array=0-2%1 \
-  scripts/run_flat_variant.slurm configs/baselines/flat_hydra.yaml 5000
+  scripts/slurm/run_flat_variant.slurm configs/baselines/flat_hydra.yaml 5000
 ```
 
 ---

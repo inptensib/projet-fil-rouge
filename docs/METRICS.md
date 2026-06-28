@@ -134,10 +134,10 @@ Particularities to be aware of:
 
 ```bash
 # HYDRA standard (3 variants, both modes shown in the console)
-sbatch scripts/run_eval.slurm
+sbatch scripts/slurm/run_eval.slurm
 
 # HYDRA hierarchy (models in models_hierarchy/)
-sbatch scripts/run_eval.slurm models_hierarchy
+sbatch scripts/slurm/run_eval.slurm models_hierarchy
 
 # A single variant, locally with GPU
 python scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \

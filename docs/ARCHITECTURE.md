@@ -94,8 +94,10 @@ rakuten-classification/
 │   ├── hydra/                  # default.yaml, hierarchy.yaml, title_only*.yaml, mbert_default.yaml
 │   ├── baselines/              # flat_hydra.yaml, flat_hydra_3090.yaml, …
 │   └── hlpd/                   # hlpd_3090.yaml
-├── scripts/                    # Python CLI + SLURM scripts
-│   ├── flat_inference/         # standalone inference (CamemBERT Flat v2)
+├── scripts/                    # Python CLI entry points (root) + subfolders below
+│   ├── slurm/                  # all SLURM job scripts (train, eval, baselines)
+│   ├── flat_inference/         # standalone + ONNX inference (CamemBERT Flat v2)
+│   ├── hydra_inference/        # ONNX inference of the 3 HYDRA variants (+ mask)
 │   └── synthetic_pipeline/     # synthetic data generation
 ├── notebooks/                  # exploration and baselines (outside the package)
 │   ├── eda/                    # exploratory analysis

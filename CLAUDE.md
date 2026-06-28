@@ -76,9 +76,10 @@ rakuten/               Package Python installable (pip install -e .)
 configs/hydra/         default.yaml (source de verite), hierarchy.yaml, title_only*.yaml, mbert_default.yaml
 configs/baselines/     flat_hydra*.yaml
 configs/hlpd/          hlpd_3090.yaml
-scripts/               run_train.py, generate_comparison.py, generate_f1_per_class.py, eval_hierarchy.py
-                       run_train_variant.slurm, run_train_array.slurm, chain_submit_array.sh
-scripts/flat_inference/     inference standalone du modele retenu (CamemBERT Flat v2)
+scripts/               run_train.py, eval_hierarchy.py, generate_comparison.py, download_*.py, chain_submit_array.sh
+scripts/slurm/         tous les jobs SLURM (train, eval, baselines)
+scripts/flat_inference/     inference standalone + ONNX du modele retenu (CamemBERT Flat v2)
+scripts/hydra_inference/    inference ONNX des 3 variantes HYDRA (+ masque hierarchique)
 scripts/synthetic_pipeline/ generation de donnees synthetiques (LLM + templates + duplication)
 notebooks/eda/         analyse exploratoire
 notebooks/baselines/   fasttext_baseline.ipynb, tfidf_baseline.ipynb, word2vec_baseline.ipynb

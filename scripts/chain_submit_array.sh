@@ -17,9 +17,9 @@ echo "=============================================="
 PREV_JOB=""
 for i in $(seq 1 "$N_CHAINS"); do
     if [ -z "$PREV_JOB" ]; then
-        JOB=$(sbatch --parsable scripts/run_train_array.slurm "$CONFIG")
+        JOB=$(sbatch --parsable scripts/slurm/run_train_array.slurm "$CONFIG")
     else
-        JOB=$(sbatch --parsable --dependency=afterany:"$PREV_JOB" scripts/run_train_array.slurm "$CONFIG")
+        JOB=$(sbatch --parsable --dependency=afterany:"$PREV_JOB" scripts/slurm/run_train_array.slurm "$CONFIG")
     fi
     echo "  Chain $i/$N_CHAINS : job array $JOB (depends=${PREV_JOB:-none})"
     PREV_JOB=$JOB

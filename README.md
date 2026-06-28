@@ -128,18 +128,12 @@ for no gain over the plain CamemBERT Flat.
 
 ---
 
-## Key results (v1, test)
+## Results
 
-> L1 F1 not reported for the deep models — target metric = L2 F1.
-
-| Model | F1 L1 | F1 L2 | HCR |
-|:-------|:-----:|:-----:|:---:|
-| TF-IDF + LinearSVC | 83.26 % | 42.75 % | 63.41 % |
-| FastText Supervised | 82.60 % | 10.01 % | 29.29 % |
-| Word2Vec + LinearSVC | 60.24 % | 22.27 % | 25.06 % |
-| **FlatHydra CamemBERT** | **—** | **71.7 %** | — |
-| HYDRA local CamemBERT | — | 66.8 % | > 95 % |
-| HLPD CamemBERT | — | 61.5 % | — |
+Retained model: **CamemBERT Flat v2 — 78.9 % L2 macro-F1**, the project's best
+(above the multi-head HYDRA and the hybrid systems). Full per-model tables
+(baselines, HYDRA, HLPD, FlatHydra; v1 + v2; traced to source files):
+[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md).
 
 ---
 
@@ -181,148 +175,63 @@ The whole chain runs **without an LLM** for testing (`RAKUTEN_LLM_OFFLINE=1`); s
 
 ## Quick Start
 
-> **New to the project?** Follow [ONBOARDING.md](ONBOARDING.md) — installation,
-> access to data and models, first training run, SLURM.
-> Detailed reference: [docs/PIPELINE.md](docs/PIPELINE.md) (which script for which model)
-> and [docs/METRICS.md](docs/METRICS.md) (metrics and provenance of the results).
+> **New here?** [ONBOARDING.md](ONBOARDING.md) covers install, data/model access,
+> first run and SLURM; [docs/PIPELINE.md](docs/PIPELINE.md) is the script × model matrix.
 
 ```bash
-# 1. Clone and install
+# Install (CPU or another CUDA: install torch first — see requirements.txt)
 git clone <repo-url> && cd rakuten-classification
-python -m venv venv && source venv/bin/activate
-# CPU or another CUDA version? Install torch first via the appropriate PyTorch index
-# (see the comment at the top of requirements.txt), then:
-pip install -e .
+python -m venv venv && source venv/bin/activate && pip install -e .
 
-# 2. Verify the installation — no data or GPU required
-python -m pytest tests/ -q          # 312 tests should pass
+# Verify — no data or GPU needed
+python -m pytest tests/ -q                     # 312 tests pass
 
-# 3. Download the data (HF token required — see the next section)
+# Download data + local smoke test (HF token required — see below)
 export HF_TOKEN="hf_..."
 python scripts/download_dataset.py
+python scripts/run_train.py --split-dir dataset/ --n-samples 5000 --config configs/hydra/default.yaml
 
-# 4. Local smoke test — requires the dataset (step 3 above)
-# Duration: a few minutes to tens of minutes depending on the machine
-# Without an HF token: stop after the 312 tests, that is the normal fallback path.
-python scripts/run_train.py --split-dir dataset/ --n-samples 5000 \
-    --config configs/hydra/default.yaml
-
-# 5. Full training on the SLURM cluster
-sbatch --job-name=hydra-local --array=0-9%1 scripts/run_train_variant.slurm local
+# Full training on SLURM
+sbatch --job-name=hydra-local --array=0-9%1 scripts/slurm/run_train_variant.slurm local
 ```
 
 ---
 
 ## Access to data and models
 
-> **Private HuggingFace repos** — a read HF token is required.
-> Contact: `TahianaAndriambahoaka` (owner of the repos).
+Three **private** HuggingFace repos (owner `TahianaAndriambahoaka` — ask for a read
+token). Without a token you can still `pip install -e .` and run the 312 tests
+(no data, no GPU) — the normal fallback path.
 
-### Without access (fallback path)
-
-You can install the package and run the 312 tests **without data or GPU**:
-
-```bash
-pip install -e .
-python -m pytest tests/ -q   # 312 passed
-```
-
-What this covers: imports, model architecture, metrics, configs, utilities.
-What this does not cover: real training and evaluation.
-
-### Data (dataset v2)
-
-Private HF repo: [`TahianaAndriambahoaka/rakuten-dataset`][hf-dataset]
-Subfolder: `datasets_finaux/` — pre-generated splits (70/15/15, stratified by L2, seed=42).
-
-| File | Lines |
-|:--------|-------:|
-| `train_split.jsonl` | 5 259 035 |
-| `val_split.jsonl` | 1 194 355 |
-| `test_split.jsonl` | 1 194 356 |
-
-Each line: `{"designation": "...", "description": "...", "typelabel": "L1", "producttype": "L2"}`
+| Repo | Download with | Content |
+|:--|:--|:--|
+| [`rakuten-dataset`][hf-dataset] | `scripts/download_dataset.py` | v2 splits (`datasets_finaux/`, 70/15/15 stratified by L2) — train 5 259 035 / val 1 194 355 / test 1 194 356 |
+| [`rakuten-models`][hf-models] | `scripts/download_models.py [name]` | 22 trained models (~63 GB) |
+| [`rakuten-delivery`][hf-delivery] | `scripts/download_delivery.py` | **one-shot handoff** — the 4 ONNX models + v2 dataset (~9 GB) |
 
 ```bash
-export HF_TOKEN="hf_..."           # read token provided by the owner
-python scripts/download_dataset.py  # downloads into <repo>/dataset/
+export HF_TOKEN="hf_..."             # read token provided by the owner
+python scripts/download_dataset.py   # → dataset/
+python scripts/download_models.py    # → models/  (or one model: ... flat-hydra-camembert-v2)
 ```
 
-> **Dataset v2**: duplicate leakage purged (−314 624 net train rows).
-> Measured effect of the leakage (FlatHydra): ~1 pt at L1; at L2 the v1↔v2 figures
-> do not compare term for term (6 126 → 5 777 classes). See
-> [docs/METRICS.md](docs/METRICS.md).
+### Delivery bundle — offline ONNX inference
 
-### Trained models (~63 GB, 22 models)
-
-Private HF repo: [`TahianaAndriambahoaka/rakuten-models`][hf-models]
-
-The simplest way — via the dedicated script:
+`rakuten-delivery` bundles everything needed to **run** the models (no training):
+`onnx/flat_v2/` (retained model), `onnx/hydra_v2/` (3 HYDRA + mask matrix) and
+`dataset_v2/`, each with a standalone `predict_onnx.py`. **Inference is fully
+offline** — `onnxruntime` only, no PyTorch, no Hugging Face at runtime:
 
 ```bash
-export HF_TOKEN="hf_..."
-python scripts/download_models.py                      # all models (~63 GB)
-python scripts/download_models.py flat-hydra-camembert-v2   # a single model
+python scripts/download_delivery.py --onnx-only        # ~1.8 GB
+cd rakuten-delivery/onnx/flat_v2 && pip install -r requirements.txt
+python predict_onnx.py --model-dir . --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
 ```
 
-Or directly in Python for a specific subfolder:
-
-```python
-from huggingface_hub import snapshot_download
-snapshot_download(
-    repo_id="TahianaAndriambahoaka/rakuten-models",
-    allow_patterns="flat-hydra/*",   # replace according to the desired model
-    token="hf_...",
-)
-```
-
-Mapping of HF subfolders → local paths expected by the evaluation scripts:
-see [ONBOARDING.md](ONBOARDING.md), "Retrieving the trained models" section.
-
-### Delivery bundle (ONNX — offline inference)
-
-For a one-shot handoff, everything needed to **run** the models — plus the v2
-dataset — is bundled in a single private repo:
-[`TahianaAndriambahoaka/rakuten-delivery`][hf-delivery] (~9 GB).
-
-| Folder | Content |
-|:--------|:---------|
-| `onnx/flat_v2/` | Retained model (CamemBERT Flat v2) in ONNX + tokenizer, label encoders, standalone `predict_onnx.py` |
-| `onnx/hydra_v2/` | The 3 HYDRA hierarchy models in ONNX + hierarchical mask matrix + `predict_onnx.py` |
-| `dataset_v2/` | train / val / test splits (JSONL) + `synthetic_ids.txt` |
-
-```bash
-export HF_TOKEN="hf_..."                            # read token provided by the owner
-python scripts/download_delivery.py                 # everything (~9 GB)
-python scripts/download_delivery.py --onnx-only     # ONNX models only (~1.8 GB)
-python scripts/download_delivery.py --dataset-only  # dataset v2 only (~7.2 GB)
-```
-
-**Inference is fully offline** — `onnxruntime` only, no PyTorch and no Hugging
-Face at runtime (the tokenizer and label encoders are bundled):
-
-```bash
-cd rakuten-delivery/onnx/flat_v2
-pip install -r requirements.txt
-python predict_onnx.py --model-dir . \
-    --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
-```
-
-The same export/inference code lives in the repo under
-[`scripts/flat_inference/`](scripts/flat_inference/) (retained model) and
-[`scripts/hydra_inference/`](scripts/hydra_inference/) (HYDRA + hierarchical mask).
-
-### SLURM cluster
-
-The `scripts/*.slurm` scripts assume the `P100` (2×16 GB)
-and `3090` (2-4×24 GB) partitions of the Télécom Paris cluster.
-On a different infrastructure, adapt the `#SBATCH` directives and the variables:
-
-```bash
-export PROJECT_ROOT="/path/to/rakuten-classification"
-export VENV_ACTIVATE="/path/to/venv/bin/activate"
-export DATA_DIR="/path/to/dataset"
-```
+The same export/inference code is in [`scripts/flat_inference/`](scripts/flat_inference/)
+and [`scripts/hydra_inference/`](scripts/hydra_inference/). HF→local model mapping:
+[ONBOARDING.md](ONBOARDING.md). SLURM jobs (`scripts/slurm/*.slurm`) override paths
+via `PROJECT_ROOT` / `VENV_ACTIVATE` / `DATA_DIR`.
 
 [hf-dataset]: https://huggingface.co/datasets/TahianaAndriambahoaka/rakuten-dataset
 [hf-models]: https://huggingface.co/TahianaAndriambahoaka/rakuten-models
@@ -332,70 +241,37 @@ export DATA_DIR="/path/to/dataset"
 
 ## Metrics
 
-All defined in `rakuten/common/metrics.py`, documented in [docs/METRICS.md](docs/METRICS.md).
-
-| Metric | Description |
-|:---------|:------------|
-| `f1_l1_macro` | Macro F1 over the 157 L1 categories |
-| `f1_l2_macro` | Macro F1 over the 5 777 L2 subcategories — **main metric** |
-| `HCR` | Hierarchical consistency rate: % of predictions where L2 is a valid child of L1 |
-| `constrained_f1` | L2 F1 counted only if the L1 parent is correct |
-
-Goal: maximize `f1_l2_macro` with HCR > 95 %.
-
-Each epoch also logs: L1/L2 confusion matrices, per-class F1 (sorted barplots),
-and an HTML explainability report (Gradient × Input) available in MLflow
-(`docker compose up mlflow -d`).
+Defined in `rakuten/common/metrics.py` ([docs/METRICS.md](docs/METRICS.md)):
+**`f1_l2_macro`** is the main target (macro over the 5 777 L2 classes), alongside
+`f1_l1_macro`, **HCR** (share of predictions where L2 is a valid child of L1) and
+`constrained_f1`. Goal: maximize `f1_l2_macro` with HCR > 95 %. Training also logs
+confusion matrices, per-class F1 and an MLflow explainability report.
 
 ---
 
 ## HYDRA configuration
 
-Source of truth: [`configs/hydra/default.yaml`](configs/hydra/default.yaml)
-
-| Parameter | Value | | Parameter | Value |
-|-----------|--------|-|-----------|--------|
-| Encoder | `camembert-base` | | `batch_size` | 64 |
-| `max_length` | 256 | | `lr` | 3.5e-5 |
-| Warmup | 10% (linear) | | Weight decay | 0.01 |
-| Gradient clip | 1.0 | | Early stop | patience 2 |
-| `dropout` | 0.3 | | `hidden_dim` | 256 |
-
-Hierarchical variant: [`configs/hydra/hierarchy.yaml`](configs/hydra/hierarchy.yaml) — enables `condition_l2_on_l1` (teacher forcing) and `check_hierarchy` (mask at inference)
+Source of truth [`configs/hydra/default.yaml`](configs/hydra/default.yaml):
+`camembert-base` · `max_length` 256 · `batch_size` 64 · `lr` 3.5e-5 · `dropout` 0.3
+· `hidden_dim` 256 · 10 % linear warmup · gradient clip 1.0 · early stop patience 2.
+Hierarchical variant [`hierarchy.yaml`](configs/hydra/hierarchy.yaml) adds teacher
+forcing (`condition_l2_on_l1`) + the inference mask (`check_hierarchy`).
 
 ---
 
 ## Structure
 
 ```
-rakuten-classification/
-├── rakuten/                   Installable Python package (pip install -e .)
-│   ├── common/                data_loader, metrics, training_utils, utils
-│   └── models/
-│       ├── baselines/         TF-IDF, Word2Vec, fastText, FlatHydra
-│       ├── hydra/             HYDRA (EMNLP 2025): models, losses, trainer, config
-│       └── hlpd/              HLPD (ECIR 2025) — Mehdi Aithamma
-├── configs/                   YAML outside the package (source of truth)
-│   ├── hydra/                 default.yaml, hierarchy.yaml, title_only*.yaml
-│   ├── baselines/             flat_hydra*.yaml
-│   └── hlpd/                  hlpd_3090.yaml
-├── scripts/                   Python CLI, SLURM scripts, evaluation, comparison
-│   ├── flat_inference/        Standalone + ONNX inference of the selected model (CamemBERT Flat v2)
-│   ├── hydra_inference/       ONNX inference of the 3 HYDRA hierarchy models (+ hierarchical mask)
-│   └── synthetic_pipeline/    Synthetic data generation (LLM + templates + duplication)
-├── notebooks/
-│   ├── eda/                   Exploratory analysis
-│   └── baselines/             fastText, TF-IDF, Word2Vec (notebooks)
-├── docs/                      ARCHITECTURE.md, PIPELINE.md, METRICS.md, EXPERIMENTS.md
-├── results/                   HTML reports, per-model metrics
-├── tests/                     312 pytest tests (no data or GPU)
-├── hybrid_system/             Separate experimental contribution — outside the package, not audited (see its own README)
-├── ONBOARDING.md              Complete getting-started guide
-└── docker-compose.yml         MLflow, tests, training
+rakuten/         installable package — common/ + models/{baselines, hydra, hlpd}
+configs/         YAML, source of truth — hydra/, baselines/, hlpd/
+scripts/         CLI entry points (root) + slurm/ · flat_inference/ · hydra_inference/ · synthetic_pipeline/
+notebooks/       eda/ + baselines/
+docs/            ARCHITECTURE · PIPELINE · METRICS · EXPERIMENTS
+results/         per-model metrics + HTML reports     ·     tests/  312 pytest (no data/GPU)
+hybrid_system/   separate experimental track (CamemBERT + XGBoost, unaudited)
 ```
 
-Detailed architecture and old → new mapping table:
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Detailed tree + old → new mapping: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 

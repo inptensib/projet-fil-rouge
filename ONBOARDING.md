@@ -167,7 +167,7 @@ The hyperparameters come from the YAML (source of truth:
 
 ## Working on the SLURM Cluster
 
-All `scripts/*.slurm` scripts use four overridable environment
+All `scripts/slurm/*.slurm` scripts use four overridable environment
 variables (defaults based on `$HOME`):
 
 ```bash
@@ -181,7 +181,7 @@ Typical launch of a HYDRA training run (job array with auto-resume):
 
 ```bash
 sbatch --job-name=hydra-local --array=0-9%1 \
-    scripts/run_train_variant.slurm local configs/hydra/default.yaml
+    scripts/slurm/run_train_variant.slurm local configs/hydra/default.yaml
 ```
 
 The `--array=0-9%1` pattern chains up to 10 tasks of 36 h max,
@@ -212,7 +212,7 @@ rakuten/                Installable Python package (pip install -e .)
 configs/hydra/          default.yaml, hierarchy.yaml, title_only*.yaml, mbert_default.yaml
 configs/baselines/      flat_hydra*.yaml
 configs/hlpd/           hlpd_3090.yaml
-scripts/                Python CLI + SLURM scripts (see docs/PIPELINE.md)
+scripts/                Python CLI (root); SLURM jobs in scripts/slurm/ (see docs/PIPELINE.md)
 notebooks/eda/          Exploratory data analysis
 notebooks/baselines/    fastText, TF-IDF, Word2Vec (notebooks)
 tests/                  312 pytest tests (no data, no GPU)
