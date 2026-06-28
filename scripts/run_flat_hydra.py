@@ -1,10 +1,6 @@
 """CLI entry point for FlatHydra training — CPU local ou GPU cluster.
 
 Usage:
-    # Entraînement local CPU sur N samples réels (via Docker)
-    #   docker compose run --rm --profile baselines flat-hydra-cpu
-    #   N_SAMPLES=2000 N_EPOCHS=3 docker compose run --rm --profile baselines flat-hydra-cpu
-
     # Depuis un seul fichier JSONL (sample + split automatique)
     python scripts/run_flat_hydra.py \
         --data <chemin>/products.jsonl \

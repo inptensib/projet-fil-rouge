@@ -1,4 +1,4 @@
-"""CLI entry point for single-GPU training via Docker or direct invocation.
+"""CLI entry point for single-GPU training (direct invocation or SLURM).
 
 Maps the YAML config keys to HYDRATrainer constructor parameters.
 
