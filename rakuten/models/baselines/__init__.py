@@ -1,1 +1,1 @@
-"""Modèles de référence : TF-IDF, Word2Vec, fastText, FlatHydra."""
+"""FlatHydra — modèle de classification à plat L1+L2 (modèle retenu)."""

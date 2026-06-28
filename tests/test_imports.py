@@ -45,26 +45,6 @@ class TestBaselinesImports:
         import rakuten.models.baselines.flat_model as flat_model
         assert hasattr(flat_model, "FlatHydra")
 
-    def test_import_baselines_tfidf_pipeline(self):
-        import rakuten.models.baselines.tfidf_pipeline as tfidf
-        assert hasattr(tfidf, "train_tfidf_pipeline")
-        assert hasattr(tfidf, "main")
-
-    def test_import_baselines_word2vec_pipeline(self):
-        import rakuten.models.baselines.word2vec_pipeline as word2vec
-        assert hasattr(word2vec, "train_word2vec_pipeline")
-        assert hasattr(word2vec, "main")
-
-    def test_import_baselines_bert_flat_classifier(self):
-        import rakuten.models.baselines.bert_flat_classifier as bert_flat
-        assert hasattr(bert_flat, "BERTClassifier")
-        assert hasattr(bert_flat, "main")
-
-    def test_import_baselines_evaluate(self):
-        import rakuten.models.baselines.evaluate as evaluate
-        assert hasattr(evaluate, "compare_baselines")
-        assert hasattr(evaluate, "main")
-
 
 class TestHlpdImports:
     def test_import_hlpd_models(self):
