@@ -10,7 +10,6 @@ Features:
 - Mixed precision (AMP) when fp16=True.
 - Early stopping on f1_l2_macro.
 - Gradient accumulation with final flush.
-- MLflow logging (hyperparams, per-epoch metrics, model artifact).
 - Config loaded from configs/hydra/default.yaml.
 """
 
@@ -36,7 +35,6 @@ from rakuten.common.data_loader import build_parent_child_matrix_from_labels
 from rakuten.common.metrics import compute_all_metrics, compute_f1_by_tranche
 from rakuten.common.training_utils import (
     EarlyStopping,
-    MLflowSession,
     get_linear_schedule_with_warmup,
     make_hierarchical_loader,
     resolve_rebalancing,
@@ -341,9 +339,6 @@ class HYDRATrainer:
             self.optimizer, num_warmup_steps, num_training_steps
         )
 
-        # MLflow logging
-        self._setup_mlflow(model_key)
-
         # Training state
         self._early_stopping = EarlyStopping(
             self.early_stopping_patience, self.early_stopping_min_delta
@@ -371,35 +366,6 @@ class HYDRATrainer:
                 break
 
         return self._finalize(test_loader, epoch, start_time)
-
-    def _setup_mlflow(self, model_key: str) -> None:
-        """Open the MLflow run and log hyperparameters."""
-        db_path = Path(__file__).resolve().parents[3] / "mlflow.db"
-        self._mlflow = MLflowSession(f"sqlite:///{db_path}", model_key)
-        gpu_type = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
-        self._mlflow.start(params={
-            "variant": self.variant,
-            "encoder": self.encoder_name,
-            "batch_size": self.batch_size,
-            "epochs": self.epochs,
-            "lr": self.lr,
-            "warmup_ratio": self.warmup_ratio,
-            "fp16": self.fp16,
-            "gradient_accumulation_steps": self.gradient_accumulation_steps,
-            "num_classes_l1": self.num_classes_l1,
-            "num_classes_l2": self.num_classes_l2,
-            "weight_decay": self.weight_decay,
-            "max_length": self.max_length,
-            "max_grad_norm": self.max_grad_norm,
-            "level_weight_l1": self.level_weight_l1,
-            "use_focal": self.use_focal,
-            "focal_gamma": self.focal_gamma,
-            "early_stopping_patience": self.early_stopping_patience,
-            "early_stopping_min_delta": self.early_stopping_min_delta,
-            "class_weighting": self.class_weighting,
-            "logit_adjustment_tau": self.logit_adjustment_tau,
-            "gpu_type": gpu_type,
-        })
 
     def _resume_from_checkpoint(self) -> None:
         """Restore model, optimizer, scheduler, scaler and training state."""
@@ -548,9 +514,6 @@ class HYDRATrainer:
             f"HCR: {val_metrics.get('hcr', 0):.4f}"
         )
 
-        # MLflow per-epoch logging + audit artifacts
-        self._log_audit_artifacts(epoch, avg_train_loss, val_metrics)
-
         # Early stopping & checkpointing on f1_l2_macro only
         if self._early_stopping.update(val_f1_l2):
             torch.save(
@@ -573,112 +536,8 @@ class HYDRATrainer:
             return True
         return False
 
-    def _log_audit_artifacts(self, epoch: int, avg_train_loss: float, val_metrics: dict) -> None:
-        """Log per-epoch metrics and audit visualizations to MLflow."""
-        if not self._mlflow.active:
-            return
-        try:
-            import matplotlib.pyplot as plt
-
-            from rakuten.common.metrics import plot_training_curves
-
-            self._mlflow.log_metrics({
-                "train_loss": avg_train_loss,
-                "val_f1_l1_macro": val_metrics["f1_l1_macro"],
-                "val_f1_l2_macro": val_metrics["f1_l2_macro"],
-                "val_hcr": val_metrics.get("hcr", 0.0),
-            }, step=epoch + 1)
-
-            # Audit visualizations (overwritten each epoch)
-            has_val_preds = bool(val_metrics.get("_labels_l1", []))
-            if has_val_preds:
-                self._log_confusion_matrices(epoch, val_metrics)
-                self._log_f1_plots(epoch, val_metrics)
-
-            if self._history["epoch"]:
-                fig = plot_training_curves(self._history)
-                self._mlflow.log_figure(fig, "training_curves.png")
-                plt.close(fig)
-
-            # Explainability report (on validation set)
-            if has_val_preds:
-                self._log_explainability(val_metrics)
-        except Exception as e:
-            print(f"  [MLflow] Warning: per-epoch artifacts failed ({e})")
-
-    def _log_confusion_matrices(self, epoch: int, val_metrics: dict) -> None:
-        """Log the L1 and L2 (top 50) confusion matrix figures to MLflow."""
-        import matplotlib.pyplot as plt
-
-        from rakuten.common.metrics import plot_confusion_matrix
-
-        v_preds_l1 = val_metrics.get("_preds_l1", [])
-        v_labels_l1 = val_metrics.get("_labels_l1", [])
-        v_preds_l2 = val_metrics.get("_preds_l2", [])
-        v_labels_l2 = val_metrics.get("_labels_l2", [])
-
-        fig = plot_confusion_matrix(
-            v_labels_l1, v_preds_l1, self.l1_encoder,
-            title=f"Confusion L1 — epoch {epoch + 1}",
-        )
-        self._mlflow.log_figure(fig, "confusion_matrix_l1.png")
-        plt.close(fig)
-
-        fig = plot_confusion_matrix(
-            v_labels_l2, v_preds_l2, self.l2_encoder,
-            title=f"Confusion L2 (top 50) — epoch {epoch + 1}", top_n=50,
-        )
-        self._mlflow.log_figure(fig, "confusion_matrix_l2_top50.png")
-        plt.close(fig)
-
-    def _log_f1_plots(self, epoch: int, val_metrics: dict) -> None:
-        """Log the per-class F1 figures and JSON dicts (L1 and L2) to MLflow."""
-        import matplotlib.pyplot as plt
-
-        from rakuten.common.metrics import compute_per_class_f1, plot_per_class_f1
-
-        v_preds_l1 = val_metrics.get("_preds_l1", [])
-        v_labels_l1 = val_metrics.get("_labels_l1", [])
-        v_preds_l2 = val_metrics.get("_preds_l2", [])
-        v_labels_l2 = val_metrics.get("_labels_l2", [])
-
-        f1_l1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
-        fig = plot_per_class_f1(f1_l1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
-        self._mlflow.log_figure(fig, "f1_per_class_l1.png")
-        plt.close(fig)
-        self._mlflow.log_dict(f1_l1_pc, "f1_per_class_l1.json")
-
-        f1_l2_pc = compute_per_class_f1(v_labels_l2, v_preds_l2, self.l2_encoder)
-        fig = plot_per_class_f1(f1_l2_pc, f"F1 par classe L2 — epoch {epoch + 1}")
-        self._mlflow.log_figure(fig, "f1_per_class_l2.png")
-        self._mlflow.log_dict(f1_l2_pc, "f1_per_class_l2.json")
-        plt.close(fig)
-
-    def _log_explainability(self, val_metrics: dict) -> None:
-        """Generate the validation explainability HTML report and log it to MLflow."""
-        from rakuten.common.explainability import generate_explainability_report
-
-        X_val = self.data["X_val"]
-        val_texts = X_val.tolist() if hasattr(X_val, "tolist") else list(X_val)
-        parent_child = self.parent_child_matrix if self.condition_l2_on_l1 else None
-        explain_html = generate_explainability_report(
-            model=self._base_model,
-            tokenizer=self.tokenizer,
-            texts=val_texts,
-            labels_l1=list(self.data["y_l1_val"]),
-            labels_l2=list(self.data["y_l2_val"]),
-            preds_l1=val_metrics.get("_preds_l1", []),
-            preds_l2=val_metrics.get("_preds_l2", []),
-            confs_l2=val_metrics.get("_confs_l2", []),
-            parent_child_matrix=parent_child,
-            l1_encoder=self.l1_encoder,
-            l2_encoder=self.l2_encoder,
-            device=self.device,
-        )
-        self._mlflow.log_text(explain_html, "explainability_report.html")
-
     def _finalize(self, test_loader: DataLoader, epoch: int, start_time: float) -> dict:
-        """Mark training complete, run the final test evaluation, close MLflow."""
+        """Mark training complete and run the final test evaluation."""
         (self._model_dir / "training_complete.txt").write_text(
             f"Training finished. Epochs: {epoch + 1}, Best F1 L2: {self._early_stopping.best:.4f}\n"
         )
@@ -693,16 +552,6 @@ class HYDRATrainer:
         print(f"Test F1 L2 Macro: {test_metrics['f1_l2_macro']:.4f}")
         print(f"Test HCR: {test_metrics.get('hcr', 0):.4f}")
         print(f"{'='*60}")
-
-        # MLflow: log final test metrics
-        self._mlflow.log_metrics({
-            "test_f1_l1_macro": test_metrics["f1_l1_macro"],
-            "test_f1_l2_macro": test_metrics["f1_l2_macro"],
-            "test_hcr": test_metrics.get("hcr", 0),
-            "total_time_s": total_time,
-        })
-        self._mlflow.log_artifact(str(self._model_dir / "best_model.pt"))
-        self._mlflow.end()
 
         return {
             "history": self._history,

@@ -436,8 +436,7 @@ Epoch N
               ├─► early stopping on f1_l2_macro
               ├─► save best_model.pt if improvement
               ├─► save checkpoint_latest.pt (auto-resume)
-              ├─► metrics.json (local fallback)
-              └─► mlflow.log_metrics()
+              └─► metrics.json (per-epoch history)
 ```
 
 ### Auto-resume (SLURM job array)
@@ -492,7 +491,7 @@ models/flat_hydra/
     l2_label_encoder.pkl     sklearn LabelEncoder → decode int → L2 label
     l2_to_l1_mapping.json    L2 → L1 hierarchy (for HCR and constrained F1)
     config.json              full FlatHydraConfig + num_classes
-    metrics.json             per-epoch history (fallback without MLflow)
+    metrics.json             per-epoch history
     training_complete.txt    completion flag (prevents accidental SLURM re-run)
 ```
 

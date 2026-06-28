@@ -9,7 +9,6 @@
 ![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
 ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-yellow?logo=huggingface&logoColor=white)
-![MLflow](https://img.shields.io/badge/MLflow-Tracking-0194E2?logo=mlflow&logoColor=white)
 ![Tests](https://img.shields.io/badge/Tests-passing-brightgreen?logo=pytest&logoColor=white)
 ![SLURM](https://img.shields.io/badge/SLURM-Multi--GPU-orange)
 
@@ -245,8 +244,7 @@ via `PROJECT_ROOT` / `VENV_ACTIVATE` / `DATA_DIR`.
 Defined in `rakuten/common/metrics.py` ([docs/METRICS.md](docs/METRICS.md)):
 **`f1_l2_macro`** is the main target (macro over the 5 777 L2 classes), alongside
 `f1_l1_macro`, **HCR** (share of predictions where L2 is a valid child of L1) and
-`constrained_f1`. Goal: maximize `f1_l2_macro` with HCR > 95 %. Training also logs
-confusion matrices, per-class F1 and an MLflow explainability report.
+`constrained_f1`. Goal: maximize `f1_l2_macro` with HCR > 95 %.
 
 ---
 

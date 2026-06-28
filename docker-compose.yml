@@ -2,7 +2,6 @@
 # Rakuten Classification -- Docker Compose
 # ==============================================================================
 # Usage:
-#   docker compose up mlflow                                    # MLflow UI :5000
 #   docker compose run --rm --profile test test                 # Tests
 #   docker compose run --rm --profile gpu train                 # HYDRA training
 #   docker compose run --rm --profile baselines baseline-tfidf  # TF-IDF baseline
@@ -26,29 +25,7 @@ x-app: &app
 services:
 
   # --------------------------------------------------------------------------
-  # MLflow Tracking Server
-  # --------------------------------------------------------------------------
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.12.1
-    ports:
-      - "5000:5000"
-    volumes:
-      - mlflow-data:/mlflow
-    command: >
-      mlflow server
-        --backend-store-uri sqlite:///mlflow/mlflow.db
-        --default-artifact-root /mlflow/artifacts
-        --host 0.0.0.0
-        --port 5000
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    restart: unless-stopped
-
-  # --------------------------------------------------------------------------
-  # Tests (no GPU, no data, no MLflow)
+  # Tests (no GPU, no data)
   # --------------------------------------------------------------------------
   test:
     <<: *app
@@ -103,6 +80,3 @@ services:
         --n_samples 10000
         --save_dir models/baseline_bert
     profiles: ["baselines"]
-
-volumes:
-  mlflow-data:

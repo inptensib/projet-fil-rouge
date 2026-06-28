@@ -33,7 +33,6 @@ from transformers import AutoTokenizer
 from rakuten.common.metrics import compute_all_metrics  # noqa: E402
 from rakuten.common.training_utils import (             # noqa: E402
     EarlyStopping,
-    MLflowSession,
     get_linear_schedule_with_warmup as _get_linear_schedule_with_warmup,
     make_hierarchical_loader,
 )
@@ -309,7 +308,7 @@ class HLPDTrainer:
         return self._finalize_training(model_dir)
 
     def _setup_training(self) -> tuple[DataLoader, DataLoader, Path, int]:
-        """Build loaders, scheduler, MLflow session and resume state."""
+        """Build loaders, scheduler and resume state."""
         d = self.data
         train_loader = self._make_loader(
             d["X_train"], d["y_l1_train"], d["y_l2_train"], shuffle=True
@@ -341,29 +340,6 @@ class HLPDTrainer:
         start_epoch = 0
         self._global_step = 0
         self._start_step_in_epoch = 0
-
-        # MLflow (optional — graceful if not running)
-        db_path = Path(__file__).resolve().parents[3] / "mlflow.db"
-        self._mlflow = MLflowSession(
-            f"sqlite:///{db_path}", self.config.experiment_name
-        )
-        self._mlflow.start(params={
-            "encoder": self.config.encoder,
-            "max_length": self.config.max_length,
-            "num_decoder_layers": self.config.num_decoder_layers,
-            "nhead": self.config.nhead,
-            "ffn_dim": self.config.ffn_dim,
-            "decoder_dropout": self.config.decoder_dropout,
-            "gradient_checkpointing": self.config.gradient_checkpointing,
-            "batch_size": self.config.batch_size,
-            "epochs": self.config.epochs,
-            "lr": self.config.lr,
-            "warmup_ratio": self.config.warmup_ratio,
-            "gradient_accumulation_steps": self.config.gradient_accumulation_steps,
-            "precision": self.config.precision,
-            "num_l1": self.num_l1,
-            "num_l2": self.num_l2,
-        })
 
         # Resume from checkpoint
         if self.resume_from and Path(self.resume_from).exists():
@@ -495,16 +471,6 @@ class HLPDTrainer:
         with open(model_dir / "metrics.json", "w") as f:
             json.dump(self._history, f, indent=2)
 
-        self._mlflow.log_metrics({
-            "train_loss": avg_loss,
-            "val_f1_l1_macro": val_metrics["f1_l1_macro"],
-            "val_f1_l2_macro": val_f1_l2,
-            "val_hcr": val_metrics.get("hcr", 0.0),
-            "val_constrained_f1_macro": val_metrics.get(
-                "constrained_f1_macro", 0.0
-            ),
-        }, step=epoch + 1)
-
         # Best model + early stopping
         if self._early_stop.update(val_f1_l2):
             torch.save(
@@ -534,9 +500,7 @@ class HLPDTrainer:
         return False
 
     def _finalize_training(self, model_dir: Path) -> dict:
-        """Close the MLflow run and write the completion marker."""
-        self._mlflow.end()
-
+        """Write the completion marker."""
         (model_dir / "training_complete.txt").write_text(
             f"best_val_f1_l2={self._early_stop.best:.4f}\n"
             f"epochs_trained="

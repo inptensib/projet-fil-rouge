@@ -1,7 +1,7 @@
 """Token-level explainability for HYDRA models via Gradient × Input attribution.
 
 Generates HTML reports with highlighted tokens showing which words contributed
-most to L1 and L2 predictions. Designed for MLflow artifact logging.
+most to L1 and L2 predictions. Rendered as a standalone HTML report.
 """
 
 from __future__ import annotations
@@ -229,7 +229,7 @@ def generate_explainability_report(
         n_correct: Number of correct samples to include.
 
     Returns:
-        Complete HTML string for MLflow artifact.
+        Complete HTML string.
     """
     # Split into errors and correct predictions
     errors_idx = []

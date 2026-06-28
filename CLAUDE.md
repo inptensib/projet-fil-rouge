@@ -19,7 +19,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 
 ```
 1. COMPRENDRE     Lire le code, les resultats existants, les papiers de reference
-                  → /content-report, /pdf-read, MLflow MCP (list_runs, search_best_runs)
+                  → /content-report, /pdf-read
 
 2. PLANIFIER      Definir l'hypothese, les metriques cibles, le plan d'experience
                   → Mode Plan (ultrathink), comparer aux baselines et runs precedents
@@ -28,10 +28,10 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
                   → /shard-check, /gpu-status
 
 4. EXPERIMENTER   Lancer le training, monitorer
-                  → /slurm submit, /loop 5m /slurm status, MLflow MCP (get_metric_history)
+                  → /slurm submit, /loop 5m /slurm status
 
 5. EVALUER        Analyser les resultats, comparer aux baselines, error analysis
-                  → MLflow MCP (compare_runs), error_analysis.py, /content-report
+                  → error_analysis.py, /content-report
 
 6. DOCUMENTER     Mettre a jour READMEs, docs/, diagrammes
                   → /sync-check, /markdown, /diagram
@@ -41,8 +41,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 ```
 
 **Regles critiques :**
-- **TOUJOURS consulter MLflow** avant de lancer un nouveau training (pas de run en double)
-- **TOUJOURS comparer au baseline** TF-IDF et au meilleur run existant (via MLflow)
+- **TOUJOURS comparer au baseline** TF-IDF et au meilleur run existant
 - **TOUJOURS verifier la coherence hierarchique** (HCR) en plus du F1
 - **Tester** apres chaque modification de code (le hook auto-test le fait, sinon manuellement) :
   ```bash
@@ -76,7 +75,7 @@ rakuten/               Package Python installable (pip install -e .)
 configs/hydra/         default.yaml (source de verite), hierarchy.yaml, title_only*.yaml, mbert_default.yaml
 configs/baselines/     flat_hydra*.yaml
 configs/hlpd/          hlpd_3090.yaml
-scripts/               run_train.py, eval_hierarchy.py, generate_comparison.py, download_*.py, chain_submit_array.sh
+scripts/               run_train.py, eval_hierarchy.py, generate_f1_per_class.py, download_*.py, chain_submit_array.sh
 scripts/slurm/         tous les jobs SLURM (train, eval, baselines)
 scripts/flat_inference/     inference standalone + ONNX du modele retenu (CamemBERT Flat v2)
 scripts/hydra_inference/    inference ONNX des 3 variantes HYDRA (+ masque hierarchique)
@@ -87,7 +86,7 @@ docs/                  ARCHITECTURE.md, PIPELINE.md (matrice scripts), METRICS.m
 results/               metriques JSON (test_metrics, hydra_eval_*, baseline_results) ; rapports HTML/PNG regenerables (gitignores)
 tests/                 syntaxe + imports (smoke, sans donnees/GPU)
 ONBOARDING.md          guide de prise en main pour nouveau developpeur
-docker-compose.yml     services : test, training, baselines, mlflow
+docker-compose.yml     services : test, training, baselines
 ```
 
 ## Qualite code
@@ -105,26 +104,6 @@ docker-compose.yml     services : test, training, baselines, mlflow
 - **Couverture L2** : `_ensure_l2_coverage()` duplique ~923 echantillons pour garantir que chaque classe L2 apparait dans chaque split
 - **Pas de data dans le repo** : les splits JSONL doivent etre places manuellement
 
-## Experimentation & MLflow
-
-Le MCP MLflow est disponible quand le conteneur tourne (`docker compose up mlflow -d`).
-
-**Outils MCP disponibles :**
-
-| Outil MCP | Quand l'utiliser |
-|:----------|:-----------------|
-| `list_experiments()` | Lister toutes les experiences MLflow (decouvrir les experiments existants) |
-| `list_runs(experiment_name)` | Voir les runs recents avant de lancer un nouveau training |
-| `search_best_runs(metric)` | Trouver le meilleur modele sur une metrique donnee |
-| `compare_runs(run_ids, metrics)` | Comparer variantes ou hyperparametres cote a cote |
-| `get_metric_history(run_id, metric)` | Suivre l'evolution d'une metrique epoch par epoch |
-| `get_run_details(run_id)` | Inspecter tous les parametres et metriques d'un run |
-
-**Bonnes pratiques :**
-- Avant un nouveau training → `search_best_runs("f1_l2_macro")` pour connaitre la reference
-- Apres un training → `compare_runs([new_id, best_id])` pour valider l'amelioration
-- Debug convergence → `get_metric_history(run_id, "train_loss")` + `"val_loss"`
-
 ---
 
 ## Skills -- TOUJOURS les invoquer quand le trigger est rempli
@@ -135,7 +114,6 @@ Invoquer le skill correspondant est **OBLIGATOIRE** dans chaque situation listee
 ### Automatiques (rien a invoquer)
 
 - **Hook auto-test** : pytest tourne apres chaque Edit/Write
-- **MCP MLflow** : outils disponibles automatiquement si le conteneur tourne
 
 ### Qualite & Coherence — a chaque modification
 

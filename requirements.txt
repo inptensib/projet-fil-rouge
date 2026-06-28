@@ -9,7 +9,6 @@ scikit-learn==1.8.0
 pandas==2.3.3
 polars==1.39.3
 numpy==2.4.2
-mlflow==3.10.0
 matplotlib==3.10.8
 seaborn==0.13.2
 tqdm==4.67.3

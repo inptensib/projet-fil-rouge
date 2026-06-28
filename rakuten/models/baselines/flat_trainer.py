@@ -29,7 +29,6 @@ from transformers import AutoTokenizer
 from rakuten.common.metrics import compute_all_metrics, compute_f1_by_tranche  # noqa: E402
 from rakuten.common.training_utils import (  # noqa: E402
     EarlyStopping,
-    MLflowSession,
     get_linear_schedule_with_warmup as _get_linear_schedule_with_warmup,
     make_hierarchical_loader,
     resolve_rebalancing,
@@ -74,7 +73,7 @@ class FlatHydraConfig:
         fp16: Enable AMP mixed precision.
         num_workers: DataLoader workers.
         save_dir: Model artefacts directory.
-        experiment_name: MLflow experiment name.
+        experiment_name: Experiment name label (no longer used).
         freeze_encoder: Freeze encoder weights.
         use_description: Concatenate the description to the designation.
         normalize_text: Loader-side option: normalize designation/description.
@@ -296,29 +295,6 @@ class FlatHydraTrainer:
         metrics["_confs_l2"] = all_confs_l2
         return metrics
 
-    def _setup_mlflow(self) -> MLflowSession:
-        """Open the optional MLflow run and log hyperparameters."""
-        db_path = Path(__file__).resolve().parents[3] / "mlflow.db"
-        session = MLflowSession(f"sqlite:///{db_path}", self.config.experiment_name)
-        session.start(params={
-            "encoder": self.config.encoder,
-            "pooling": self.config.pooling,
-            "project_embedding": self.config.project_embedding,
-            "dropout": self.config.dropout,
-            "batch_size": self.config.batch_size,
-            "epochs": self.config.epochs,
-            "lr": self.config.lr,
-            "warmup_ratio": self.config.warmup_ratio,
-            "use_focal": self.config.use_focal,
-            "level_weight_l1": self.config.level_weight_l1,
-            "num_classes_l1": self.num_classes_l1,
-            "num_classes_l2": self.num_classes_l2,
-            "class_weighting": self.config.class_weighting,
-            "logit_adjustment_tau": self.config.logit_adjustment_tau,
-            "fp16": self.fp16,
-        })
-        return session
-
     def _resume_from_checkpoint(self, history: dict) -> tuple[int, dict]:
         """Restore model/optimizer/scheduler/scaler state from checkpoint_latest.pt."""
         start_epoch = 0
@@ -368,60 +344,6 @@ class FlatHydraTrainer:
 
         return epoch_loss / max(n_batches, 1)
 
-    def _log_epoch_mlflow(
-        self, epoch: int, avg_loss: float, val_metrics: dict, history: dict
-    ) -> None:
-        """Log epoch metrics and figures to MLflow."""
-        if not self._mlflow.active:
-            return
-        try:
-            import matplotlib.pyplot as plt
-            from rakuten.common.metrics import (
-                compute_per_class_f1,
-                plot_confusion_matrix,
-                plot_per_class_f1,
-                plot_training_curves,
-            )
-            self._mlflow.log_metrics({
-                "train_loss": avg_loss,
-                "val_f1_l1_macro": val_metrics["f1_l1_macro"],
-                "val_f1_l2_macro": val_metrics["f1_l2_macro"],
-                "val_hcr": val_metrics.get("hcr", 0.0),
-                "val_constrained_f1_macro": val_metrics.get("constrained_f1_macro", 0.0),
-            }, step=epoch + 1)
-
-            v_labels_l1 = val_metrics["_labels_l1"]
-            v_preds_l1 = val_metrics["_preds_l1"]
-            v_labels_l2 = val_metrics["_labels_l2"]
-            v_preds_l2 = val_metrics["_preds_l2"]
-
-            if v_labels_l1:
-                fig = plot_confusion_matrix(
-                    v_labels_l1, v_preds_l1, self.l1_encoder,
-                    title=f"Confusion L1 — epoch {epoch + 1}",
-                )
-                self._mlflow.log_figure(fig, "confusion_matrix_l1.png")
-                plt.close(fig)
-
-                fig = plot_confusion_matrix(
-                    v_labels_l2, v_preds_l2, self.l2_encoder,
-                    title=f"Confusion L2 (top 50) — epoch {epoch + 1}",
-                    top_n=50,
-                )
-                self._mlflow.log_figure(fig, "confusion_matrix_l2.png")
-                plt.close(fig)
-
-                f1_pc = compute_per_class_f1(v_labels_l1, v_preds_l1, self.l1_encoder)
-                fig = plot_per_class_f1(f1_pc, f"F1 par classe L1 — epoch {epoch + 1}")
-                self._mlflow.log_figure(fig, "per_class_f1_l1.png")
-                plt.close(fig)
-
-            fig = plot_training_curves(history)
-            self._mlflow.log_figure(fig, "training_curves.png")
-            plt.close(fig)
-        except Exception as e:
-            print(f"  [MLflow] Artefacts failed ({e})")
-
     def _evaluate_and_checkpoint(
         self,
         val_loader: DataLoader,
@@ -454,11 +376,9 @@ class FlatHydraTrainer:
             f"{elapsed:.0f}s"
         )
 
-        # Persist metrics locally (fallback sans MLflow)
+        # Persist metrics locally
         with open(model_dir / "metrics.json", "w") as f:
             json.dump(history, f, indent=2)
-
-        self._log_epoch_mlflow(epoch, avg_loss, val_metrics, history)
 
         # Early stopping & checkpointing
         if self._early_stopping.update(val_f1_l2):
@@ -533,8 +453,6 @@ class FlatHydraTrainer:
             min_delta=self.config.early_stopping_min_delta,
         )
 
-        self._mlflow = self._setup_mlflow()
-
         start_epoch, history = self._resume_from_checkpoint(history)
 
         print(f"\n{'=' * 60}")
@@ -550,8 +468,6 @@ class FlatHydraTrainer:
                 val_loader, epoch, avg_loss, history, model_dir, start_time
             ):
                 break
-
-        self._mlflow.end()
 
         best_val_f1 = self._early_stopping.best
         (model_dir / "training_complete.txt").write_text(

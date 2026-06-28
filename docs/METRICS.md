@@ -104,7 +104,7 @@ the produced JSON contains the `_mode`, `_config` and `_date` metadata.
 
 ## Provenance of the Published Figures
 
-Each `results/` file consumed by `generate_comparison.py`:
+Each metrics file in `results/` and its source:
 
 | File                                 | Models                | Source                      | Mode  |
 |:--------------------------------------|:----------------------|:-----------------------------|:------|
@@ -116,19 +116,15 @@ Each `results/` file consumed by `generate_comparison.py`:
 | `hlpd/test_metrics.json`               | HLPD                   | Reported (best @ step 345k)  | native |
 | `baselines/baseline_results.json`      | TF-IDF, W2V, fastText  | Baseline scripts/notebooks   | base  |
 | `baselines/baseline_results_title.json`| Same, title-only       | Same                         | base  |
-| `<modele>/f1_per_class_l{1,2}.json`    | Per-class F1           | `generate_f1_per_class.py`   | base  |
-| `class_metadata.json`                  | Per-class support      | `build_class_metadata.py`    | —     |
 
 Particularities to be aware of:
 
 - JSON files marked with a `_source` or `_note` field were **curated by
   hand** afterwards (notably the mBERT one) — do not regenerate them without
   re-reading their header.
-- The metrics of the **standard title-only** HYDRA models come from MLflow
-  logging at the end of training (no dedicated evaluation JSON);
-  `generate_comparison.py` reads them directly from `mlflow.db`.
-- `mlflow.db` (repo root, git-ignored) contains the full history of the
-  runs — interface via `docker compose up mlflow -d`.
+- The **standard title-only** HYDRA models were only logged at training time
+  (no dedicated evaluation JSON); their figures live in the tables of
+  [`EXPERIMENTS.md`](EXPERIMENTS.md).
 
 ## Reproducing an Evaluation
 
@@ -150,11 +146,8 @@ only the JSON follows `--output-mode`.
 
 ## Evaluating a New Model
 
-1. **Check MLflow before training**: `search_best_runs("f1_l2_macro")`
-   to know the reference to beat (no duplicate run)
 1. **Systematically compare** against the TF-IDF baseline (L2 F1 = 42.8 %) and
    the best model (FlatHydra, L2 F1 = 71.7 %)
 1. **Check the HCR** in addition to the F1 — a hierarchical model must hold
    HCR > 95 %
-1. **Publish the right mode** (`--output-mode auto` makes the right choice) and
-   regenerate `results/comparison.html` via `generate_comparison.py`
+1. **Publish the right mode** (`--output-mode auto` makes the right choice).

@@ -35,8 +35,7 @@ Three model families are compared:
 
 The main metrics are `f1_l1_macro`, `f1_l2_macro` and the **HCR**
 (hierarchical consistency rate) — defined in `rakuten/common/metrics.py`
-and documented in [docs/METRICS.md](docs/METRICS.md). A comparison report can
-be regenerated with `scripts/generate_comparison.py` (→ `results/comparison.html`).
+and documented in [docs/METRICS.md](docs/METRICS.md).
 
 ## Prerequisites
 
@@ -162,8 +161,7 @@ python scripts/run_train.py \
 ```
 
 The hyperparameters come from the YAML (source of truth:
-`configs/hydra/default.yaml`). Run tracking is in MLflow
-(`mlflow.db` at the root, UI via `docker compose up mlflow -d`).
+`configs/hydra/default.yaml`).
 
 ## Working on the SLURM Cluster
 

@@ -6,10 +6,6 @@ models/*.pth
 models/*.safetensors
 *.pkl
 
-# MLflow runs
-mlruns/
-mlflow.db
-
 # Logs
 logs/
 slurm-*.out

@@ -19,16 +19,10 @@ and publish each model in the project.
 HF dataset (JSONL splits)
         |
         v
-   training      ----->  models*/...                (best_model.pt + checkpoint)
-        |                   |
-        v                   v
-   MLflow (mlflow.db)   evaluation  ----->  results/*.json   (test metrics)
-                            |
-                            v
-                  per-class F1  ----->  results/<modele>/f1_per_class_l*.json
-                            |
-                            v
-            generate_comparison.py  ----->  results/comparison.html
+   training      ----->  models*/...                     (best_model.pt + checkpoint)
+        |
+        v
+   evaluation    ----->  results/*/test_metrics.json     (test metrics)
 ```
 
 ## Model × Step Matrix
@@ -202,16 +196,10 @@ per task, `P100` (2×16 GB) and `3090` (2-4×24 GB) partitions.
 ## Report Generation
 
 ```bash
-# Global comparison page (reads mlflow.db + all results/*.json)
-python scripts/generate_comparison.py        # → results/comparison.html
-
 # Per-class F1 of an already-trained model
 python scripts/generate_f1_per_class.py \
     --split-dir "$DATA_DIR" --config configs/hydra/default.yaml \
     --variant local --results-dir hydra-local-camembert
-
-# Per-model HTML reports (confusion, curves)
-python scripts/generate_report.py
 
 # Class metadata (test support, L1 parent)
 python scripts/build_class_metadata.py --dataset-dir "$DATA_DIR"

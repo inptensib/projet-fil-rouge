@@ -1,7 +1,7 @@
 """Evaluation metrics and audit visualizations for hierarchical classification.
 
 Includes standard F1 scores, hierarchy-specific metrics inspired by
-the Fatos Torba thesis (HMTC evaluation protocol), and MLflow-ready
+the Fatos Torba thesis (HMTC evaluation protocol), plus
 plotting functions for model auditing.
 """
 
@@ -204,7 +204,7 @@ def compute_f1_by_tranche(
 
 
 # ---------------------------------------------------------------------------
-# Audit visualizations (MLflow-ready)
+# Audit visualizations
 # ---------------------------------------------------------------------------
 
 

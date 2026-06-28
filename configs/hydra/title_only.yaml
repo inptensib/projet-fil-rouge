@@ -5,7 +5,7 @@
 #   - use_description: false  (désactive la concat description)
 #   - max_length: 128         (les designations tiennent en < 80 tokens)
 #   - save_dir: models_title  (dossier dédié, n'écrase pas models/)
-#   - experiment_suffix: _title (MLflow experiment isolé)
+#   - experiment_suffix: _title (suffixe du nom de run / dossier)
 
 # --- Encoder ---
 encoder: camembert-base
