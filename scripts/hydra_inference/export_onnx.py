@@ -11,8 +11,8 @@ This is a DEV / build tool: it imports the ``rakuten`` package to load the
 checkpoint. The shipped inference (predict_onnx.py) needs only onnxruntime.
 
     python export_onnx.py \\
-        --ckpt ../../models_hierarchy/HYDRA_local_CamemBERT/best_model.pt \\
-        --out  ../../models_hierarchy/HYDRA_local_CamemBERT/hydra_local_v2.onnx
+        --ckpt ../../models/v2/HYDRA_local_CamemBERT/best_model.pt \\
+        --out  ../../models/v2/HYDRA_local_CamemBERT/hydra_local_v2.onnx
 """
 from __future__ import annotations
 

@@ -19,8 +19,8 @@ cd "$PROJECT_ROOT"
 export TRANSFORMERS_OFFLINE=1
 export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 
-CKPT="models/flat_hydra/checkpoint_latest.pt"
-COMPLETE="models/flat_hydra/training_complete.txt"
+CKPT="models/v1/flat_hydra/checkpoint_latest.pt"
+COMPLETE="models/v1/flat_hydra/training_complete.txt"
 
 if [ -f "$COMPLETE" ]; then
     echo "Training déjà terminé :"

@@ -132,14 +132,14 @@ by the evaluation scripts:
 
 | HF subfolder                        | Expected local path                           |
 |:------------------------------------|:----------------------------------------------|
-| `hydra-{variante}-camembert/`        | `models/HYDRA_{variante}_CamemBERT/`           |
-| `hydra-local-mbert/`                 | `models/HYDRA_local_mBERT/`                    |
-| `hydra-{v}-hierarchy-camembert/`     | `models_hierarchy/HYDRA_{v}_CamemBERT/`        |
-| `hydra-{v}-title-camembert/`         | `models_title/HYDRA_{v}_CamemBERT_title/`      |
-| `hydra-{v}-title-hierarchy-...`      | `models_title_hierarchy/HYDRA_{v}_..._title_hierarchy/` |
-| `flat-hydra/`, `flat-hydra-title/`   | `models/flat_hydra/`, `models/flat_hydra_title/` |
-| `hlpd/`                              | `models/hlpd/`                                 |
-| `baselines/{tfidf,word2vec,...}/`    | `models/baselines/{...}/`                      |
+| `hydra-{variante}-camembert/`        | `models/v1/HYDRA_{variante}_CamemBERT/`           |
+| `hydra-local-mbert/`                 | `models/v1/HYDRA_local_mBERT/`                    |
+| `hydra-{v}-hierarchy-camembert/`     | `models/v2/HYDRA_{v}_CamemBERT/`        |
+| `hydra-{v}-title-camembert/`         | `models/v1/title/HYDRA_{v}_CamemBERT_title/`      |
+| `hydra-{v}-title-hierarchy-...`      | `models/v1/title_hierarchy/HYDRA_{v}_..._title_hierarchy/` |
+| `flat-hydra/`, `flat-hydra-title/`   | `models/v1/flat_hydra/`, `models/v1/flat_hydra_title/` |
+| `hlpd/`                              | `models/v1/hlpd/`                                 |
+| `baselines/{tfidf,word2vec,...}/`    | `models/v1/baselines/{...}/`                      |
 
 Each folder contains `best_model.pt` (inference weights, ~440 MB) and
 `checkpoint_latest.pt` (full state with optimizer, to resume a training

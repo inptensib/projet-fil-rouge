@@ -44,7 +44,7 @@ from rakuten.common.metrics import compute_all_metrics, compute_per_class_f1
 N_JOBS      = int(os.environ.get("N_JOBS", 10))
 SEED        = 42
 DATASET_DIR = Path(os.environ.get("DATA_DIR", str(Path.home() / "fil_rouge" / "dataset")))
-SAVE_DIR    = Path("models/baselines/fasttext-softmax-title")
+SAVE_DIR    = Path("models/v1/baselines/fasttext-softmax-title")
 RESULTS_DIR = Path("results/baselines")
 SAVE_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)

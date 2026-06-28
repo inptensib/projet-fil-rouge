@@ -42,7 +42,7 @@ sbatch --job-name=flat-cam-v2 --array=0-9%1 scripts/slurm/run_flat_camembert_v2.
 # …or directly on a GPU box:
 python scripts/run_flat_hydra.py --split-dir "$DATA_DIR/" \
     --config configs/baselines/flat_hydra_camembert_v2.yaml
-# → models_v2/flat_hydra/best_model.pt
+# → models/v2/flat_hydra/best_model.pt
 ```
 
 ### HYDRA v2 — local / nested / global
@@ -54,7 +54,7 @@ done
 # …or directly (one variant at a time):
 python scripts/run_train.py --split-dir "$DATA_DIR/" \
     --config configs/hydra/hierarchy.yaml --variant local      # local | nested | global
-# → models_hierarchy/HYDRA_<variant>_CamemBERT/
+# → models/v2/HYDRA_<variant>_CamemBERT/
 ```
 
 ## 2. Re-test (re-run the evaluations)
@@ -62,12 +62,12 @@ python scripts/run_train.py --split-dir "$DATA_DIR/" \
 ```bash
 # CamemBERT Flat v2  → results/flat_hydra_v2/test_metrics.json
 sbatch --job-name=eval-cam-v2 scripts/slurm/run_eval_flat_hydra_generic.slurm
-#   (defaults point at models_v2/flat_hydra/best_model.pt on the v2 dataset —
+#   (defaults point at models/v2/flat_hydra/best_model.pt on the v2 dataset —
 #    see the header of that script to evaluate another checkpoint)
 
 # HYDRA v2 (3 variants, base + hierarchical mask) → console + JSON
 python scripts/eval_hierarchy.py --split-dir "$DATA_DIR/" \
-    --config configs/hydra/hierarchy.yaml --model-dir models_hierarchy --eval-batch-size 2048
+    --config configs/hydra/hierarchy.yaml --model-dir models/v2 --eval-batch-size 2048
 ```
 
 Every evaluation reports `f1_l1_macro`, `f1_l2_macro`, `constrained_f1` and `HCR`.

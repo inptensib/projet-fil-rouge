@@ -116,7 +116,7 @@ class HYDRATrainer:
         hidden_dim: int = 256,
         freeze_encoder: bool = False,
         check_hierarchy: bool = False,
-        save_dir: str = "models",
+        save_dir: str = "models/v1",
         seed: int = 42,
         warmup_ratio: float = 0.1,
         fp16: bool = True,

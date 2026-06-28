@@ -56,8 +56,8 @@ sbatch scripts/slurm/run_f1_perclass.slurm
 # Train — chain N arrays if > 36 h
 ./scripts/chain_submit_array.sh 3 configs/hydra/hierarchy.yaml
 
-# Evaluate (models are in models_hierarchy/)
-sbatch scripts/slurm/run_eval.slurm models_hierarchy
+# Evaluate (models are in models/v2/)
+sbatch scripts/slurm/run_eval.slurm models/v2
 
 # Per-class F1
 sbatch scripts/slurm/run_f1_perclass_hierarchy.slurm
@@ -105,7 +105,7 @@ sbatch --array=0-9%1 scripts/slurm/run_flat_mbert_v2.slurm
 sbatch scripts/slurm/run_eval_flat_hydra_generic.slurm
 # Example for mBERT v2:
 # sbatch --job-name=eval-mbert-v2 \
-#   --export=ALL,MODEL_PT=models_v2/flat_hydra_mbert/best_model.pt,\
+#   --export=ALL,MODEL_PT=models/v2/flat_hydra_mbert/best_model.pt,\
 #   EVAL_CONFIG=configs/baselines/flat_hydra_mbert_v2.yaml,\
 #   RESULTS_DIR=results/flat_hydra_mbert_v2 \
 #   scripts/slurm/run_eval_flat_hydra_generic.slurm
@@ -141,7 +141,7 @@ the other configs:
 |:-----------------------------|:-----:|:----------|:-------------------------------------------|
 | `default.yaml`               | 64    | 3.5e-5    | Reference (dropout 0.3, hidden 256)        |
 | `hierarchy.yaml`             | 128   | 5.0e-5    | `use_focal`, `condition_l2_on_l1`, mask    |
-| `title_only.yaml`            | 320   | 7.8e-5    | Title only, `save_dir: models_title`       |
+| `title_only.yaml`            | 320   | 7.8e-5    | Title only, `save_dir: models/v1/title`       |
 | `title_only_hierarchy.yaml`  | 640   | 1.12e-4   | Title + hierarchy                          |
 | `mbert_default.yaml`         | 64    | 3.5e-5    | mBERT encoder, rest identical              |
 

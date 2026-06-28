@@ -4,7 +4,7 @@
 # Complète la matrice 2×2 {CamemBERT, mBERT} × {v1, v2}.
 # batch_size 96 = IDENTIQUE au mBERT v1 (job 854034) → seule la donnée change,
 # comparaison v1↔v2 propre pour mBERT.
-# save_dir séparé pour ne pas écraser le mBERT v1 (models/flat_hydra_mbert).
+# save_dir séparé pour ne pas écraser le mBERT v1 (models/v1/flat_hydra_mbert).
 # ==============================================================================
 
 # --- Encoder ---
@@ -45,4 +45,4 @@ seed: 42
 
 # --- Hardware ---
 fp16: true
-save_dir: models_v2/flat_hydra_mbert
+save_dir: models/v2/flat_hydra_mbert

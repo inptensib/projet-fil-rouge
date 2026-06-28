@@ -11,7 +11,7 @@
 # Évalue HYDRA Local mBERT (best_model.pt) sur le test set.
 # Produit : results/hydra_eval_test_metrics_mbert.json
 #
-# Prérequis : models/HYDRA_local_mBERT/best_model.pt doit exister.
+# Prérequis : models/v1/HYDRA_local_mBERT/best_model.pt doit exister.
 #
 # Usage :
 #   sbatch scripts/run_eval_hydra_mbert.slurm

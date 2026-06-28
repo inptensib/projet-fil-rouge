@@ -9,7 +9,7 @@
 #SBATCH --error=slurm-f1-perclass-%j.err
 
 # Génère f1_per_class_l2.json pour les 3 variantes HYDRA (local/global/nested).
-# Charge models/HYDRA_{variant}_CamemBERT/best_model.pt, prédit sur le test set
+# Charge models/v1/HYDRA_{variant}_CamemBERT/best_model.pt, prédit sur le test set
 # (1,2M samples), sauvegarde dans results/hydra-{variant}-camembert/.
 #
 # Usage :

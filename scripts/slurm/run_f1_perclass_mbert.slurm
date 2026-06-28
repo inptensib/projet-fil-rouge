@@ -9,7 +9,7 @@
 #SBATCH --error=slurm-f1-perclass-mbert-%j.err
 
 # Génère f1_per_class_l1.json + f1_per_class_l2.json pour HYDRA Local mBERT.
-# Prérequis : models/HYDRA_local_mBERT/best_model.pt doit exister.
+# Prérequis : models/v1/HYDRA_local_mBERT/best_model.pt doit exister.
 #
 # Usage :
 #   sbatch scripts/run_f1_perclass_mbert.slurm

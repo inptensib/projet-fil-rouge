@@ -6,10 +6,10 @@ but inference needs only onnxruntime + the tokenizer + the label files (not the
 torch/transformers model stack) — lighter and faster to start, portable.
 
     # single
-    python predict_onnx.py --model-dir ../../models_v2/flat_hydra \\
+    python predict_onnx.py --model-dir ../../models/v2/flat_hydra \\
         --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
     # batch (JSONL in -> JSONL out)
-    python predict_onnx.py --model-dir ../../models_v2/flat_hydra \\
+    python predict_onnx.py --model-dir ../../models/v2/flat_hydra \\
         --input products.jsonl --output predictions.jsonl
 
 The ONNX file is produced by export_onnx.py (parity-checked against PyTorch).
@@ -95,7 +95,7 @@ class OnnxFlatClassifier:
 
 def main():
     ap = argparse.ArgumentParser(description="ONNX inference (CamemBERT Flat v2, sans torch).")
-    ap.add_argument("--model-dir", default="../../models_v2/flat_hydra")
+    ap.add_argument("--model-dir", default="../../models/v2/flat_hydra")
     ap.add_argument("--onnx", default=None, help="défaut : <model-dir>/flat_hydra_v2.onnx")
     ap.add_argument("--designation")
     ap.add_argument("--description", default="")

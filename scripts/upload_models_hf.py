@@ -35,24 +35,24 @@ UPLOAD_MAPPING = [
     (PROJECT_ROOT / "models" / "HYDRA_global_mBERT",            "hydra-global-mbert"),
     (PROJECT_ROOT / "models" / "HYDRA_nested_mBERT",            "hydra-nested-mbert"),
     # HYDRA hierarchy CamemBERT
-    (PROJECT_ROOT / "models_hierarchy" / "HYDRA_local_CamemBERT",   "hydra-local-hierarchy-camembert"),
-    (PROJECT_ROOT / "models_hierarchy" / "HYDRA_nested_CamemBERT",  "hydra-nested-hierarchy-camembert"),
-    (PROJECT_ROOT / "models_hierarchy" / "HYDRA_global_CamemBERT",  "hydra-global-hierarchy-camembert"),
+    (PROJECT_ROOT / "models/v2" / "HYDRA_local_CamemBERT",   "hydra-local-hierarchy-camembert"),
+    (PROJECT_ROOT / "models/v2" / "HYDRA_nested_CamemBERT",  "hydra-nested-hierarchy-camembert"),
+    (PROJECT_ROOT / "models/v2" / "HYDRA_global_CamemBERT",  "hydra-global-hierarchy-camembert"),
     # HYDRA title-only standard
-    (PROJECT_ROOT / "models_title" / "HYDRA_local_CamemBERT_title",  "hydra-local-title-camembert"),
-    (PROJECT_ROOT / "models_title" / "HYDRA_nested_CamemBERT_title", "hydra-nested-title-camembert"),
-    (PROJECT_ROOT / "models_title" / "HYDRA_global_CamemBERT_title", "hydra-global-title-camembert"),
+    (PROJECT_ROOT / "models/v1/title" / "HYDRA_local_CamemBERT_title",  "hydra-local-title-camembert"),
+    (PROJECT_ROOT / "models/v1/title" / "HYDRA_nested_CamemBERT_title", "hydra-nested-title-camembert"),
+    (PROJECT_ROOT / "models/v1/title" / "HYDRA_global_CamemBERT_title", "hydra-global-title-camembert"),
     # HYDRA title-only hierarchy
-    (PROJECT_ROOT / "models_title_hierarchy" / "HYDRA_local_CamemBERT_title_hierarchy",  "hydra-local-title-hierarchy-camembert"),
-    (PROJECT_ROOT / "models_title_hierarchy" / "HYDRA_nested_CamemBERT_title_hierarchy", "hydra-nested-title-hierarchy-camembert"),
-    (PROJECT_ROOT / "models_title_hierarchy" / "HYDRA_global_CamemBERT_title_hierarchy", "hydra-global-title-hierarchy-camembert"),
+    (PROJECT_ROOT / "models/v1/title_hierarchy" / "HYDRA_local_CamemBERT_title_hierarchy",  "hydra-local-title-hierarchy-camembert"),
+    (PROJECT_ROOT / "models/v1/title_hierarchy" / "HYDRA_nested_CamemBERT_title_hierarchy", "hydra-nested-title-hierarchy-camembert"),
+    (PROJECT_ROOT / "models/v1/title_hierarchy" / "HYDRA_global_CamemBERT_title_hierarchy", "hydra-global-title-hierarchy-camembert"),
     # FlatHydra
     (PROJECT_ROOT / "models" / "flat_hydra",       "flat-hydra"),
     (PROJECT_ROOT / "models" / "flat_hydra_title", "flat-hydra-title"),
     # FlatHydra mBERT + dataset v2 (entraînés post-restructure, méthode naïve)
     (PROJECT_ROOT / "models" / "flat_hydra_mbert",    "flat-hydra-mbert"),
-    (PROJECT_ROOT / "models_v2" / "flat_hydra",       "flat-hydra-camembert-v2"),
-    (PROJECT_ROOT / "models_v2" / "flat_hydra_mbert", "flat-hydra-mbert-v2"),
+    (PROJECT_ROOT / "models/v2" / "flat_hydra",       "flat-hydra-camembert-v2"),
+    (PROJECT_ROOT / "models/v2" / "flat_hydra_mbert", "flat-hydra-mbert-v2"),
     # HLPD
     (PROJECT_ROOT / "models" / "hlpd", "hlpd"),
     # Baselines
@@ -324,8 +324,8 @@ def delete_local(mapping: list) -> None:
         else:
             print(f"  [skip] Déjà absent : {path.relative_to(PROJECT_ROOT)}")
 
-    # Supprimer aussi les dossiers racines vides (models_hierarchy, models_title, etc.)
-    for root_dir in ["models_hierarchy", "models_title", "models_title_hierarchy"]:
+    # Supprimer aussi les dossiers racines vides (models/v2, models/v1/title, etc.)
+    for root_dir in ["models/v2", "models/v1/title", "models/v1/title_hierarchy"]:
         root_path = PROJECT_ROOT / root_dir
         if root_path.exists():
             remaining = list(root_path.iterdir())
@@ -333,7 +333,7 @@ def delete_local(mapping: list) -> None:
                 root_path.rmdir()
                 print(f"  ✓ Répertoire vide supprimé : {root_dir}/")
 
-    print("\nSuppression terminée. Vérifiez avec : du -sh models* models_hierarchy models_title*")
+    print("\nSuppression terminée. Vérifiez avec : du -sh models* models/v2 models/v1/title*")
 
 
 def main():

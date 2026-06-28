@@ -47,7 +47,7 @@ num_workers: 4
 pin_memory: true
 
 # --- Save ---
-save_dir: models/hlpd
+save_dir: models/v1/hlpd
 experiment_name: HLPD_CamemBERT
 
 # --- Reproducibility ---

@@ -17,7 +17,7 @@ Usage:
     python scripts/run_hlpd.py \\
         --split-dir /path/to/dataset/ \\
         --config configs/hlpd/hlpd_3090.yaml \\
-        --resume models/hlpd/checkpoint_latest.pt
+        --resume models/v1/hlpd/checkpoint_latest.pt
 """
 # NOTE : les configs YAML restent dans configs/hlpd/ (non migré).
 

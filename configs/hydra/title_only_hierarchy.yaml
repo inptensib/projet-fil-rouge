@@ -4,7 +4,7 @@
 # Identique à hierarchy.yaml sauf :
 #   - use_description: false         (designation seule)
 #   - max_length: 128                (titles seuls tiennent en < 80 tokens)
-#   - save_dir: models_title_hierarchy
+#   - save_dir: models/v1/title_hierarchy
 #   - experiment_suffix: _title_hierarchy
 
 # --- Encoder ---
@@ -51,7 +51,7 @@ pin_memory: true
 experiment_suffix: "_title_hierarchy"
 
 # --- Save ---
-save_dir: models_title_hierarchy
+save_dir: models/v1/title_hierarchy
 
 # --- Reproducibility ---
 seed: 42

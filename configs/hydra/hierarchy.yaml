@@ -4,7 +4,7 @@
 # Identique à default.yaml sauf :
 #   - condition_l2_on_l1: true  (teacher forcing pendant le training)
 #   - check_hierarchy: true     (enforce_hierarchy à l'inférence)
-#   - save_dir: models_hierarchy (séparer des modèles sans conditioning)
+#   - save_dir: models/v2 (séparer des modèles sans conditioning)
 
 # --- Encoder ---
 encoder: camembert-base
@@ -42,7 +42,7 @@ check_hierarchy: true
 condition_l2_on_l1: true
 
 # --- Save ---
-save_dir: models_hierarchy
+save_dir: models/v2
 
 # --- Data ---
 num_workers: 4

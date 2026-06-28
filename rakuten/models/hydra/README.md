@@ -38,10 +38,10 @@ Implémentation de **HYDRA** (Karl et al., EMNLP 2025) pour la classification hi
 
 | Config                      | Description |
 |-----------------------------|-------------|
-| `hierarchy.yaml`            | Conditioning hiérarchique L2\|L1 : teacher forcing au training, masque à l'inférence, `save_dir: models_hierarchy` |
+| `hierarchy.yaml`            | Conditioning hiérarchique L2\|L1 : teacher forcing au training, masque à l'inférence, `save_dir: models/v2` |
 | `mbert_default.yaml`        | Encodeur mBERT (`bert-base-multilingual-cased`), identique à `default.yaml` sinon |
-| `title_only.yaml`           | Designation seule (sans description), `max_length: 128`, `save_dir: models_title` |
-| `title_only_hierarchy.yaml` | Title-only + conditioning hiérarchique, `save_dir: models_title_hierarchy` |
+| `title_only.yaml`           | Designation seule (sans description), `max_length: 128`, `save_dir: models/v1/title` |
+| `title_only_hierarchy.yaml` | Title-only + conditioning hiérarchique, `save_dir: models/v1/title_hierarchy` |
 
 ## Usage
 

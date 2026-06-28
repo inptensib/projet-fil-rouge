@@ -10,7 +10,7 @@
 
 # Génère f1_per_class_l1.json et f1_per_class_l2.json pour les 3 variantes
 # HYDRA hierarchy (local/nested/global) avec masque hiérarchique actif.
-# Charge models_hierarchy/HYDRA_{variant}_CamemBERT/best_model.pt,
+# Charge models/v2/HYDRA_{variant}_CamemBERT/best_model.pt,
 # évalue sur le test set (1.2M samples), sauvegarde dans
 # results/hydra-{variant}-hierarchy-camembert/.
 #
@@ -43,7 +43,7 @@ echo "GPUs : $(python -c 'import torch; print(torch.cuda.device_count())')"
 python scripts/generate_f1_per_class.py \
     --split-dir "$DATA_DIR/" \
     --config configs/hydra/hierarchy.yaml \
-    --model-dir models_hierarchy \
+    --model-dir models/v2 \
     --results-tag hierarchy \
     --check-hierarchy \
     --batch-size 512 \

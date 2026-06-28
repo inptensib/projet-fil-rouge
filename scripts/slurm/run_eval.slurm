@@ -13,7 +13,7 @@
 #
 # Usage:
 #   sbatch scripts/run_eval.slurm                  # évalue models/ (ancienne approche)
-#   sbatch scripts/run_eval.slurm models_hierarchy # évalue models_hierarchy/
+#   sbatch scripts/run_eval.slurm models/v2 # évalue models/v2/
 
 # --- Chemins (surcharger via export avant sbatch si besoin) ---
 PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"

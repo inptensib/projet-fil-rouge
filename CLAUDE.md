@@ -61,7 +61,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
   - `check_hierarchy: true` — masque hierarchique a l'inference
   - `use_focal: true` — Perte asymetrique : L1 → CrossEntropy (stable, calibre pour le masque hierarchique),
     L2 → FocalLoss `-(1-p_t)^γ·log(p_t)`, `γ=2.0` (concentre le gradient sur les classes L2 rares)
-  - `save_dir: models_hierarchy`
+  - `save_dir: models/v2`
 - Tout default dans le code Python DOIT matcher le fichier YAML correspondant
 
 ## Structure du projet

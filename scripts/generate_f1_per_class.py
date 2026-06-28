@@ -13,7 +13,7 @@ Usage:
 
     # HYDRA CamemBERT hierarchy Title-only
     python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
-        --no-description --model-dir models_title_hierarchy \
+        --no-description --model-dir models/v1/title_hierarchy \
         --results-tag title-hier --check-hierarchy
 
     # HYDRA mBERT
@@ -195,7 +195,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=None,
                         help="Batch size pour l'évaluation (défaut: config YAML)")
     parser.add_argument("--model-dir", default="models",
-                        help="Répertoire racine des modèles (ex: 'models_hierarchy')")
+                        help="Répertoire racine des modèles (ex: 'models/v2')")
     parser.add_argument("--results-tag", default="",
                         help="Suffixe dossier résultats (ex: 'hierarchy' → hydra-local-hierarchy-camembert/)")
     parser.add_argument("--results-dir", default="",

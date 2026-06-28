@@ -4,7 +4,7 @@
 # Identique à default.yaml sauf :
 #   - use_description: false  (désactive la concat description)
 #   - max_length: 128         (les designations tiennent en < 80 tokens)
-#   - save_dir: models_title  (dossier dédié, n'écrase pas models/)
+#   - save_dir: models/v1/title  (dossier dédié, n'écrase pas models/)
 #   - experiment_suffix: _title (suffixe du nom de run / dossier)
 
 # --- Encoder ---
@@ -51,7 +51,7 @@ pin_memory: true
 experiment_suffix: "_title"
 
 # --- Save ---
-save_dir: models_title
+save_dir: models/v1/title
 
 # --- Reproducibility ---
 seed: 42

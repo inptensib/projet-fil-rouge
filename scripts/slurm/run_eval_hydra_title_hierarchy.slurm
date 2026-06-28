@@ -33,7 +33,7 @@ echo "GPU : $(python -c 'import torch; [print(f"  GPU {i}: {torch.cuda.get_devic
 python scripts/eval_hierarchy.py \
     --split-dir "$DATA_DIR/" \
     --config configs/hydra/title_only_hierarchy.yaml \
-    --model-dir models_title_hierarchy \
+    --model-dir models/v1/title_hierarchy \
     --model-suffix _title_hierarchy \
     --no-description \
     --eval-batch-size 1024 \

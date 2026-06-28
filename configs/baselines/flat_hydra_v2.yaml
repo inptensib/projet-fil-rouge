@@ -56,4 +56,4 @@ seed: 42
 
 # --- Hardware ---
 fp16: true
-save_dir: models_v2/flat_hydra
+save_dir: models/v2/flat_hydra

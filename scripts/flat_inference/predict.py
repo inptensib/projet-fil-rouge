@@ -191,7 +191,7 @@ class FlatClassifier:
 def main():
     ap = argparse.ArgumentParser(
         description="Classify Rakuten products into L1/L2 with CamemBERT Flat (v2).")
-    ap.add_argument("--model-dir", default="models_v2/flat_hydra",
+    ap.add_argument("--model-dir", default="models/v2/flat_hydra",
                     help="Folder with best_model.pt, tokenizer/, encoders, mapping.")
     ap.add_argument("--designation", help="Product title (single-item mode).")
     ap.add_argument("--description", default="", help="Product description (optional).")

@@ -7,7 +7,7 @@
 #   - batch_size: 512         (256 × 2 — mesuré ~11 GB/GPU sur RTX 3090)
 #     OOM à 1280 (640/GPU) : 23.21/23.56 GiB. DataParallel overhead GPU 0.
 #   - lr: 4.9e-5              (3.5e-5 × √2, √k scaling depuis batch=256)
-#   - save_dir: models/flat_hydra_title
+#   - save_dir: models/v1/flat_hydra_title
 #   - experiment_name: flat_hydra_title
 
 # --- Encoder ---
@@ -49,4 +49,4 @@ seed: 42
 
 # --- Hardware ---
 fp16: true
-save_dir: models/flat_hydra_title
+save_dir: models/v1/flat_hydra_title

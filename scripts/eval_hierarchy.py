@@ -206,7 +206,7 @@ def main():
     )
     parser.add_argument(
         "--model-dir", default="models",
-        help="Répertoire racine des modèles (ex: 'models' ou 'models_hierarchy').",
+        help="Répertoire racine des modèles (ex: 'models' ou 'models/v2').",
     )
     parser.add_argument(
         "--model-suffix", default="",

@@ -9,7 +9,7 @@
 
 # Éval TEST générique d'un modèle FlatHydra (best_model.pt) sur un dataset donné.
 # Paramétrable via variables d'environnement (passées par --export) :
-#   MODEL_PT      chemin du best_model.pt        (def: models_v2/flat_hydra/best_model.pt)
+#   MODEL_PT      chemin du best_model.pt        (def: models/v2/flat_hydra/best_model.pt)
 #   EVAL_CONFIG   yaml d'architecture du modèle  (def: configs/baselines/flat_hydra_camembert_v2.yaml)
 #   DATA_DIR      dossier des splits *_split.jsonl
 #   RESULTS_DIR   où écrire test_metrics.json
@@ -20,7 +20,7 @@
 #   sbatch --job-name=eval-cam-v2 scripts/run_eval_flat_hydra_generic.slurm
 #   # mBERT v1 (ancien dataset) :
 #   sbatch --job-name=eval-mbert-v1 --export=ALL,\
-#     MODEL_PT=models/flat_hydra_mbert/best_model.pt,\
+#     MODEL_PT=models/v1/flat_hydra_mbert/best_model.pt,\
 #     EVAL_CONFIG=configs/baselines/flat_hydra_mbert.yaml,\
 #     DATA_DIR=$HOME/fil_rouge/dataset,\
 #     RESULTS_DIR=results/flat_hydra_mbert \
@@ -30,7 +30,7 @@ PROJECT_ROOT="${PROJECT_ROOT:-$HOME/fil_rouge/rakuten-classification}"
 VENV_ACTIVATE="${VENV_ACTIVATE:-$HOME/fil_rouge/venv/bin/activate}"
 
 # Defaults (CamemBERT v2) — surchargés par --export
-export MODEL_PT="${MODEL_PT:-models_v2/flat_hydra/best_model.pt}"
+export MODEL_PT="${MODEL_PT:-models/v2/flat_hydra/best_model.pt}"
 export EVAL_CONFIG="${EVAL_CONFIG:-configs/baselines/flat_hydra_camembert_v2.yaml}"
 export DATA_DIR="${DATA_DIR:-$HOME/fil_rouge/dataset_v2/datasets_finaux}"
 export RESULTS_DIR="${RESULTS_DIR:-results/flat_hydra_v2}"

@@ -20,7 +20,7 @@ Usage:
     # Reprendre un training interrompu
     python scripts/run_flat_hydra.py \
         --data <chemin>/products.jsonl \
-        --resume models/flat_hydra_cpu/checkpoint_latest.pt
+        --resume models/v1/flat_hydra_cpu/checkpoint_latest.pt
 """
 
 from __future__ import annotations

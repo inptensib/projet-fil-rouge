@@ -38,7 +38,7 @@ from rakuten.common.data_loader import prepare_hierarchical_data_from_splits
 from rakuten.models.baselines.flat_trainer import FlatHydraConfig, FlatHydraTrainer
 
 CONFIG   = "configs/baselines/flat_hydra_3090.yaml"
-MODEL_PT = "models/flat_hydra/best_model.pt"
+MODEL_PT = "models/v1/flat_hydra/best_model.pt"
 SPLIT_DIR = Path(os.environ.get("DATA_DIR", str(Path.home() / "fil_rouge" / "dataset")))
 RESULTS_DIR = Path("results/flat_hydra")
 RESULTS_DIR.mkdir(parents=True, exist_ok=True)

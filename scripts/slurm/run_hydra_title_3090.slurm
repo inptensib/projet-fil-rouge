@@ -34,7 +34,7 @@ export PYTHONPATH=""
 VARIANT="${1:?Erreur : variante manquante. Usage: sbatch ... run_hydra_title_3090.slurm <local|global|nested>}"
 CONFIG="configs/hydra/title_only.yaml"
 
-SAVE_DIR=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models_title'))" 2>/dev/null || echo "models_title")
+SAVE_DIR=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/v1/title'))" 2>/dev/null || echo "models/v1/title")
 SUFFIX=$(python3 -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('experiment_suffix', ''))" 2>/dev/null || echo "_title")
 MODEL_DIR="${SAVE_DIR}/HYDRA_${VARIANT}_CamemBERT${SUFFIX}"
 CKPT="${MODEL_DIR}/checkpoint_latest.pt"

@@ -6,8 +6,8 @@ the unified logits (157 L1 + 5 775 L2). The graph runs with onnxruntime WITHOUT
 torch/transformers — only the tokenizer and the label files are still needed
 alongside (they are pre/post-processing, not part of the net). See predict_onnx.py.
 
-    python export_onnx.py --model-dir ../../models_v2/flat_hydra \\
-        --out ../../models_v2/flat_hydra/flat_hydra_v2.onnx
+    python export_onnx.py --model-dir ../../models/v2/flat_hydra \\
+        --out ../../models/v2/flat_hydra/flat_hydra_v2.onnx
 
 Dynamic axes: batch and sequence length are both flexible.
 """
@@ -95,8 +95,8 @@ def validate(clf, onnx_path, tol=1e-2):
 
 def main():
     ap = argparse.ArgumentParser(description="Export Flat v2 to ONNX + parity check.")
-    ap.add_argument("--model-dir", default="../../models_v2/flat_hydra")
-    ap.add_argument("--out", default="../../models_v2/flat_hydra/flat_hydra_v2.onnx")
+    ap.add_argument("--model-dir", default="../../models/v2/flat_hydra")
+    ap.add_argument("--out", default="../../models/v2/flat_hydra/flat_hydra_v2.onnx")
     ap.add_argument("--opset", type=int, default=17)
     args = ap.parse_args()
 

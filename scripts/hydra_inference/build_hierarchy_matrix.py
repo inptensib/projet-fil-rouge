@@ -9,7 +9,7 @@ the indices match the model heads). Saves ``parent_child_matrix_v2.npy``
 
     python build_hierarchy_matrix.py \\
         --ds ~/fil_rouge/dataset_v2/datasets_finaux \\
-        --encoders ../../models_v2/flat_hydra \\
+        --encoders ../../models/v2/flat_hydra \\
         --out parent_child_matrix_v2.npy
 """
 import argparse
@@ -23,7 +23,7 @@ import numpy as np
 def main():
     ap = argparse.ArgumentParser(description="Build multi-parent L1->L2 matrix for HYDRA masking.")
     ap.add_argument("--ds", default=os.path.expanduser("~/fil_rouge/dataset_v2/datasets_finaux"))
-    ap.add_argument("--encoders", default="../../models_v2/flat_hydra")
+    ap.add_argument("--encoders", default="../../models/v2/flat_hydra")
     ap.add_argument("--out", default="parent_child_matrix_v2.npy")
     args = ap.parse_args()
 

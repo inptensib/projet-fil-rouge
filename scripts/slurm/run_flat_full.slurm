@@ -29,7 +29,7 @@ export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
 export PYTHONPATH=""
 
 CONFIG="configs/baselines/flat_hydra_full.yaml"
-SAVE_DIR=$(python -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/flat_hydra'))" 2>/dev/null || echo "models/flat_hydra")
+SAVE_DIR=$(python -c "import yaml; print(yaml.safe_load(open('$CONFIG')).get('save_dir', 'models/v1/flat_hydra'))" 2>/dev/null || echo "models/v1/flat_hydra")
 CKPT="${SAVE_DIR}/checkpoint_latest.pt"
 COMPLETE="${SAVE_DIR}/training_complete.txt"
 

@@ -22,7 +22,7 @@ echo "=== Node: $(hostname) | $(date) ==="
 python scripts/eval_hierarchy.py \
     --split-dir dataset/ \
     --config configs/hydra/hierarchy.yaml \
-    --model-dir models_hierarchy \
+    --model-dir models/v2 \
     --eval-batch-size 2048 \
     --output-mode hier \
     --output-json results/hydra_hierarchy_v2_metrics.json

@@ -132,8 +132,8 @@ Particularities to be aware of:
 # HYDRA standard (3 variants, both modes shown in the console)
 sbatch scripts/slurm/run_eval.slurm
 
-# HYDRA hierarchy (models in models_hierarchy/)
-sbatch scripts/slurm/run_eval.slurm models_hierarchy
+# HYDRA hierarchy (models in models/v2/)
+sbatch scripts/slurm/run_eval.slurm models/v2
 
 # A single variant, locally with GPU
 python scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
