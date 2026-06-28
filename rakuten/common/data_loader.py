@@ -517,27 +517,6 @@ def build_parent_child_mapping(
     return l2_to_l1
 
 
-def build_parent_child_matrix(
-    l2_to_l1_mapping: dict[int, int],
-    num_l1_classes: int,
-    num_l2_classes: int,
-) -> torch.Tensor:
-    """Build a binary matrix [num_l1, num_l2] indicating valid parent-child pairs.
-
-    Args:
-        l2_to_l1_mapping: Mapping from L2 index to L1 index.
-        num_l1_classes: Number of L1 classes.
-        num_l2_classes: Number of L2 classes.
-
-    Returns:
-        Binary tensor of shape (num_l1_classes, num_l2_classes).
-    """
-    matrix = torch.zeros(num_l1_classes, num_l2_classes)
-    for l2_idx, l1_idx in l2_to_l1_mapping.items():
-        matrix[l1_idx, l2_idx] = 1.0
-    return matrix
-
-
 def build_parent_child_matrix_from_labels(
     level_1_labels, level_2_labels, num_l1_classes: int, num_l2_classes: int
 ) -> torch.Tensor:

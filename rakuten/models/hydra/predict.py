@@ -8,33 +8,10 @@ from __future__ import annotations
 
 import torch
 import torch.nn.functional as F
-from torch.amp import autocast
-from torch.utils.data import DataLoader, Dataset
 
 from rakuten.common.utils import ENCODERS, enforce_hierarchy
 
 from .models import create_hydra_model
-
-
-class _TextDataset(Dataset):
-    """Simple dataset for batch inference."""
-
-    def __init__(self, texts: list[str], tokenizer, max_length: int = 256):
-        self.texts = texts
-        self.tokenizer = tokenizer
-        self.max_length = max_length
-
-    def __len__(self):
-        return len(self.texts)
-
-    def __getitem__(self, idx):
-        return self.tokenizer(
-            self.texts[idx],
-            truncation=True,
-            max_length=self.max_length,
-            padding="max_length",
-            return_tensors="pt",
-        )
 
 
 def load_model(model_path: str, device: torch.device = None):
@@ -128,71 +105,3 @@ def predict(
             "confidence": conf_l2.item(),
         },
     }
-
-
-def predict_batch(
-    texts: list[str],
-    model: torch.nn.Module,
-    tokenizer,
-    l1_encoder,
-    l2_encoder,
-    device: torch.device,
-    max_length: int = 256,
-    batch_size: int = 64,
-    parent_child_matrix: torch.Tensor | None = None,
-) -> list[dict]:
-    """Run inference on a batch of texts using DataLoader.
-
-    Args:
-        texts: List of product description texts.
-        model: Trained HYDRA model.
-        tokenizer: HuggingFace tokenizer.
-        l1_encoder: Fitted LabelEncoder for L1.
-        l2_encoder: Fitted LabelEncoder for L2.
-        device: Computation device.
-        max_length: Maximum token length.
-        batch_size: Batch size for inference.
-        parent_child_matrix: Optional parent-child matrix for hierarchy enforcement.
-
-    Returns:
-        List of prediction dictionaries.
-    """
-    dataset = _TextDataset(texts, tokenizer, max_length)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
-
-    all_results = []
-    model.eval()
-
-    use_amp = device.type == "cuda"
-
-    with torch.no_grad():
-        for batch in loader:
-            input_ids = batch["input_ids"].squeeze(1).to(device)
-            attention_mask = batch["attention_mask"].squeeze(1).to(device)
-
-            with autocast("cuda", enabled=use_amp):
-                level_outputs, _ = model(input_ids, attention_mask)
-            logits_l1, logits_l2 = level_outputs
-
-            if parent_child_matrix is not None:
-                logits_l2 = enforce_hierarchy(logits_l1, logits_l2, parent_child_matrix)
-
-            probs_l1 = F.softmax(logits_l1, dim=-1)
-            probs_l2 = F.softmax(logits_l2, dim=-1)
-
-            confs_l1, preds_l1 = torch.max(probs_l1, dim=-1)
-            confs_l2, preds_l2 = torch.max(probs_l2, dim=-1)
-
-            for i in range(input_ids.size(0)):
-                all_results.append({
-                    "level_1": {
-                        "label": l1_encoder.inverse_transform([preds_l1[i].item()])[0],
-                        "confidence": confs_l1[i].item(),
-                    },
-                    "level_2": {
-                        "label": l2_encoder.inverse_transform([preds_l2[i].item()])[0],
-                        "confidence": confs_l2[i].item(),
-                    },
-                })
-
-    return all_results

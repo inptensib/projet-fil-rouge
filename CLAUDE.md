@@ -68,7 +68,7 @@ Ne pas sauter d'etape. Chaque etape a un skill dedie.
 
 ```
 rakuten/               Package Python installable (pip install -e .)
-  common/              data_loader.py, metrics.py, training_utils.py, text_normalization.py, explainability.py, utils.py
+  common/              data_loader.py, metrics.py, training_utils.py, text_normalization.py, utils.py
   models/baselines/    tfidf_pipeline.py, word2vec_pipeline.py, bert_flat_classifier.py, flat_model.py, flat_trainer.py
   models/hydra/        models.py, losses.py, trainer.py, predict.py, config.py
   models/hlpd/         HLPD (decodeur hierarchique — Mehdi Aithamma)

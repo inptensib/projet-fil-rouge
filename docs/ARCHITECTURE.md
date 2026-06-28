@@ -85,7 +85,6 @@ rakuten-classification/
 │   │   ├── metrics.py          # f1_l1_macro, f1_l2_macro, HCR, constrained_f1
 │   │   ├── training_utils.py   # EarlyStopping, compute_class_weights
 │   │   ├── text_normalization.py
-│   │   ├── explainability.py   # token attributions (Gradient × Input) → HTML
 │   │   └── utils.py
 │   └── models/
 │       ├── baselines/          # TF-IDF, Word2Vec, BERT-flat, FlatHydra

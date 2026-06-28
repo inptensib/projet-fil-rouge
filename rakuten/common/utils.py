@@ -61,17 +61,3 @@ def enforce_hierarchy(
     masked = logits_l2.clone()
     masked[valid_l2_mask == 0] = float("-inf")
     return masked
-
-
-def count_parameters(model: torch.nn.Module) -> dict[str, int]:
-    """Count total and trainable parameters in a model.
-
-    Args:
-        model: PyTorch model.
-
-    Returns:
-        Dictionary with 'total' and 'trainable' parameter counts.
-    """
-    total = sum(p.numel() for p in model.parameters())
-    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    return {"total": total, "trainable": trainable}
