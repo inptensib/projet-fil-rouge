@@ -24,8 +24,7 @@ _SKIP_ANYWHERE = {
 # Weights / data / runs / slides — skipped only at the repo ROOT, so that the
 # source tree `rakuten/models/` is NOT excluded by the top-level `models/`.
 _SKIP_TOPLEVEL = {
-    "models", "dataset",
-    "presentation_finale", "rakuten_classification.egg-info",
+    "models", "dataset", "rakuten_classification.egg-info",
 }
 
 

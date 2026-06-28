@@ -120,9 +120,6 @@ results/**/per_class_f1_*.json
 results/class_metadata.json
 *.onnx
 
-# Présentations / slides (binaires, hors dépôt)
-presentation_finale/
-
 # Clés de service Google — ne jamais committer
 *service-account*.json
 gcp_sa_key.json
