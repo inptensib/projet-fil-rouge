@@ -85,9 +85,10 @@ rakuten-classification/
 │   │   ├── metrics.py          # f1_l1_macro, f1_l2_macro, HCR, constrained_f1
 │   │   ├── training_utils.py   # EarlyStopping, compute_class_weights
 │   │   ├── text_normalization.py
+│   │   ├── explainability.py   # token attributions (Gradient × Input) → HTML
 │   │   └── utils.py
 │   └── models/
-│       ├── baselines/          # TF-IDF, Word2Vec, fastText, FlatHydra
+│       ├── baselines/          # TF-IDF, Word2Vec, BERT-flat, FlatHydra
 │       ├── hydra/              # HYDRA (EMNLP 2025): models, losses, trainer, config
 │       └── hlpd/               # HLPD (ECIR 2025): models, losses, attention_bias, trainer
 ├── configs/                    # YAML outside the package (not imported in Python)

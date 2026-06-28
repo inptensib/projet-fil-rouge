@@ -203,8 +203,8 @@ The complete "which script for which model" matrix is in
 
 ```text
 rakuten/                Installable Python package (pip install -e .)
-  common/               data_loader, metrics, training_utils, utilities
-  models/baselines/     TF-IDF, Word2Vec, fastText, FlatHydra
+  common/               data_loader, metrics, training_utils, text_normalization, explainability, utils
+  models/baselines/     TF-IDF, Word2Vec, BERT-flat, FlatHydra
   models/hydra/         HYDRA (EMNLP 2025): models, losses, trainer, config
   models/hlpd/          HLPD (ECIR 2025) — Mehdi Aithamma
 configs/hydra/          default.yaml, hierarchy.yaml, title_only*.yaml, mbert_default.yaml
