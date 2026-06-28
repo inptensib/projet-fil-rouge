@@ -35,8 +35,8 @@ Three model families are compared:
 
 The main metrics are `f1_l1_macro`, `f1_l2_macro` and the **HCR**
 (hierarchical consistency rate) — defined in `rakuten/common/metrics.py`
-and documented in [docs/METRICS.md](docs/METRICS.md). The comparison
-deliverable is `results/comparison.html`.
+and documented in [docs/METRICS.md](docs/METRICS.md). A comparison report can
+be regenerated with `scripts/generate_comparison.py` (→ `results/comparison.html`).
 
 ## Prerequisites
 
@@ -216,7 +216,7 @@ scripts/                Python CLI (root); SLURM jobs in scripts/slurm/ (see doc
 notebooks/eda/          Exploratory data analysis
 notebooks/baselines/    fastText, TF-IDF, Word2Vec (notebooks)
 tests/                  312 pytest tests (no data, no GPU)
-results/                JSON metrics, HTML reports, comparison.html
+results/                JSON metrics (HTML/PNG reports regenerated, gitignored)
 docs/                   ARCHITECTURE.md, PIPELINE.md, METRICS.md
 hybrid_system/          Separate contribution (CamemBERT + XGBoost)
 ```

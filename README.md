@@ -176,7 +176,8 @@ The whole chain runs **without an LLM** for testing (`RAKUTEN_LLM_OFFLINE=1`); s
 ## Quick Start
 
 > **New here?** [ONBOARDING.md](ONBOARDING.md) covers install, data/model access,
-> first run and SLURM; [docs/PIPELINE.md](docs/PIPELINE.md) is the script × model matrix.
+> first run and SLURM; [docs/PIPELINE.md](docs/PIPELINE.md) is the script × model
+> matrix. **To re-train or re-test the delivered models → [REPRODUCE.md](REPRODUCE.md).**
 
 ```bash
 # Install (CPU or another CUDA: install torch first — see requirements.txt)

@@ -174,6 +174,6 @@ Everywhere, title only remains below full text — the description provides sign
 
 - HYDRA / FlatHydra evaluations: see [`PIPELINE.md`](PIPELINE.md) (model ×
   command matrix) and [`METRICS.md`](METRICS.md) (modes, provenance).
-- Comparative HTML report: `results/comparison.html`
-  (`scripts/generate_comparison.py`).
+- Comparative HTML report: regenerate with `scripts/generate_comparison.py`
+  (→ `results/comparison.html`; not committed — regenerable artifact).
 - Full run history: `mlflow.db` (`docker compose up mlflow -d`).

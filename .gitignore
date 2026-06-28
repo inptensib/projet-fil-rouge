@@ -113,6 +113,17 @@ logs_*.out
 
 # Résultats générés par les notebooks baselines
 notebooks/baselines/results/
+
+# results/ — ne suivre que les JSON de métriques (test_metrics, hydra_eval_*,
+# baseline_results) ; rapports HTML, plots PNG, F1 par-classe et class_metadata
+# sont régénérables (generate_comparison.py / generate_report.py / build_class_metadata.py)
+results/*.html
+results/**/*.html
+results/*.png
+results/**/*.png
+results/**/f1_per_class_*.json
+results/**/per_class_f1_*.json
+results/class_metadata.json
 /models_v2/
 /models_hierarchy/
 *.onnx
