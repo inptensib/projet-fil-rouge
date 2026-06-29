@@ -1,0 +1,131 @@
+# ==============================================================================
+# Python
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.o
+*.eggs/
+*.egg-info/
+*.egg
+dist/
+build/
+*.manifest
+*.spec
+
+# ==============================================================================
+# Virtual environments
+# ==============================================================================
+venv/
+.venv/
+env/
+ENV/
+
+# ==============================================================================
+# IDE / Editor
+# ==============================================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ==============================================================================
+# Data (large files, not tracked)
+# ==============================================================================
+*.pkl
+*.pickle
+shards/
+# Dossier de données téléchargé localement (racine uniquement, ancré)
+/dataset/
+# Bundle de livraison téléchargé localement (ONNX + dataset v2, ~9 Go)
+/rakuten-delivery/
+
+# ==============================================================================
+# Models (weights only -- code IS tracked)
+# ==============================================================================
+/models/
+*.pt
+*.pth
+*.safetensors
+*.bin
+
+# ==============================================================================
+# Jupyter
+# ==============================================================================
+.ipynb_checkpoints/
+*_executed.ipynb
+results/baselines/*.html
+
+# ==============================================================================
+# Node
+# ==============================================================================
+node_modules/
+package-lock.json
+
+# ==============================================================================
+# SLURM
+# ==============================================================================
+slurm-*.out
+slurm-*.err
+.nfs*
+
+# ==============================================================================
+# OS
+# ==============================================================================
+.DS_Store
+Thumbs.db
+
+# ==============================================================================
+# Logs
+# ==============================================================================
+logs/
+*.log
+
+# ==============================================================================
+# Environment files
+# ==============================================================================
+.env
+.env.*
+
+# ==============================================================================
+# DDP (Distributed Data Parallel)
+# ==============================================================================
+rendez_vous*
+.ddp_config
+
+# ==============================================================================
+# Compiled
+# ==============================================================================
+*.so
+*.o
+!/models/.gitkeep
+
+# Logs d'exécution locaux (machines lame, GPU directs)
+logs_*.out
+
+# Résultats générés par les notebooks baselines
+notebooks/baselines/results/
+
+# results/ — ne suivre que les JSON de métriques (test_metrics, hydra_eval_*,
+# baseline_results) ; rapports HTML, plots PNG, F1 par-classe et class_metadata
+# sont régénérables (generate_comparison.py / generate_report.py / build_class_metadata.py)
+results/*.html
+results/**/*.html
+results/*.png
+results/**/*.png
+results/**/f1_per_class_*.json
+results/**/per_class_f1_*.json
+results/class_metadata.json
+*.onnx
+
+# Clés de service Google — ne jamais committer
+*service-account*.json
+gcp_sa_key.json
+
+# Outillage IA local (hors dépôt transmis)
+.claude/
+CLAUDE.md
+.mcp.json
+docs/superpowers/

@@ -1,0 +1,7 @@
+torch>=2.0             # PyTorch inference (predict.py) + ONNX export (export_onnx.py)
+transformers>=4.40
+scikit-learn>=1.3      # only to read the label-encoder pickles
+huggingface_hub>=0.23  # only for download_weights.py
+numpy>=1.24
+onnxruntime>=1.17      # ONNX inference (predict_onnx.py) — no torch needed at runtime
+onnx>=1.15             # only for ONNX export (export_onnx.py)

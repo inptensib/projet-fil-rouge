@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rakuten-classification"
+version = "0.1.0"
+description = "Hierarchical classification of Rakuten products (HYDRA + FlatHydra)"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+include = ["rakuten*"]
+
+[project.optional-dependencies]
+dev = ["ruff", "pytest"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "F",     # Pyflakes (unused imports, undefined names)
+    "E",     # PEP 8 style
+    "W",     # PEP 8 warnings
+    "I",     # isort (import ordering)
+]
+ignore = [
+    "E501",  # Line too long (handled by formatter, not blocker)
+    "E731",  # Lambda assignment (common in ML code)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F401"]           # Unused imports OK in tests (fixtures)
+"__init__.py" = ["F401"]       # Re-exports in __init__.py
+
+[tool.ruff.lint.isort]
+known-first-party = ["rakuten"]

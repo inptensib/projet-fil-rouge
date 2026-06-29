@@ -1,0 +1,29 @@
+{
+  "_mode": "hier",
+  "_config": "configs/hydra/hierarchy.yaml",
+  "_date": "2026-06-25",
+  "local": {
+    "f1_l1_macro": 0.9259909262400695,
+    "f1_l2_macro": 0.7738373062702391,
+    "hcr": 0.870351752904906,
+    "hcr_multiparent": 1.0,
+    "constrained_f1_macro": 0.7930788433582338,
+    "eval_time_s": 319.2
+  },
+  "nested": {
+    "f1_l1_macro": 0.9258523187579951,
+    "f1_l2_macro": 0.7640600437980072,
+    "hcr": 0.8702303750909287,
+    "hcr_multiparent": 1.0,
+    "constrained_f1_macro": 0.7856008721268285,
+    "eval_time_s": 319.8
+  },
+  "global": {
+    "f1_l1_macro": 0.9291327645676498,
+    "f1_l2_macro": 0.772864487305294,
+    "hcr": 0.8699005622722596,
+    "hcr_multiparent": 0.9999991629116277,
+    "constrained_f1_macro": 0.7916908230344766,
+    "eval_time_s": 319.9
+  }
+}

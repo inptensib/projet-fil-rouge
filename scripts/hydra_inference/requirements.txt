@@ -1,0 +1,8 @@
+# Inference (predict_onnx.py) — no torch needed at runtime:
+onnxruntime>=1.17
+transformers>=4.40     # tokenizer only (reused from the Flat v2 bundle)
+scikit-learn>=1.3      # to read the label-encoder pickles (reused from Flat v2)
+numpy>=1.24
+# Export (export_onnx.py) additionally needs: torch>=2.0, onnx>=1.15 and the
+# installed `rakuten` package (pip install -e .).
+# build_hierarchy_matrix.py needs numpy + the v2 dataset splits.
