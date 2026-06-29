@@ -13,8 +13,8 @@ choisit selon la config pour éviter de mélanger les deux familles de chiffres
 (cf. docs/METRICS.md, incident mBERT).
 
 Usage:
-    python scripts/eval_hierarchy.py --split-dir /path/to/splits
-    python scripts/eval_hierarchy.py --split-dir /path/to/splits --variant local
+    python3 scripts/eval_hierarchy.py --split-dir /path/to/splits
+    python3 scripts/eval_hierarchy.py --split-dir /path/to/splits --variant local
 """
 from __future__ import annotations
 

@@ -5,26 +5,26 @@ le F1 per-class L1 et L2 en JSON dans results/{model_dir}/.
 
 Usage:
     # HYDRA CamemBERT Title+Description (standard)
-    python scripts/generate_f1_per_class.py --split-dir /path/to/splits
+    python3 scripts/generate_f1_per_class.py --split-dir /path/to/splits
 
     # HYDRA CamemBERT Title-only
-    python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
+    python3 scripts/generate_f1_per_class.py --split-dir /path/to/splits \
         --no-description --results-tag title
 
     # HYDRA CamemBERT hierarchy Title-only
-    python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
+    python3 scripts/generate_f1_per_class.py --split-dir /path/to/splits \
         --no-description --model-dir models/v1/title_hierarchy \
         --results-tag title-hier --check-hierarchy
 
     # HYDRA mBERT
-    python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
+    python3 scripts/generate_f1_per_class.py --split-dir /path/to/splits \
         --config configs/hydra/mbert_default.yaml --results-tag ''
 
     # FlatHydra Title+Description
-    python scripts/generate_f1_per_class.py --split-dir /path/to/splits --flat-hydra
+    python3 scripts/generate_f1_per_class.py --split-dir /path/to/splits --flat-hydra
 
     # FlatHydra Title-only
-    python scripts/generate_f1_per_class.py --split-dir /path/to/splits \
+    python3 scripts/generate_f1_per_class.py --split-dir /path/to/splits \
         --flat-hydra --no-description
 """
 from __future__ import annotations

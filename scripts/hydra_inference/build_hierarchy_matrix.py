@@ -7,7 +7,7 @@ child of several L1). Reuses the Flat v2 label encoders (same v2 label space, so
 the indices match the model heads). Saves ``parent_child_matrix_v2.npy``
 (uint8, 157x5775, ~900 KB) — needed by predict_onnx.py for the hierarchical mask.
 
-    python build_hierarchy_matrix.py \\
+    python3 build_hierarchy_matrix.py \\
         --ds ~/fil_rouge/dataset_v2/datasets_finaux \\
         --encoders ../../models/v2/flat_hydra \\
         --out parent_child_matrix_v2.npy

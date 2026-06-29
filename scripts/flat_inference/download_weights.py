@@ -2,7 +2,7 @@
 """Download the retained Flat v2 model from the Hugging Face Hub.
 
     export HF_TOKEN=hf_...                  # the model repo is private
-    python download_weights.py [target_dir]   # default: current directory
+    python3 download_weights.py [target_dir]   # default: current directory
 
 Fetches the ``flat-hydra-camembert-v2/`` folder (~497 MB: best_model.pt,
 tokenizer/, label encoders, mapping, config) from the model repo and prints the

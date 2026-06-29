@@ -9,8 +9,8 @@
 # Utilisation :
 #   pip install huggingface_hub
 #   export HF_TOKEN="hf_..."                    # token read-only fourni par Tahiana
-#   python scripts/download_dataset.py          # v2 -> <repo>/dataset/
-#   python scripts/download_dataset.py --old    # v1 -> <repo>/dataset/old/
+#   python3 scripts/download_dataset.py          # v2 -> <repo>/dataset/
+#   python3 scripts/download_dataset.py --old    # v1 -> <repo>/dataset/old/
 
 import argparse
 import os

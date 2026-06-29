@@ -5,7 +5,7 @@ pipeline. Everything below is the **actual output of the offline demo**, so it i
 reproducible right now with no API key:
 
 ```bash
-python sample/make_sample.py sample/demo_ds                 # write a mini datasets_finaux/
+python3 sample/make_sample.py sample/demo_ds                 # write a mini datasets_finaux/
 export RAKUTEN_LLM_OFFLINE=1
 export RAKUTEN_DS=sample/demo_ds
 export RAKUTEN_OUT=sample/out

@@ -178,15 +178,15 @@ The whole chain runs **without an LLM** for testing (`RAKUTEN_LLM_OFFLINE=1`); s
 ```bash
 # Install (CPU or another CUDA: install torch first — see requirements.txt)
 git clone <repo-url> && cd rakuten-classification
-python -m venv venv && source venv/bin/activate && pip install -e .
+python3 -m venv venv && source venv/bin/activate && pip install -e .
 
 # Verify — no data or GPU needed
-python -m pytest tests/ -q                     # syntax + import smoke tests pass
+python3 -m pytest tests/ -q                     # syntax + import smoke tests pass
 
 # Download data + local smoke test (HF token required — see below)
 export HF_TOKEN="hf_..."
-python scripts/download_dataset.py
-python scripts/run_train.py --split-dir dataset/ --n-samples 5000 --config configs/hydra/default.yaml
+python3 scripts/download_dataset.py
+python3 scripts/run_train.py --split-dir dataset/ --n-samples 5000 --config configs/hydra/default.yaml
 
 # Full training on SLURM
 sbatch --job-name=hydra-local --array=0-9%1 scripts/slurm/run_train_variant.slurm local
@@ -208,8 +208,8 @@ token). Without a token you can still `pip install -e .` and run the smoke tests
 
 ```bash
 export HF_TOKEN="hf_..."             # read token provided by the owner
-python scripts/download_dataset.py   # → dataset/
-python scripts/download_models.py    # → models/  (or one model: ... flat-hydra-camembert-v2)
+python3 scripts/download_dataset.py   # → dataset/
+python3 scripts/download_models.py    # → models/  (or one model: ... flat-hydra-camembert-v2)
 ```
 
 ### Delivery bundle — offline ONNX inference
@@ -220,9 +220,9 @@ python scripts/download_models.py    # → models/  (or one model: ... flat-hydr
 offline** — `onnxruntime` only, no PyTorch, no Hugging Face at runtime:
 
 ```bash
-python scripts/download_delivery.py --onnx-only        # ~1.8 GB
+python3 scripts/download_delivery.py --onnx-only        # ~1.8 GB
 cd rakuten-delivery/onnx/flat_v2 && pip install -r requirements.txt
-python predict_onnx.py --model-dir . --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
+python3 predict_onnx.py --model-dir . --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
 ```
 
 The same export/inference code is in [`scripts/flat_inference/`](scripts/flat_inference/)

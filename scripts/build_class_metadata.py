@@ -2,8 +2,8 @@
 """Précalcule results/class_metadata.json : support test par classe + parent L1 pour L2.
 
 Usage:
-    python scripts/build_class_metadata.py
-    python scripts/build_class_metadata.py --dataset-dir /path/to/splits
+    python3 scripts/build_class_metadata.py
+    python3 scripts/build_class_metadata.py --dataset-dir /path/to/splits
 """
 import argparse
 import json

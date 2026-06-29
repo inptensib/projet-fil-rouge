@@ -2,19 +2,19 @@
 
 Usage:
     # Depuis un seul fichier JSONL (sample + split automatique)
-    python scripts/run_flat_hydra.py \
+    python3 scripts/run_flat_hydra.py \
         --data <chemin>/products.jsonl \
         --n-samples 1000 \
         --epochs 2 \
         --batch-size 16
 
     # Depuis des splits pré-générés (recommandé pour le dataset complet)
-    python scripts/run_flat_hydra.py \
+    python3 scripts/run_flat_hydra.py \
         --split-dir /path/to/dataset/ \
         --config configs/baselines/flat_hydra.yaml
 
     # Reprendre un training interrompu
-    python scripts/run_flat_hydra.py \
+    python3 scripts/run_flat_hydra.py \
         --data <chemin>/products.jsonl \
         --resume models/v1/flat_hydra_cpu/checkpoint_latest.pt
 """

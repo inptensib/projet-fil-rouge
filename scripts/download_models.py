@@ -6,8 +6,8 @@
 # Utilisation :
 #   pip install huggingface_hub
 #   export HF_TOKEN="hf_..."                      # token read fourni par Tahiana
-#   python scripts/download_models.py             # TOUS les modèles (~63 Go)
-#   python scripts/download_models.py flat-hydra-camembert-v2   # un seul modèle
+#   python3 scripts/download_models.py             # TOUS les modèles (~63 Go)
+#   python3 scripts/download_models.py flat-hydra-camembert-v2   # un seul modèle
 
 import os
 import sys

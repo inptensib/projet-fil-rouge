@@ -47,7 +47,7 @@ The weights (~497 MB) are not in git. Download them from the model hub
 
 ```bash
 export HF_TOKEN=hf_...
-python download_weights.py .        # -> ./flat-hydra-camembert-v2
+python3 download_weights.py .        # -> ./flat-hydra-camembert-v2
 ```
 
 The model directory contains: `best_model.pt`, `tokenizer/`,
@@ -63,7 +63,7 @@ The model directory contains: `best_model.pt`, `tokenizer/`,
 ### Single product
 
 ```bash
-python predict.py --model-dir flat-hydra-camembert-v2 \
+python3 predict.py --model-dir flat-hydra-camembert-v2 \
     --designation "Cage à hamster 3 étages tubes" \
     --description "Cage en métal pour rongeurs, 60x40 cm, roue et abreuvoir inclus"
 ```
@@ -80,7 +80,7 @@ python predict.py --model-dir flat-hydra-camembert-v2 \
 ### Batch (JSONL in → JSONL out)
 
 ```bash
-python predict.py --model-dir flat-hydra-camembert-v2 \
+python3 predict.py --model-dir flat-hydra-camembert-v2 \
     --input products.jsonl --output predictions.jsonl
 ```
 
@@ -112,11 +112,11 @@ startup, portable to C++/Java/C#).
 
 ```bash
 # 1. export (parity-checked vs PyTorch) -> flat_hydra_v2.onnx (~491 MB)
-python export_onnx.py --model-dir flat-hydra-camembert-v2 \
+python3 export_onnx.py --model-dir flat-hydra-camembert-v2 \
     --out flat-hydra-camembert-v2/flat_hydra_v2.onnx
 
 # 2. inference (same I/O as predict.py, no torch)
-python predict_onnx.py --model-dir flat-hydra-camembert-v2 \
+python3 predict_onnx.py --model-dir flat-hydra-camembert-v2 \
     --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
 ```
 

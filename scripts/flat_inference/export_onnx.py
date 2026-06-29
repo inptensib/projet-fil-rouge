@@ -6,7 +6,7 @@ the unified logits (157 L1 + 5 775 L2). The graph runs with onnxruntime WITHOUT
 torch/transformers — only the tokenizer and the label files are still needed
 alongside (they are pre/post-processing, not part of the net). See predict_onnx.py.
 
-    python export_onnx.py --model-dir ../../models/v2/flat_hydra \\
+    python3 export_onnx.py --model-dir ../../models/v2/flat_hydra \\
         --out ../../models/v2/flat_hydra/flat_hydra_v2.onnx
 
 Dynamic axes: batch and sequence length are both flexible.

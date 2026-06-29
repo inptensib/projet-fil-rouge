@@ -4,16 +4,16 @@ Upload des modèles entraînés Rakuten vers HuggingFace Hub.
 
 Usage :
   # Vérification sans upload (recommandé en premier)
-  python scripts/upload_models_hf.py --dry-run
+  python3 scripts/upload_models_hf.py --dry-run
 
   # Upload complet
-  python scripts/upload_models_hf.py --token hf_xxx
+  python3 scripts/upload_models_hf.py --token hf_xxx
 
   # Upload d'un seul sous-dossier (debug / reprise)
-  python scripts/upload_models_hf.py --token hf_xxx --target hydra-local-camembert
+  python3 scripts/upload_models_hf.py --token hf_xxx --target hydra-local-camembert
 
   # Suppression locale après vérification (destructif)
-  python scripts/upload_models_hf.py --token hf_xxx --verify-and-delete
+  python3 scripts/upload_models_hf.py --token hf_xxx --verify-and-delete
 """
 
 import argparse
@@ -430,12 +430,12 @@ def main():
         for dst, err in errors:
             print(f"  ✗ {dst} : {err}")
         print("\nPour reprendre un dossier spécifique :")
-        print("  python scripts/upload_models_hf.py --token hf_xxx --target <nom>")
+        print("  python3 scripts/upload_models_hf.py --token hf_xxx --target <nom>")
     else:
         print("Upload complet sans erreur.")
         print(f"\nVérifiez sur : https://huggingface.co/{REPO_ID}")
         print("\nPour vérifier et supprimer localement :")
-        print("  python scripts/upload_models_hf.py --token hf_xxx --verify-and-delete")
+        print("  python3 scripts/upload_models_hf.py --token hf_xxx --verify-and-delete")
 
 
 if __name__ == "__main__":

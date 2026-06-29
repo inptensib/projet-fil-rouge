@@ -93,7 +93,7 @@ values 66.8 % / 85.8 % — later corrected by hand in
 Since then, the script chooses the right mode automatically:
 
 ```bash
-python scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
+python3 scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
     --config configs/hydra/mbert_default.yaml \
     --output-json results/eval.json
 # → "base" mode because the config has neither check_hierarchy nor condition_l2_on_l1
@@ -136,7 +136,7 @@ sbatch scripts/slurm/run_eval.slurm
 sbatch scripts/slurm/run_eval.slurm models/v2
 
 # A single variant, locally with GPU
-python scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
+python3 scripts/eval_hierarchy.py --split-dir "$DATA_DIR" \
     --variant local --eval-batch-size 2048 \
     --output-json results/hydra_eval_test_metrics.json
 ```

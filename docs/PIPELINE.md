@@ -197,12 +197,12 @@ per task, `P100` (2×16 GB) and `3090` (2-4×24 GB) partitions.
 
 ```bash
 # Per-class F1 of an already-trained model
-python scripts/generate_f1_per_class.py \
+python3 scripts/generate_f1_per_class.py \
     --split-dir "$DATA_DIR" --config configs/hydra/default.yaml \
     --variant local --results-dir hydra-local-camembert
 
 # Class metadata (test support, L1 parent)
-python scripts/build_class_metadata.py --dataset-dir "$DATA_DIR"
+python3 scripts/build_class_metadata.py --dataset-dir "$DATA_DIR"
 ```
 
 The provenance of each consumed JSON is traced in
