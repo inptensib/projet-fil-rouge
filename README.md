@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="docs/screenshots/hero.jpg" alt="HieraCat" width="80%" style="border-radius:12px; margin-bottom:16px"/>
-
 # Rakuten Hierarchical Product Classification
 
 **8M+ products · 157 categories · 5 777 subcategories · CamemBERT**
@@ -265,7 +263,7 @@ configs/         YAML, source of truth — hydra/, baselines/, hlpd/
 scripts/         CLI entry points (root) + slurm/ · flat_inference/ · hydra_inference/ · synthetic_pipeline/
 notebooks/       eda/ + baselines/
 docs/            ARCHITECTURE · PIPELINE · METRICS · EXPERIMENTS
-results/         per-model metrics + HTML reports     ·     tests/  syntax + import smoke tests
+results/         per-model metric JSON     ·     tests/  syntax + import smoke tests
 hybrid_system/   separate experimental track (CamemBERT + XGBoost, unaudited)
 ```
 
