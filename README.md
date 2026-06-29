@@ -28,10 +28,17 @@ de-leaked **v2** dataset. Encoder: `camembert-base`.
 
 | Model | Approach | **Test F1 L2** | F1 L1 | HCR |
 |:--|:--|:--:|:--:|:--:|
-| **CamemBERT Flat v2** ⭐ | single unified L1+L2 head | **78.9 %** | 92.5 % | 85.2 % |
-| HYDRA local (+ mask) | 2 local heads + hierarchical mask | 77.4 % | 92.6 % | 87.0 % |
-| HYDRA nested (+ mask) | + nested head (training only) | 76.4 % | 92.6 % | 87.0 % |
-| HYDRA global (+ mask) | + global head (training only) | 77.3 % | 92.9 % | 87.0 % |
+| **CamemBERT Flat v2** ⭐ | single unified L1+L2 head | **78.9 %** | 92.5 % | 85.2 %¹ |
+| HYDRA local (+ mask) | 2 local heads + hierarchical mask | 77.4 % | 92.6 % | ≈100 %² |
+| HYDRA nested (+ mask) | + nested head (training only) | 76.4 % | 92.6 % | ≈100 %² |
+| HYDRA global (+ mask) | + global head (training only) | 77.3 % | 92.9 % | ≈100 %² |
+
+¹ Flat applies **no** hierarchical mask by default → genuine HCR ≈ 85 %
+  (`--enforce-hierarchy` constrains L2 to the predicted L1's children).
+² HYDRA's mask keeps only valid L2 children of the predicted L1 → **every**
+  prediction is hierarchically consistent (verified 100 % on real test rows). The
+  single-canonical-parent figure in `test_metrics` reads 87 % — understated, as
+  545 of the 5 777 L2 classes have several valid L1 parents.
 
 **Retained production model: CamemBERT Flat v2** (best L2 macro-F1). Figures are
 traced to [`results/flat_hydra_v2/test_metrics.json`](results/flat_hydra_v2/test_metrics.json)
