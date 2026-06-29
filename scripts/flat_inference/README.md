@@ -63,18 +63,21 @@ The model directory contains: `best_model.pt`, `tokenizer/`,
 
 ```bash
 python predict.py --model-dir flat-hydra-camembert-v2 \
-    --designation "Cage à hamster 3 étages tubes" \
-    --description "Cage en métal pour rongeurs, 60x40 cm, roue et abreuvoir inclus"
+    --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
+    --description "Abreuvoir à poulet / volaille, tétine à boire, plastique + acier inoxydable"
 ```
 
 ```json
 {
-  "text": "Cage à hamster 3 étages tubes. Cage en métal ...",
-  "level1": {"label": "Accessoires animalerie", "confidence": 0.98},
-  "level2": {"label": "Cage à rongeurs", "confidence": 0.74},
+  "text": "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir ...",
+  "level1": {"label": "Accessoires animalerie", "confidence": 0.999},
+  "level2": {"label": "Abreuvoir", "confidence": 0.999},
   "hierarchy_enforced": false
 }
 ```
+
+> **Use real listing text** — terse, keyword-heavy, as on the catalogue (the
+> training distribution). Clean hand-written sentences degrade accuracy.
 
 ### Batch (JSONL in → JSONL out)
 

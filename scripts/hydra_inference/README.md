@@ -60,7 +60,8 @@ python predict_onnx.py \
     --onnx models/v2/HYDRA_local_CamemBERT/hydra_local_v2.onnx \
     --encoders models/v2/flat_hydra \
     --matrix scripts/hydra_inference/parent_child_matrix_v2.npy \
-    --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
+    --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
+    --description "Abreuvoir à poulet / volaille, tétine à boire, plastique + acier inoxydable"
 ```
 
 `--no-hierarchy` disables the mask (raw local-head predictions). `--top-k N`,

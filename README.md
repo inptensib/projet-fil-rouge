@@ -88,8 +88,15 @@ python scripts/download_delivery.py --onnx-only          # one-shot ONNX bundle 
 ```bash
 cd scripts/flat_inference && pip install -r requirements.txt
 python predict_onnx.py --model-dir <onnx_model_dir> \
-    --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm, 3 niveaux"
+    --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
+    --description "Abreuvoir à poulet / volaille, tétine à boire, plastique + acier inoxydable"
+# → level1: "Accessoires animalerie"  ·  level2: "Abreuvoir"   (confidence ≈ 1.0)
 ```
+
+> **Feed real product-listing text** — terse, keyword-heavy, as on the catalogue.
+> The models were trained on that style; clean hand-written sentences are
+> out-of-distribution and degrade accuracy. On real v2 test listings the four
+> retained models score **~90–93 %** (L1 and L2).
 
 - **CamemBERT Flat v2** → [`scripts/flat_inference/`](scripts/flat_inference/)
 - **3 HYDRA + hierarchical mask** → [`scripts/hydra_inference/`](scripts/hydra_inference/)
