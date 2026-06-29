@@ -39,14 +39,19 @@ text -> CamemBERT-base -> Linear(768 -> 1536)   (projection BEFORE pooling)
 pip install -r requirements.txt
 ```
 
-## Get the weights
+## Get the weights (optional — PyTorch path)
+
+> The delivered inference is **ONNX** (the `rakuten-delivery` bundle — see the
+> [root README](../../README.md), §2–3). The **PyTorch** `predict.py` below is an
+> optional reference: it needs the `.pt`, which lives in the **separate**
+> `rakuten-models` repo (its own access — it is **not** in the delivery bundle).
 
 The weights (~497 MB) are not in git. Download them from the model hub
 (`TahianaAndriambahoaka/rakuten-models`, private — set a token):
 
 ```bash
 export HF_TOKEN=hf_...
-python download_weights.py .        # -> ./flat-hydra-camembert-v2
+python3 download_weights.py .        # -> ./flat-hydra-camembert-v2
 ```
 
 The model directory contains: `best_model.pt`, `tokenizer/`,
@@ -62,7 +67,7 @@ The model directory contains: `best_model.pt`, `tokenizer/`,
 ### Single product
 
 ```bash
-python predict.py --model-dir flat-hydra-camembert-v2 \
+python3 predict.py --model-dir flat-hydra-camembert-v2 \
     --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
     --description "Abreuvoir à poulet / volaille, tétine à boire, plastique + acier inoxydable"
 ```
@@ -82,7 +87,7 @@ python predict.py --model-dir flat-hydra-camembert-v2 \
 ### Batch (JSONL in → JSONL out)
 
 ```bash
-python predict.py --model-dir flat-hydra-camembert-v2 \
+python3 predict.py --model-dir flat-hydra-camembert-v2 \
     --input products.jsonl --output predictions.jsonl
 ```
 
@@ -114,11 +119,11 @@ startup, portable to C++/Java/C#).
 
 ```bash
 # 1. export (parity-checked vs PyTorch) -> flat_hydra_v2.onnx (~491 MB)
-python export_onnx.py --model-dir flat-hydra-camembert-v2 \
+python3 export_onnx.py --model-dir flat-hydra-camembert-v2 \
     --out flat-hydra-camembert-v2/flat_hydra_v2.onnx
 
 # 2. inference (same I/O as predict.py, no torch)
-python predict_onnx.py --model-dir flat-hydra-camembert-v2 \
+python3 predict_onnx.py --model-dir flat-hydra-camembert-v2 \
     --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
     --description "Abreuvoir à poulet / volaille, tétine à boire"
 ```

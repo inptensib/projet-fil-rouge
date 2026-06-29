@@ -3,7 +3,7 @@
 Maps the YAML config keys to HYDRATrainer constructor parameters.
 
 Usage:
-    # Splits pré-générés (recommandé — voir scripts/download_dataset.py)
+    # Splits pré-générés (recommandé — voir scripts/download_delivery.py --dataset-only)
     python scripts/run_train.py --split-dir dataset/ --config configs/hydra/default.yaml
     python scripts/run_train.py --split-dir dataset/ --config configs/hydra/default.yaml --n-samples 50000
     # Fichier JSONL unique (sample + split automatique)

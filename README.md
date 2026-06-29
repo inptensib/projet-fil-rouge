@@ -65,36 +65,44 @@ Detailed FlatHydra design: [docs/flat_hydra_conception.md](docs/flat_hydra_conce
 ## 1. Install
 
 ```bash
-python -m venv venv && source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 # CPU or another CUDA version? Install torch first (see the top of requirements.txt), then:
 pip install -e .
-python -m pytest tests/ -q       # smoke tests (syntax + imports) — no data, no GPU
+python3 -m pytest tests/ -q       # smoke tests (syntax + imports) — no data, no GPU
 ```
 Python ≥ 3.11.
 
-## 2. Get the dataset and models (HuggingFace, READ token)
+## 2. Download everything in one shot (HuggingFace, READ token)
 
-Three **private** HuggingFace repos (owner `TahianaAndriambahoaka`) — ask the owner
-for a **READ token**, then:
+The **`rakuten-delivery`** repo (private, owner `TahianaAndriambahoaka`) is a
+self-contained bundle (~9 GB): the **v2 dataset** *and* the **ONNX models** in a
+**single** download. Ask the owner for a **READ token**, then:
 
 ```bash
-export HF_TOKEN="hf_..."
-python scripts/download_dataset.py                       # v2 splits  → dataset/
-python scripts/download_models.py flat-hydra-camembert-v2 # one model → models/  (omit name = all)
-python scripts/download_delivery.py --onnx-only          # one-shot ONNX bundle (~1.8 GB)
+export HF_TOKEN="hf_..."                              # READ token from the owner
+python3 scripts/download_delivery.py                  # everything: dataset v2 + ONNX (~9 GB)
+python3 scripts/download_delivery.py --onnx-only      # ONNX models only (~1.8 GB)
+python3 scripts/download_delivery.py --dataset-only   # v2 dataset only (~7.2 GB)
 ```
 
-| Repo | Downloader | Content |
-|:--|:--|:--|
-| `rakuten-dataset` | `download_dataset.py` | v2 splits — train 5 259 035 / val 1 194 355 / test 1 194 356 |
-| `rakuten-models` | `download_models.py` | trained weights (`best_model.pt` + tokenizer/encoders) |
-| `rakuten-delivery` | `download_delivery.py` | one-shot bundle: the 4 ONNX models + v2 dataset |
+Everything lands in `rakuten-delivery/`:
+
+```
+onnx/flat_v2/    retained model (CamemBERT Flat v2) — ONNX + tokenizer + encoders
+onnx/hydra_v2/   the 3 HYDRA models — ONNX + the hierarchical mask matrix
+dataset_v2/      train / val / test splits (JSONL) + synthetic_ids.txt
+```
+
+> **PyTorch checkpoints (`.pt`) are *not* in the bundle** — inference here is ONNX.
+> The optional PyTorch path ([`scripts/flat_inference/predict.py`](scripts/flat_inference/))
+> needs the original `.pt` from the separate `rakuten-models` repo
+> (`scripts/flat_inference/download_weights.py`, requires its own access).
 
 ## 3. Run inference (offline, ONNX — no PyTorch, no HuggingFace at runtime)
 
 ```bash
 cd scripts/flat_inference && pip install -r requirements.txt
-python predict_onnx.py --model-dir <onnx_model_dir> \
+python3 predict_onnx.py --model-dir ../../rakuten-delivery/onnx/flat_v2 \
     --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
     --description "Abreuvoir à poulet / volaille, tétine à boire, plastique + acier inoxydable"
 # → level1: "Accessoires animalerie"  ·  level2: "Abreuvoir"   (confidence ≈ 1.0)
@@ -116,18 +124,18 @@ Both run on `onnxruntime` only. The HYDRA bundle ships its pre-computed
 Full runbook with expected metrics: **[REPRODUCE.md](REPRODUCE.md)**. In short:
 
 ```bash
-export DATA_DIR="$PWD/dataset"
+export DATA_DIR="$PWD/rakuten-delivery/dataset_v2"   # the dataset from the delivery bundle (§2)
 
 # CamemBERT Flat v2 (the retained model)
-python scripts/run_flat_hydra.py --split-dir "$DATA_DIR/" \
+python3 scripts/run_flat_hydra.py --split-dir "$DATA_DIR/" \
     --config configs/baselines/flat_hydra_camembert_v2.yaml      # → models/v2/flat_hydra/
 
 # HYDRA v2 — local | nested | global
-python scripts/run_train.py --split-dir "$DATA_DIR/" \
+python3 scripts/run_train.py --split-dir "$DATA_DIR/" \
     --config configs/hydra/hierarchy.yaml --variant local        # → models/v2/HYDRA_local_CamemBERT/
 
 # Evaluate
-python scripts/eval_hierarchy.py --split-dir "$DATA_DIR/" --config configs/hydra/hierarchy.yaml
+python3 scripts/eval_hierarchy.py --split-dir "$DATA_DIR/" --config configs/hydra/hierarchy.yaml
 ```
 SLURM equivalents in [`scripts/slurm/`](scripts/slurm/) (`run_flat_camembert_v2.slurm`,
 `run_hydra_3090_v2.slurm`).
@@ -149,7 +157,7 @@ L2 is a valid child of L1). All in [`rakuten/common/metrics.py`](rakuten/common/
 ```
 rakuten/      installable package — common/ + models/{baselines (FlatHydra), hydra}
 configs/      retained configs — hydra/{default,hierarchy}.yaml, baselines/flat_hydra*.yaml
-scripts/      download_* · run_flat_hydra · run_train · eval_hierarchy
+scripts/      download_delivery · run_flat_hydra · run_train · eval_hierarchy
               slurm/ · flat_inference/ (ONNX) · hydra_inference/ (ONNX + mask)
 docs/         flat_hydra_conception.md + diagrams/
 results/      retained test metrics (JSON)

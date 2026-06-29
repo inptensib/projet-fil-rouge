@@ -51,12 +51,12 @@ label space 157/5 775 — the HYDRA folders ship no encoders).
 
 ```bash
 # export (once, dev side) — needs torch + the rakuten package
-python export_onnx.py \
+python3 export_onnx.py \
     --ckpt models/v2/HYDRA_local_CamemBERT/best_model.pt \
     --out  models/v2/HYDRA_local_CamemBERT/hydra_local_v2.onnx
 
 # inference (no torch) — masking ON by default (the whole point)
-python predict_onnx.py \
+python3 predict_onnx.py \
     --onnx models/v2/HYDRA_local_CamemBERT/hydra_local_v2.onnx \
     --encoders models/v2/flat_hydra \
     --matrix scripts/hydra_inference/parent_child_matrix_v2.npy \

@@ -18,10 +18,10 @@
 # Usage:
 #   pip install huggingface_hub
 #   export HF_TOKEN="hf_..."                          # read token provided by the owner
-#   python scripts/download_delivery.py               # everything (~9 GB)
-#   python scripts/download_delivery.py --onnx-only       # ONNX models only (~1.8 GB)
-#   python scripts/download_delivery.py --dataset-only    # dataset v2 only (~7.2 GB)
-#   python scripts/download_delivery.py --output /path/to/dir
+#   python3 scripts/download_delivery.py               # everything (~9 GB)
+#   python3 scripts/download_delivery.py --onnx-only       # ONNX models only (~1.8 GB)
+#   python3 scripts/download_delivery.py --dataset-only    # dataset v2 only (~7.2 GB)
+#   python3 scripts/download_delivery.py --output /path/to/dir
 
 import argparse
 import os

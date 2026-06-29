@@ -15,12 +15,12 @@ without the training package. Source of truth, kept in sync with this copy:
 
 Usage:
     # single product
-    python predict.py --model-dir flat-hydra-camembert-v2 \\
+    python3 predict.py --model-dir flat-hydra-camembert-v2 \\
         --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Elevage" \\
         --description "Abreuvoir a poulet / volaille, tetine a boire"
 
     # batch: JSONL in ({"designation": ..., "description": ...} per line) -> JSONL out
-    python predict.py --model-dir flat-hydra-camembert-v2 \\
+    python3 predict.py --model-dir flat-hydra-camembert-v2 \\
         --input products.jsonl --output predictions.jsonl
 
 The model weights are not shipped in git (~493 MB). Fetch them first with
@@ -110,7 +110,7 @@ class FlatClassifier:
         if not (model_dir / "best_model.pt").exists():
             raise FileNotFoundError(
                 f"best_model.pt not found in '{model_dir}'. Download the model first "
-                "(python download_weights.py) — see README.md.")
+                "(python3 download_weights.py) — see README.md.")
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
 
         ckpt = torch.load(model_dir / "best_model.pt", map_location=self.device,

@@ -10,7 +10,7 @@ Needs: the .onnx, a tokenizer (camembert-base — reused from the Flat v2 bundle
 tokenizer/), the v2 label encoders (l1/l2_label_encoder.pkl, reused from Flat v2),
 and parent_child_matrix_v2.npy (built by build_hierarchy_matrix.py). No torch.
 
-    python predict_onnx.py \\
+    python3 predict_onnx.py \\
         --onnx ../../models/v2/HYDRA_local_CamemBERT/hydra_local_v2.onnx \\
         --encoders ../../models/v2/flat_hydra \\
         --matrix parent_child_matrix_v2.npy \\

@@ -13,23 +13,23 @@ Delivered models:
 
 ```bash
 # Python env + package
-python -m venv venv && source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -e .          # CPU / other CUDA: install torch first (see requirements.txt)
 
-# v2 dataset (HF read token) — or reuse the delivery bundle's dataset_v2/
+# v2 dataset — from the delivery bundle (one download: dataset v2 + ONNX)
 export HF_TOKEN="hf_..."
-python scripts/download_dataset.py      # → dataset/  (train/val/test _split.jsonl)
-export DATA_DIR="$PWD/dataset"          # SLURM scripts read $DATA_DIR (propagated by sbatch)
+python3 scripts/download_delivery.py --dataset-only   # → rakuten-delivery/dataset_v2/
+export DATA_DIR="$PWD/rakuten-delivery/dataset_v2"    # SLURM scripts read $DATA_DIR (propagated by sbatch)
 ```
 
 - **GPU** required for training (we used P100 2×16 GB / RTX 3090); evaluation fits on one GPU.
 - Training fine-tunes **`camembert-base`** (downloaded from HF on first use). The
   scripts set `TRANSFORMERS_OFFLINE=1`, so either pre-cache the encoder
-  (`python -c "from transformers import AutoModel; AutoModel.from_pretrained('camembert-base')"`)
+  (`python3 -c "from transformers import AutoModel; AutoModel.from_pretrained('camembert-base')"`)
   or `unset TRANSFORMERS_OFFLINE`.
 - The SLURM scripts default paths to our cluster — override `PROJECT_ROOT` /
   `VENV_ACTIVATE` / `DATA_DIR` (and adapt the `#SBATCH` directives), **or** run the
-  `python …` entry points directly on any GPU machine.
+  `python3 …` entry points directly on any GPU machine.
 
 ## 1. Re-train
 
@@ -39,7 +39,7 @@ export DATA_DIR="$PWD/dataset"          # SLURM scripts read $DATA_DIR (propagat
 # SLURM (auto-resume job array)
 sbatch --job-name=flat-cam-v2 --array=0-9%1 scripts/slurm/run_flat_camembert_v2.slurm
 # …or directly on a GPU box:
-python scripts/run_flat_hydra.py --split-dir "$DATA_DIR/" \
+python3 scripts/run_flat_hydra.py --split-dir "$DATA_DIR/" \
     --config configs/baselines/flat_hydra_camembert_v2.yaml
 # → models/v2/flat_hydra/best_model.pt
 ```
@@ -51,7 +51,7 @@ for V in local nested global; do
   sbatch --job-name=hydra-$V-v2 scripts/slurm/run_hydra_3090_v2.slurm "$V"
 done
 # …or directly (one variant at a time):
-python scripts/run_train.py --split-dir "$DATA_DIR/" \
+python3 scripts/run_train.py --split-dir "$DATA_DIR/" \
     --config configs/hydra/hierarchy.yaml --variant local      # local | nested | global
 # → models/v2/HYDRA_<variant>_CamemBERT/
 ```
@@ -65,7 +65,7 @@ sbatch --job-name=eval-cam-v2 scripts/slurm/run_eval_flat_hydra_generic.slurm
 #    see the header of that script to evaluate another checkpoint)
 
 # HYDRA v2 (3 variants, base + hierarchical mask) → console + JSON
-python scripts/eval_hierarchy.py --split-dir "$DATA_DIR/" \
+python3 scripts/eval_hierarchy.py --split-dir "$DATA_DIR/" \
     --config configs/hydra/hierarchy.yaml --model-dir models/v2 --eval-batch-size 2048
 ```
 
