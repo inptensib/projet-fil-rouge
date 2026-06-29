@@ -2,7 +2,7 @@
 
 # Rakuten Hierarchical Product Classification
 
-**8M+ products · 157 categories · 5 777 subcategories · CamemBERT**
+**Large-scale hierarchical classification of product listings**
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c?logo=pytorch&logoColor=white)
