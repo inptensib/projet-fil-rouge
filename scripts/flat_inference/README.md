@@ -119,7 +119,8 @@ python export_onnx.py --model-dir flat-hydra-camembert-v2 \
 
 # 2. inference (same I/O as predict.py, no torch)
 python predict_onnx.py --model-dir flat-hydra-camembert-v2 \
-    --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
+    --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
+    --description "Abreuvoir à poulet / volaille, tétine à boire"
 ```
 
 Verified: ONNX vs PyTorch logits differ by **< 5e-5** and predictions are
