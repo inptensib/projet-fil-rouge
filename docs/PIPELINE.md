@@ -101,7 +101,9 @@ sbatch --array=0-9%1 scripts/slurm/run_flat_camembert_v2.slurm
 # mBERT v2 training (77.4% L2 F1)
 sbatch --array=0-9%1 scripts/slurm/run_flat_mbert_v2.slurm
 
-# Test evaluation (generic, configurable via --export)
+# Test evaluation — direct (no SLURM, any GPU):
+python3 scripts/eval_flat_hydra.py --split-dir "$DATA_DIR/" --model-pt models/v2/flat_hydra/best_model.pt
+# …or via SLURM (generic, configurable via --export):
 sbatch scripts/slurm/run_eval_flat_hydra_generic.slurm
 # Example for mBERT v2:
 # sbatch --job-name=eval-mbert-v2 \
@@ -216,6 +218,7 @@ The provenance of each consumed JSON is traced in
 | `split_dataset.py`        | Regenerates L2-stratified 70/15/15 splits          |
 | `upload_models_hf.py`     | Archives the weights to HF (`--dry-run` available) |
 | `eval_hierarchy.py`       | Eval with/without mask (`--output-mode auto`)      |
+| `eval_flat_hydra.py`      | Eval a FlatHydra checkpoint on the test set (no SLURM) |
 
 ## Known Technical Debt
 
