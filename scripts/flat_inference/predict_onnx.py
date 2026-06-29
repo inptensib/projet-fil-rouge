@@ -7,8 +7,7 @@ torch/transformers model stack) — lighter and faster to start, portable.
 
     # single
     python3 predict_onnx.py --model-dir ../../models/v2/flat_hydra \\
-        --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \\
-        --description "Abreuvoir à poulet / volaille, tétine à boire"
+        --designation "40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires"
     # batch (JSONL in -> JSONL out)
     python3 predict_onnx.py --model-dir ../../models/v2/flat_hydra \\
         --input products.jsonl --output predictions.jsonl

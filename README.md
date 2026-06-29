@@ -103,9 +103,8 @@ dataset_v2/      train / val / test splits (JSONL) + synthetic_ids.txt
 ```bash
 cd scripts/flat_inference && pip install -r requirements.txt
 python3 predict_onnx.py --model-dir ../../rakuten-delivery/onnx/flat_v2 \
-    --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
-    --description "Abreuvoir à poulet / volaille, tétine à boire, plastique + acier inoxydable"
-# → level1: "Accessoires animalerie"  ·  level2: "Abreuvoir"   (confidence ≈ 1.0)
+    --designation "40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires"
+# → level1: "Accessoires animalerie" (0.9997)  ·  level2: "Abreuvoir" (0.9991)
 ```
 
 > **Feed real product-listing text** — terse, keyword-heavy, as on the catalogue.

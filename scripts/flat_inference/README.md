@@ -68,15 +68,14 @@ The model directory contains: `best_model.pt`, `tokenizer/`,
 
 ```bash
 python3 predict.py --model-dir flat-hydra-camembert-v2 \
-    --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
-    --description "Abreuvoir à poulet / volaille, tétine à boire, plastique + acier inoxydable"
+    --designation "40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires"
 ```
 
 ```json
 {
-  "text": "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir ...",
-  "level1": {"label": "Accessoires animalerie", "confidence": 0.999},
-  "level2": {"label": "Abreuvoir", "confidence": 0.999},
+  "text": "40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires",
+  "level1": {"label": "Accessoires animalerie", "confidence": 0.9997},
+  "level2": {"label": "Abreuvoir", "confidence": 0.9991},
   "hierarchy_enforced": false
 }
 ```
@@ -100,7 +99,7 @@ is the JSON above.
 from predict import FlatClassifier
 
 clf = FlatClassifier("flat-hydra-camembert-v2")
-print(clf.classify("Ballon de football taille 5", "Cuir synthétique, cousu main"))
+print(clf.classify("40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires"))
 ```
 
 ## Options
@@ -124,8 +123,7 @@ python3 export_onnx.py --model-dir flat-hydra-camembert-v2 \
 
 # 2. inference (same I/O as predict.py, no torch)
 python3 predict_onnx.py --model-dir flat-hydra-camembert-v2 \
-    --designation "40 Pcs Automatique Poulet Buveur d'eau Volaille Abreuvoir Mamelon Élevage" \
-    --description "Abreuvoir à poulet / volaille, tétine à boire"
+    --designation "40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires"
 ```
 
 Verified: ONNX vs PyTorch logits differ by **< 5e-5** and predictions are
