@@ -18,7 +18,7 @@
 
 ## The project in 30 seconds
 
-A product arrives with a title and a description in French. The model predicts
+A product arrives with a title and a description (mostly French). The model predicts
 **simultaneously** its L1 category among 157 and its L2 subcategory among 5 777:
 
 ```
