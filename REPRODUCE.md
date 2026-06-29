@@ -33,40 +33,42 @@ export DATA_DIR="$PWD/rakuten-delivery/dataset_v2"    # SLURM scripts read $DATA
 
 ## 1. Re-train
 
+> Runs on **any machine with a GPU** (or CPU) — **no SLURM required**. Training
+> auto-detects the device. The `scripts/slurm/*.slurm` files are only convenience
+> wrappers for our cluster (same `python3` command + auto-resume); they are optional.
+
 ### CamemBERT Flat v2 (the retained model)
 
 ```bash
-# SLURM (auto-resume job array)
-sbatch --job-name=flat-cam-v2 --array=0-9%1 scripts/slurm/run_flat_camembert_v2.slurm
-# …or directly on a GPU box:
 python3 scripts/run_flat_hydra.py --split-dir "$DATA_DIR/" \
-    --config configs/baselines/flat_hydra_camembert_v2.yaml
+    --config configs/baselines/flat_hydra_camembert_v2.yaml --batch-size 128
 # → models/v2/flat_hydra/best_model.pt
+# --batch-size: config default (256) targets 2 GPUs; use 128 on one 24 GB GPU, less on smaller.
+# Optional SLURM: sbatch --array=0-9%1 scripts/slurm/run_flat_camembert_v2.slurm
 ```
 
 ### HYDRA v2 — local / nested / global
 
 ```bash
-for V in local nested global; do
-  sbatch --job-name=hydra-$V-v2 scripts/slurm/run_hydra_3090_v2.slurm "$V"
-done
-# …or directly (one variant at a time):
 python3 scripts/run_train.py --split-dir "$DATA_DIR/" \
     --config configs/hydra/hierarchy.yaml --variant local      # local | nested | global
-# → models/v2/HYDRA_<variant>_CamemBERT/
+# → models/v2/HYDRA_<variant>_CamemBERT/   (config batch_size=128 fits one 24 GB GPU)
+# Optional SLURM: for V in local nested global; do sbatch scripts/slurm/run_hydra_3090_v2.slurm "$V"; done
 ```
 
 ## 2. Re-test (re-run the evaluations)
 
 ```bash
 # CamemBERT Flat v2  → results/flat_hydra_v2/test_metrics.json
-sbatch --job-name=eval-cam-v2 scripts/slurm/run_eval_flat_hydra_generic.slurm
-#   (defaults point at models/v2/flat_hydra/best_model.pt on the v2 dataset —
-#    see the header of that script to evaluate another checkpoint)
+python3 scripts/eval_flat_hydra.py --split-dir "$DATA_DIR/" \
+    --model-pt models/v2/flat_hydra/best_model.pt \
+    --config configs/baselines/flat_hydra_camembert_v2.yaml
+# Optional SLURM: sbatch scripts/slurm/run_eval_flat_hydra_generic.slurm
 
 # HYDRA v2 (3 variants, base + hierarchical mask) → console + JSON
 python3 scripts/eval_hierarchy.py --split-dir "$DATA_DIR/" \
     --config configs/hydra/hierarchy.yaml --model-dir models/v2 --eval-batch-size 2048
+# (lower --eval-batch-size on a small GPU)
 ```
 
 Every evaluation reports `f1_l1_macro`, `f1_l2_macro`, `constrained_f1` and `HCR`.

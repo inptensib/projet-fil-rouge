@@ -120,24 +120,25 @@ Both run on `onnxruntime` only. The HYDRA bundle ships its pre-computed
 
 ## 4. Re-train (optional)
 
-Full runbook with expected metrics: **[REPRODUCE.md](REPRODUCE.md)**. In short:
+Runs on **any GPU machine — no SLURM needed** (the `scripts/slurm/` files are only
+optional cluster wrappers). Full runbook with expected metrics:
+**[REPRODUCE.md](REPRODUCE.md)**. In short:
 
 ```bash
 export DATA_DIR="$PWD/rakuten-delivery/dataset_v2"   # the dataset from the delivery bundle (§2)
 
 # CamemBERT Flat v2 (the retained model)
 python3 scripts/run_flat_hydra.py --split-dir "$DATA_DIR/" \
-    --config configs/baselines/flat_hydra_camembert_v2.yaml      # → models/v2/flat_hydra/
+    --config configs/baselines/flat_hydra_camembert_v2.yaml --batch-size 128   # → models/v2/flat_hydra/
 
 # HYDRA v2 — local | nested | global
 python3 scripts/run_train.py --split-dir "$DATA_DIR/" \
     --config configs/hydra/hierarchy.yaml --variant local        # → models/v2/HYDRA_local_CamemBERT/
 
-# Evaluate
+# Evaluate (Flat retained model · HYDRA variants)
+python3 scripts/eval_flat_hydra.py --split-dir "$DATA_DIR/" --model-pt models/v2/flat_hydra/best_model.pt
 python3 scripts/eval_hierarchy.py --split-dir "$DATA_DIR/" --config configs/hydra/hierarchy.yaml
 ```
-SLURM equivalents in [`scripts/slurm/`](scripts/slurm/) (`run_flat_camembert_v2.slurm`,
-`run_hydra_3090_v2.slurm`).
 
 > **HYDRA evaluation — two non-comparable modes.** `eval_hierarchy.py` reports
 > either `base` (no mask, HCR ≈ 0.86) or `hier` (with mask, HCR ≈ 1.0 *by
@@ -156,7 +157,7 @@ L2 is a valid child of L1). All in [`rakuten/common/metrics.py`](rakuten/common/
 ```
 rakuten/      installable package — common/ + models/{baselines (FlatHydra), hydra}
 configs/      retained configs — hydra/{default,hierarchy}.yaml, baselines/flat_hydra*.yaml
-scripts/      download_delivery · run_flat_hydra · run_train · eval_hierarchy
+scripts/      download_delivery · run_flat_hydra · run_train · eval_flat_hydra · eval_hierarchy
               slurm/ · flat_inference/ (ONNX) · hydra_inference/ (ONNX + mask)
 docs/         flat_hydra_conception.md + diagrams/
 results/      retained test metrics (JSON)
