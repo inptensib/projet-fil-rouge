@@ -14,7 +14,7 @@ and parent_child_matrix_v2.npy (built by build_hierarchy_matrix.py). No torch.
         --onnx ../../models/v2/HYDRA_local_CamemBERT/hydra_local_v2.onnx \\
         --encoders ../../models/v2/flat_hydra \\
         --matrix parent_child_matrix_v2.npy \\
-        --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
+        --designation "40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires"
 """
 import argparse
 import json

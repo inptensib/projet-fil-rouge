@@ -7,7 +7,7 @@ torch/transformers model stack) — lighter and faster to start, portable.
 
     # single
     python3 predict_onnx.py --model-dir ../../models/v2/flat_hydra \\
-        --designation "Cage à hamster 3 étages" --description "Métal, 60x40 cm"
+        --designation "40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires"
     # batch (JSONL in -> JSONL out)
     python3 predict_onnx.py --model-dir ../../models/v2/flat_hydra \\
         --input products.jsonl --output predictions.jsonl

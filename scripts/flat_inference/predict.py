@@ -16,7 +16,7 @@ without the training package. Source of truth, kept in sync with this copy:
 Usage:
     # single product
     python3 predict.py --model-dir flat-hydra-camembert-v2 \\
-        --designation "Cage a hamster 3 etages" --description "Metal, 60x40 cm"
+        --designation "40 Pcs Automatique Poulet Buveur D'eau Volaille Abreuvoir Potable Mamelon Élevage Accessoires"
 
     # batch: JSONL in ({"designation": ..., "description": ...} per line) -> JSONL out
     python3 predict.py --model-dir flat-hydra-camembert-v2 \\
