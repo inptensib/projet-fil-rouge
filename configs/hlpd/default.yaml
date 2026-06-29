@@ -1,0 +1,50 @@
+# ==============================================================================
+# HLPD — default configuration
+# ==============================================================================
+# Hierarchical Label Pre-populated Decoder (Torba, Laclau et al., ECIR 2025),
+# CamemBERT backbone. Trained on the full dataset (5.57M train / 1.19M val / 1.19M test).
+# bfloat16 autocast (ZLPR is numerically stable, no GradScaler needed).
+
+# --- Encoder ---
+encoder: camembert-base
+max_length: 128            # text tokens per product
+label_max_len: 64          # tokens per label description (cached once)
+freeze_encoder: false
+
+# --- Decoder ---
+num_decoder_layers: 3      # cross-attention layers (best ablation)
+nhead: 8
+ffn_dim: 3072
+decoder_dropout: 0.1
+gradient_checkpointing: true
+use_hiera_mask: true       # hierarchical distance bias in the self-attention
+
+# --- Training ---
+batch_size: 16
+epochs: 5
+lr: 2.0e-5
+weight_decay: 0.01
+warmup_ratio: 0.05
+max_grad_norm: 1.0
+gradient_accumulation_steps: 2     # effective batch size = 32
+
+# --- Early stopping ---
+early_stopping_patience: 3
+early_stopping_min_delta: 0.001
+
+# --- Intra-epoch checkpointing ---
+checkpoint_every_n_steps: 15000    # mid-epoch save for cluster resume
+
+# --- Data loading ---
+num_workers: 4
+pin_memory: true
+
+# --- Artefacts ---
+save_dir: models/v1/hlpd
+experiment_name: HLPD_CamemBERT
+
+# --- Reproducibility ---
+seed: 42
+
+# --- Precision  ("bfloat16" | "float32") ---
+precision: bfloat16

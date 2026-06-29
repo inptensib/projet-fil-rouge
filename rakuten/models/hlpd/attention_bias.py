@@ -1,14 +1,20 @@
-"""Hierarchical attention bias matrix M_hiera for HLPD self-attention.
+"""Hierarchical distance bias M_hiera for HLPD self-attention.
 
-M ∈ {0,1}^{L×L} (L = num_l1 + num_l2) encodes three types of relationships:
+M ∈ ℝ^{L×L} (L = num_l1 + num_l2) holds the *negative* shortest-path distance
+between labels in the taxonomy tree ROOT → L1 → L2. Closer labels get a larger
+(less negative) bias, so they are penalised less in the attention softmax.
 
-1. Self (diagonal): every label attends to itself.
-2. Parent-child: each L2 class ↔ its L1 parent (bidirectional).
-3. Siblings: L2 classes sharing the same L1 parent ↔ each other.
+Distances in a two-level tree (ROOT virtual node):
+    self                       0   ->   0
+    L1 <-> its child L2        1   ->  -1
+    L1 <-> L1 (via ROOT)       2   ->  -2
+    L2 <-> sibling L2          2   ->  -2
+    L1 <-> non-child L2        3   ->  -3
+    L2 <-> L2 (other parent)   4   ->  -4
 
 Label index layout:
-    [0, num_l1)              → L1 classes (indices 0 … num_l1-1)
-    [num_l1, num_l1+num_l2)  → L2 classes (indices num_l1 … L-1)
+    [0, num_l1)              -> L1 classes
+    [num_l1, num_l1+num_l2)  -> L2 classes
 """
 
 from __future__ import annotations
@@ -21,39 +27,42 @@ def build_M_hiera(
     num_l1: int,
     num_l2: int,
 ) -> torch.Tensor:
-    """Build the hierarchical binary mask M of shape (L, L).
+    """Build the hierarchical distance-bias matrix M of shape (L, L).
 
     Args:
-        l2_to_l1_mapping: Mapping l2_index → l1_index (both 0-based).
+        l2_to_l1_mapping: Mapping l2_index -> l1_index (both 0-based).
         num_l1: Number of L1 classes.
         num_l2: Number of L2 classes.
 
     Returns:
-        Float32 tensor of shape (num_l1 + num_l2, num_l1 + num_l2) with 0/1 entries.
-        Symmetric by construction.
+        Float32 tensor of shape (num_l1 + num_l2, num_l1 + num_l2) holding
+        ``-shortest_path_distance``. Symmetric, zero diagonal.
     """
     L = num_l1 + num_l2
-    M = torch.zeros(L, L)
+    M = torch.zeros(L, L, dtype=torch.float32)
 
-    # 1. Diagonal (self-connection for all labels)
-    M.fill_diagonal_(1.0)
-
-    # 2. Parent-child edges (bidirectional)
+    # Parent L1 index for each L2 (local index); -1 if unknown.
+    parent = torch.full((num_l2,), -1, dtype=torch.long)
     for l2_idx, l1_idx in l2_to_l1_mapping.items():
-        l2_full = num_l1 + l2_idx
-        M[l1_idx, l2_full] = 1.0
-        M[l2_full, l1_idx] = 1.0
+        parent[int(l2_idx)] = int(l1_idx)
 
-    # 3. Siblings: L2 classes sharing the same L1 parent
-    l1_to_l2s: dict[int, list[int]] = {}
-    for l2_idx, l1_idx in l2_to_l1_mapping.items():
-        l1_to_l2s.setdefault(l1_idx, []).append(l2_idx)
+    # L1 <-> L1 block: 0 on the diagonal, -2 elsewhere (path through ROOT).
+    l1_block = torch.full((num_l1, num_l1), -2.0)
+    l1_block.fill_diagonal_(0.0)
+    M[:num_l1, :num_l1] = l1_block
 
-    for siblings in l1_to_l2s.values():
-        if len(siblings) < 2:
-            continue
-        full_idx = torch.tensor([num_l1 + j for j in siblings], dtype=torch.long)
-        # Vectorised all-pairs assignment
-        M[full_idx.unsqueeze(1), full_idx.unsqueeze(0)] = 1.0
+    # L1 <-> L2 block: -1 if the L1 is the L2's parent, else -3.
+    a_idx = torch.arange(num_l1).unsqueeze(1)          # (num_l1, 1)
+    p_row = parent.unsqueeze(0)                         # (1, num_l2)
+    l1_l2 = torch.where(p_row == a_idx, -1.0, -3.0)     # (num_l1, num_l2)
+    M[:num_l1, num_l1:] = l1_l2
+    M[num_l1:, :num_l1] = l1_l2.t()
+
+    # L2 <-> L2 block: 0 on the diagonal, -2 for siblings, -4 otherwise.
+    p_col = parent.unsqueeze(1)                         # (num_l2, 1)
+    p_rowv = parent.unsqueeze(0)                        # (1, num_l2)
+    l2_block = torch.where(p_col == p_rowv, -2.0, -4.0)
+    l2_block.fill_diagonal_(0.0)
+    M[num_l1:, num_l1:] = l2_block
 
     return M

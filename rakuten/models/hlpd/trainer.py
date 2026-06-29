@@ -40,7 +40,7 @@ from rakuten.common.training_utils import (             # noqa: E402
 from .losses import ZLPRLoss   # noqa: E402
 from .models import HLPD       # noqa: E402
 
-_CONFIG_PATH = Path(__file__).resolve().parents[3] / "configs" / "hlpd" / "hlpd_3090.yaml"
+_CONFIG_PATH = Path(__file__).resolve().parents[3] / "configs" / "hlpd" / "default.yaml"
 
 
 # ---------------------------------------------------------------------------
@@ -52,20 +52,22 @@ _CONFIG_PATH = Path(__file__).resolve().parents[3] / "configs" / "hlpd" / "hlpd_
 class HLPDConfig:
     """Typed hyperparameters for HLPD.
 
-    Canonical values live in ``configs/hlpd/hlpd_3090.yaml``.
+    Canonical values live in ``configs/hlpd/default.yaml``.
     """
 
     # Encoder
     encoder: str = "camembert-base"
     max_length: int = 128
+    label_max_len: int = 64
     freeze_encoder: bool = False
 
     # Decoder architecture
-    num_decoder_layers: int = 2
-    nhead: int = 4
-    ffn_dim: int = 2048
+    num_decoder_layers: int = 3
+    nhead: int = 8
+    ffn_dim: int = 3072
     decoder_dropout: float = 0.1
     gradient_checkpointing: bool = True
+    use_hiera_mask: bool = True
 
     # Training
     batch_size: int = 32
@@ -162,18 +164,27 @@ class HLPDTrainer:
 
         self.tokenizer = AutoTokenizer.from_pretrained(self.config.encoder)
 
+        # Tokenise the label descriptions used to seed the (cached) label embeddings.
+        label_ids, label_mask = self._build_label_tokens()
+
         self._base_model = HLPD(
             encoder_name=self.config.encoder,
             num_l1=self.num_l1,
             num_l2=self.num_l2,
             l2_to_l1_mapping=self.l2_to_l1_mapping,
+            label_input_ids=label_ids,
+            label_attention_mask=label_mask,
             num_decoder_layers=self.config.num_decoder_layers,
             nhead=self.config.nhead,
             ffn_dim=self.config.ffn_dim,
             decoder_dropout=self.config.decoder_dropout,
             gradient_checkpointing=self.config.gradient_checkpointing,
             freeze_encoder=self.config.freeze_encoder,
+            use_hiera_mask=self.config.use_hiera_mask,
         ).to(self.device)
+
+        # Cache the label embeddings once (on-device, before any DataParallel wrap).
+        self._base_model.encode_labels()
 
         self.model = self._base_model
         if torch.cuda.device_count() > 1:
@@ -193,6 +204,35 @@ class HLPDTrainer:
             self.config.precision == "bfloat16"
             and self.device.type == "cuda"
         )
+
+    # ------------------------------------------------------------------
+    # Label descriptions
+    # ------------------------------------------------------------------
+
+    def _build_label_tokens(self) -> tuple[torch.Tensor, torch.Tensor]:
+        """Tokenise one French description per label, in label-index order.
+
+        Index layout: [0, num_l1) are L1 classes, [num_l1, L) are L2 classes.
+        L1 description = the class name; L2 description = a "sub-type of parent"
+        template so the encoder sees the parent-child relationship.
+        """
+        l1_names = list(self.l1_encoder.classes_)
+        l2_names = list(self.l2_encoder.classes_)
+
+        descriptions: list[str] = [str(name) for name in l1_names]
+        for l2_idx, l2_name in enumerate(l2_names):
+            l1_idx = self.l2_to_l1_mapping.get(l2_idx, 0)
+            parent = l1_names[l1_idx] if 0 <= l1_idx < len(l1_names) else ""
+            descriptions.append(f"{l2_name} est un sous-type de {parent}.")
+
+        enc = self.tokenizer(
+            descriptions,
+            truncation=True,
+            max_length=self.config.label_max_len,
+            padding="max_length",
+            return_tensors="pt",
+        )
+        return enc["input_ids"], enc["attention_mask"]
 
     # ------------------------------------------------------------------
     # Data

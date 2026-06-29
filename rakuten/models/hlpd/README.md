@@ -1,96 +1,103 @@
 # HLPD : Décodeur Hiérarchique Non-Autorégressif
 
 Implémentation de **HLPD** (Torba, Laclau et al., ECIR 2025) pour la classification
-hiérarchique multi-label sur le dataset Rakuten (157 L1 × 5 777 L2 en v2).
-
-> **Note sur les dimensions.** Les schémas et coûts ci-dessous emploient
-> `L = 6 283` (= 157 + 6 126), valeur du **dataset v1** sur lequel HLPD a été
-> entraîné (F1 L2 = 61.5 %). Sur le dataset v2 dé-fuité, `L = 5 934` (= 157 + 5 777).
-> L'architecture est identique ; seule la taille de l'espace de labels change.
+hiérarchique multi-label sur le dataset Rakuten (157 L1 × ~6 000 L2), avec un
+encodeur **CamemBERT**.
 
 ## Idée clé
 
-Contrairement à HYDRA (têtes parallèles), HLPD utilise un **décodeur Transformer
-non-autorégressif** qui prédit tous les labels en un seul forward pass, avec la
-hiérarchie encodée directement dans le mécanisme d'attention.
+Plutôt que de filtrer les prédictions a posteriori, HLPD encode la hiérarchie
+**directement dans le mécanisme d'attention**. Le décodeur est non-autorégressif :
+tous les labels sont prédits en une seule passe. La cohérence hiérarchique est ainsi
+apprise par construction (HCR ≈ 98 % sans contrainte à l'inférence).
 
 ## Architecture
 
 ```
-Texte ──→ [CamemBERT] ──→ H_enc (B, 128, 768)
+Texte ───────────────→ [CamemBERT] ──→ H_text (B, 128, 768)
+
+Descriptions labels ──→ [CamemBERT CLS] ──→ label embeddings (L, 768)   [calculé une fois, mis en cache]
                                   │
-Labels (L=6283) ──→ [LabelEmbeddings] ──→ E_labels (B, L, 768)
+                          [LabelPooler]            projection non-linéaire par label
                                   │
-              [Cross-attention  Q=E_labels, K=V=H_enc]
+              [Hierarchical Self-Attention]        scores += alpha · M_hiera + beta   (sans dim. batch)
                                   │
-              [Self-attention hiérarchique  W⊙M_hiera + b]  × num_layers
+                          expand → (B, L, 768)
                                   │
-              [Logits = E_labels · LabelEmbeddings.Tᵀ]  (tied weights)
+              [Cross-Attention (Q=labels, K=V=texte) + FFN] × num_decoder_layers
                                   │
-                           (B, L=6283)
+                          [LabelWisePooler]         un logit par label
+                                  │
+                              (B, L)
 ```
 
-**Self-attention hiérarchique** : biais additif appris `W ⊙ M_hiera + b` sur les
-scores QKᵀ avant softmax, où `M_hiera` est la matrice binaire encodant les relations
-parent-enfant et siblings dans la taxonomie.
+**Self-attention hiérarchique** : biais additif `alpha · M_hiera + beta` ajouté aux
+scores QKᵀ avant softmax. `M_hiera` encode la distance dans l'arbre (plus court chemin
+ROOT → L1 → L2). Le biais est paramétré par **deux scalaires** (`alpha`, `beta`), ce
+qui rend le coût indépendant du nombre de labels.
 
-**Tied weights** : la matrice de projection finale partage ses poids avec
-`LabelEmbeddings` — réduit les paramètres de ~4.8M et améliore la cohérence des
-représentations.
+**Embeddings de labels mis en cache** : chaque label est décrit par un court texte
+(L1 = son nom ; L2 = « {sous-type} est un sous-type de {parent}. »). Ces descriptions
+sont encodées une seule fois via le token `[CLS]` de CamemBERT, puis figées. On évite
+ainsi de ré-encoder L descriptions à chaque pas.
 
-**ZLPRLoss** : ranking pairwise zero-bounded (Su et al., 2022), plus stable que la
-BCE multiclass pour L=6283 classes.
+**Self-attention sans dimension batch** : les labels sont partagés entre tous les
+exemples, donc l'auto-attention tourne en `O(L²)` (et non `O(B · L²)`).
 
-## Configuration matérielle
+**ZLPRLoss** : ranking pairwise zero-bounded (Su et al., 2022), adapté au
+déséquilibre extrême (2 positifs sur ~6 000 labels).
 
-> **Adaptation par rapport au papier original.**
->
-> Le papier Torba et al. (ECIR 2025) utilise `num_decoder_layers=2` et `nhead=4`.
-> L'attention self-attention est en O(L²) avec L=6 283, ce qui donne une matrice
-> `(B, nhead, 6283, 6283)` — très coûteuse en VRAM et en calcul.
->
-> Sur 2× RTX 3090 (24 GB/GPU), la config papier atteignait **213 h/epoch**
-> (benchmark mesuré), ce qui rendrait 10 epochs impossibles dans le budget SLURM.
->
-> **Config retenue** (`hlpd_3090.yaml`) :
->
-> | Paramètre | Papier | Notre config | Impact |
-> |---|---|---|---|
-> | `num_decoder_layers` | 2 | **1** | ×2 sur le décodeur |
-> | `nhead` | 4 | **2** | ×2 sur l'attention O(L²) |
-> | `gradient_checkpointing` | — | **false** | VRAM suffisante |
-> | `batch_size` | — | **16** (8/GPU) | Throughput maximal |
->
-> L'architecture essentielle est préservée : biais hiérarchique, tied weights, ZLPR,
-> même encodeur (CamemBERT), même espace de labels L1+L2
-> (L = 157 + L2 ; 6 283 en v1, 5 934 en v2).
-> La comparaison avec HYDRA reste valide dans ce cadre.
+## Configuration
+
+Les valeurs canoniques sont dans `configs/hlpd/default.yaml` :
+
+| Paramètre | Valeur |
+|---|---|
+| `num_decoder_layers` | 3 |
+| `nhead` | 8 |
+| `ffn_dim` | 3072 |
+| `max_length` | 128 |
+| `label_max_len` | 64 |
+| `lr` | 2e-5 |
+| `batch_size` × `grad_accum` | 16 × 2 (effectif 32) |
+| `precision` | bfloat16 |
+
+## Résultats (test, 1.17M produits)
+
+| Métrique | Valeur |
+|---|---|
+| F1 L1 (macro) | 0.807 |
+| F1 L2 (macro) | 0.615 |
+| HCR | 0.978 |
+| Hierarchical accuracy | 0.820 |
 
 ## Structure
 
 ```
 rakuten/models/hlpd/          # code (package installable)
-├── __init__.py               # Exports publics
-├── attention_bias.py         # build_M_hiera() — matrice binaire L×L
+├── __init__.py               # exports publics
+├── attention_bias.py         # build_M_hiera() — biais de distance L×L
 ├── losses.py                 # ZLPRLoss
-├── models.py                 # HLPD, HLPDDecoderLayer
+├── models.py                 # HLPD + briques (LabelPooler, self/cross-attn, LabelWisePooler)
 ├── trainer.py                # HLPDConfig, HLPDTrainer
 └── README.md
-configs/hlpd/hlpd_3090.yaml   # Config 2× RTX 3090 (hors package)
+configs/hlpd/default.yaml     # configuration (hors package)
 ```
+
+Entraînement : `python scripts/run_hlpd.py --split-dir <dataset> --config configs/hlpd/default.yaml`
 
 ## Comparaison HYDRA vs HLPD
 
 | | HYDRA | HLPD |
 |---|---|---|
-| Paradigme | Multi-tête discriminatif | Encoder-Decoder |
-| Cohérence hiérarchique | Post-hoc (variante Nested) | Par construction (masque d'attention) |
+| Paradigme | Multi-tête discriminatif | Encoder-Decoder non-autorégressif |
+| Cohérence hiérarchique | Post-hoc (variante Nested) | Par construction (biais d'attention) |
 | Perte | FocalLoss / CrossEntropy | ZLPR (pairwise ranking) |
-| Complexité | O(L) | O(L²) — coûteux pour L grand (≈ 6 000) |
-| Tied weights | Non | Oui |
+| Self-attention labels | — | O(L²), biais hiérarchique scalaire |
+| Embeddings labels | — | [CLS] CamemBERT mis en cache |
 
 ## Références
 
-- Torba, Laclau et al., *HLPD: Hierarchical Label Prediction Decoder*, ECIR 2025.
+- Torba, Laclau et al., *Hierarchical Label Pre-populated Decoder*, ECIR 2025.
 - Su et al., *ZLPR: A Novel Loss for Multi-label Classification*, 2022.
-- Repo officiel : https://github.com/FatosTorba/HLPD (Apache 2.0)
+- Dépôt officiel : https://github.com/FatosTorba/HLPD (Apache 2.0)
